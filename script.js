@@ -1,35 +1,36 @@
-// --- State Management ---
+// --- System State ---
 let watchlist = JSON.parse(localStorage.getItem('watchlist')) || [];
 let history = JSON.parse(localStorage.getItem('history')) || [];
 let searchTimeout;
 let peer = null;
 
-// --- DOM Elements ---
+const SYNC_PREFIX = "cinematic-vault-";
+
+// --- DOM References ---
 const watchlistGrid = document.getElementById('watchlist-grid');
 const historyGrid = document.getElementById('history-grid');
 const mainSearch = document.getElementById('main-search');
 const mobileSearchInput = document.getElementById('mobile-search-input');
-const desktopSearchResults = document.getElementById('desktop-search-results');
-const mobileSearchResults = document.getElementById('mobile-search-results');
-const modalOverlay = document.getElementById('universal-modal');
+const searchDropdown = document.getElementById('search-dropdown');
+const mobileResults = document.getElementById('mobile-results');
+const mainModal = document.getElementById('main-modal');
 
-// --- Initialization ---
+// --- Start App ---
 document.addEventListener('DOMContentLoaded', () => {
-    renderWatchlist();
+    renderVault();
     renderHistory();
-    setupEventListeners();
+    initEventListeners();
 });
 
-function setupEventListeners() {
-    // Responsive Navigation
+function initEventListeners() {
+    // Navigation Logic
     const navBtns = document.querySelectorAll('.nav-btn');
-    const mobileTabs = document.querySelectorAll('.mobile-tab');
+    const tabItems = document.querySelectorAll('.tab-item');
     const sections = document.querySelectorAll('main section');
 
-    const switchTab = (target) => {
-        [...navBtns, ...mobileTabs].forEach(b => b.classList.remove('active'));
+    const switchSection = (target) => {
+        [...navBtns, ...tabItems].forEach(b => b.classList.remove('active'));
         document.querySelectorAll(`[data-tab="${target}"]`).forEach(b => b.classList.add('active'));
-        
         sections.forEach(s => {
             s.classList.add('hidden');
             if (s.id === `${target}-section`) s.classList.remove('hidden');
@@ -37,206 +38,289 @@ function setupEventListeners() {
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
-    navBtns.forEach(btn => btn.onclick = () => switchTab(btn.dataset.tab));
-    mobileTabs.forEach(btn => btn.onclick = () => switchTab(btn.dataset.tab));
+    navBtns.forEach(btn => btn.onclick = () => switchSection(btn.dataset.tab));
+    tabItems.forEach(btn => btn.onclick = () => switchSection(btn.dataset.tab));
 
-    // Search Logic (Dual Input)
-    const handleSearch = (query, resultsContainer) => {
+    // Search Interaction
+    const triggerSearch = (query, container) => {
         clearTimeout(searchTimeout);
         if (query.length < 2) {
-            resultsContainer.classList.add('hidden');
-            resultsContainer.innerHTML = '';
+            container.classList.add('hidden');
+            container.innerHTML = '';
             return;
         }
-        searchTimeout = setTimeout(() => fetchMovies(query, resultsContainer), 400);
+        searchTimeout = setTimeout(() => fetchMovies(query, container), 400);
     };
 
-    mainSearch.oninput = (e) => handleSearch(e.target.value, desktopSearchResults);
-    mobileSearchInput.oninput = (e) => handleSearch(e.target.value, mobileSearchResults);
+    if (mainSearch) mainSearch.oninput = (e) => triggerSearch(e.target.value.trim(), searchDropdown);
+    if (mobileSearchInput) mobileSearchInput.oninput = (e) => triggerSearch(e.target.value.trim(), mobileResults);
 
-    // Mobile Search Overlay
-    document.getElementById('open-mobile-search').onclick = () => {
-        document.getElementById('search-overlay').classList.add('active');
-        mobileSearchInput.focus();
-    };
-    document.getElementById('close-mobile-search').onclick = () => {
-        document.getElementById('search-overlay').classList.remove('active');
-        mobileSearchInput.value = '';
-        mobileSearchResults.innerHTML = '';
-    };
+    // Mobile Search Handlers
+    const searchBtn = document.getElementById('mobile-search-btn');
+    if (searchBtn) {
+        searchBtn.onclick = () => {
+            document.getElementById('search-overlay').classList.add('active');
+            setTimeout(() => mobileSearchInput.focus(), 300);
+        };
+    }
 
-    // Modal Control
-    document.getElementById('modal-close').onclick = closeModal;
-    modalOverlay.onclick = (e) => { if (e.target === modalOverlay) closeModal(); };
+    const closeSearchBtn = document.getElementById('close-search');
+    if (closeSearchBtn) {
+        closeSearchBtn.onclick = () => {
+            document.getElementById('search-overlay').classList.remove('active');
+            mobileSearchInput.value = '';
+            mobileResults.innerHTML = '';
+        };
+    }
+
+    // Modal Handlers
+    document.getElementById('close-modal').onclick = closeModal;
+    mainModal.onclick = (e) => { if (e.target === mainModal) closeModal(); };
 
     // Sync Actions
     document.getElementById('generate-sync').onclick = generateSyncCode;
-    document.getElementById('load-sync').onclick = loadFromSyncCode;
-    document.getElementById('start-p2p').onclick = startP2P;
-    document.getElementById('stop-p2p').onclick = stopP2P;
-    document.getElementById('copy-share-link').onclick = copyShareLink;
+    document.getElementById('load-sync').onclick = loadFromSync;
 
-    // Global Clicks
+    // Close dropdown on click outside
     document.addEventListener('click', (e) => {
-        if (!mainSearch.contains(e.target) && !desktopSearchResults.contains(e.target)) {
-            desktopSearchResults.classList.add('hidden');
+        if (mainSearch && !mainSearch.contains(e.target) && searchDropdown && !searchDropdown.contains(e.target)) {
+            searchDropdown.classList.add('hidden');
+        }
+    });
+
+    // ESC to exit all
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            closeModal();
+            document.getElementById('search-overlay').classList.remove('active');
+            if (searchDropdown) searchDropdown.classList.add('hidden');
         }
     });
 }
 
-// --- API & Rendering ---
-async function fetchMovies(query, resultsContainer) {
+// --- Movie Core ---
+async function fetchMovies(query, container) {
     try {
         const res = await fetch(`https://imdb.iamidiotareyoutoo.com/search?q=${encodeURIComponent(query)}`);
         const data = await res.json();
-        if (data.ok && data.description) renderSearchResults(data.description, resultsContainer);
-    } catch (err) { console.error(err); }
+        if (data.ok && data.description) renderSearchResults(data.description, container);
+    } catch (err) { console.error('Fetch Error:', err); }
 }
 
 function renderSearchResults(movies, container) {
     container.innerHTML = '';
     movies.forEach(movie => {
-        const item = document.createElement('div');
-        item.style.padding = '1rem';
-        item.style.display = 'flex';
-        item.style.gap = '1rem';
-        item.style.cursor = 'pointer';
-        item.style.alignItems = 'center';
-        item.style.borderBottom = '1px solid var(--border)';
-        item.innerHTML = `
-            <img src="${movie['#IMG_POSTER'] || ''}" style="width:40px; height:60px; border-radius:8px; object-fit:cover;">
-            <div>
-                <h4 style="font-size:0.95rem; font-weight:800;">${movie['#TITLE']}</h4>
-                <p style="font-size:0.85rem; color:var(--text-muted)">${movie['#YEAR']}</p>
+        const row = document.createElement('div');
+        row.className = 'result-row';
+        row.style.cssText = `padding: 1rem; display: flex; gap: 1rem; align-items: center; border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.3s ease;`;
+        row.innerHTML = `
+            <img src="${movie['#IMG_POSTER'] || ''}" style="width:50px; height:70px; border-radius:8px; object-fit:cover;">
+            <div style="flex:1">
+                <h4 style="font-size:0.95rem; font-weight:700;">${movie['#TITLE']}</h4>
+                <p style="font-size:0.8rem; color:var(--text-muted); font-weight:600;">${movie['#YEAR']}</p>
             </div>
         `;
-        item.onclick = () => {
-            mainSearch.value = '';
-            mobileSearchInput.value = '';
+        row.onmouseover = () => row.style.background = 'var(--surface)';
+        row.onmouseout = () => row.style.background = 'transparent';
+        row.onclick = () => {
             container.classList.add('hidden');
+            if (mainSearch) mainSearch.value = '';
+            if (mobileSearchInput) mobileSearchInput.value = '';
             document.getElementById('search-overlay').classList.remove('active');
-            showMovieDetails(movie);
+            openMovieDetails(movie);
         };
-        container.appendChild(item);
+        container.appendChild(row);
     });
     container.classList.remove('hidden');
 }
 
-function showMovieDetails(movie) {
+function openMovieDetails(movie) {
     document.getElementById('modal-img').src = movie['#IMG_POSTER'] || '';
     document.getElementById('modal-title').textContent = movie['#TITLE'];
-    
+    document.getElementById('modal-desc').innerHTML = `
+        <span style="display:inline-block; margin-right:0.5rem; background:var(--accent); color:white; padding:0.2rem 0.4rem; border-radius:4px; font-size:0.7rem; font-weight:700;">${movie['#YEAR']}</span>
+        <span>${movie['#ACTORS'] || 'Film Details'}</span>
+    `;
+
     const inWatchlist = watchlist.some(m => m['#IMDB_ID'] === movie['#IMDB_ID']);
     const inHistory = history.some(m => m['#IMDB_ID'] === movie['#IMDB_ID']);
 
-    const addBtn = document.getElementById('modal-add-btn');
-    const watchedBtn = document.getElementById('modal-watched-btn');
+    const addBtn = document.getElementById('add-to-vault');
+    const watchBtn = document.getElementById('mark-watched');
 
     addBtn.textContent = inWatchlist ? 'In Vault' : 'Add to Vault';
     addBtn.disabled = inWatchlist;
     addBtn.onclick = () => {
-        watchlist.unshift(movie); saveData(); renderWatchlist();
-        closeModal(); showToast('Added to vault');
+        watchlist.unshift(movie); save(); renderVault();
+        closeModal(); showToast('Added to Vault');
     };
 
-    watchedBtn.textContent = inHistory ? 'Watched' : 'Mark Watched';
-    watchedBtn.disabled = inHistory;
-    watchedBtn.onclick = () => {
+    watchBtn.textContent = inHistory ? 'Finished' : 'Mark Finished';
+    watchBtn.disabled = inHistory;
+    watchBtn.onclick = () => {
         watchlist = watchlist.filter(m => m['#IMDB_ID'] !== movie['#IMDB_ID']);
-        history.unshift(movie); saveData(); renderWatchlist(); renderHistory();
-        closeModal(); showToast('Marked as watched');
+        history.unshift(movie); save(); renderVault(); renderHistory();
+        closeModal(); showToast('Marked as Finished');
     };
 
-    modalOverlay.classList.add('active');
+    // Remove Option
+    const oldR = document.getElementById('remove-btn');
+    if (oldR) oldR.remove();
+    if (inWatchlist || inHistory) {
+        const rBtn = document.createElement('button');
+        rBtn.id = 'remove-btn';
+        rBtn.className = 'btn-ghost';
+        rBtn.style.color = '#ff4444';
+        rBtn.style.marginTop = '0.5rem';
+        rBtn.textContent = 'Remove Forever';
+        rBtn.onclick = () => {
+            watchlist = watchlist.filter(m => m['#IMDB_ID'] !== movie['#IMDB_ID']);
+            history = history.filter(m => m['#IMDB_ID'] !== movie['#IMDB_ID']);
+            save(); renderVault(); renderHistory();
+            closeModal(); showToast('Removed');
+        };
+        document.querySelector('.modal-actions').appendChild(rBtn);
+    }
+
+    mainModal.classList.add('active');
 }
 
-function closeModal() { modalOverlay.classList.remove('active'); }
+function closeModal() { mainModal.classList.remove('active'); }
 
-function renderWatchlist() {
-    watchlistGrid.innerHTML = watchlist.length ? '' : '<p style="grid-column:1/-1; text-align:center; padding:4rem; color:var(--text-muted)">Vault is empty</p>';
-    watchlist.forEach(m => watchlistGrid.appendChild(createCard(m, true)));
+function renderVault() {
+    watchlistGrid.innerHTML = watchlist.length ? '' : `
+        <div style="grid-column:1/-1; text-align:center; padding:4rem 1rem; color:var(--text-muted);">
+            <i class="fas fa-layer-group" style="font-size:2rem; margin-bottom:1rem; opacity:0.1;"></i>
+            <h2 style="font-weight:700; color:var(--text); font-size:1.2rem;">Your Vault is Empty</h2>
+            <p style="font-weight:500; font-size:0.9rem;">Search for a movie to start</p>
+        </div>
+    `;
+    watchlist.forEach(m => watchlistGrid.appendChild(createCard(m)));
 }
 
 function renderHistory() {
-    historyGrid.innerHTML = history.length ? '' : '<p style="grid-column:1/-1; text-align:center; padding:4rem; color:var(--text-muted)">No history yet</p>';
-    history.forEach(m => historyGrid.appendChild(createCard(m, false)));
+    historyGrid.innerHTML = history.length ? '' : `
+        <div style="grid-column:1/-1; text-align:center; padding:4rem 1rem; color:var(--text-muted);">
+            <i class="fas fa-check-circle" style="font-size:2rem; margin-bottom:1rem; opacity:0.1;"></i>
+            <h2 style="font-weight:700; color:var(--text); font-size:1.2rem;">No History</h2>
+            <p style="font-weight:500; font-size:0.9rem;">Finished movies appear here</p>
+        </div>
+    `;
+    history.forEach(m => historyGrid.appendChild(createCard(m)));
 }
 
-function createCard(movie, isVault) {
+function createCard(movie) {
     const card = document.createElement('div');
     card.className = 'movie-card';
     card.innerHTML = `
-        <div class="card-poster"><img src="${movie['#IMG_POSTER'] || ''}" loading="lazy"></div>
+        <div class="poster-wrap">
+            <img src="${movie['#IMG_POSTER'] || ''}" loading="lazy" alt="${movie['#TITLE']}">
+            <button class="quick-action" title="Remove"><i class="fas fa-times"></i></button>
+        </div>
         <div class="card-info">
             <h3>${movie['#TITLE']}</h3>
             <p>${movie['#YEAR']}</p>
         </div>
     `;
-    card.onclick = () => showMovieDetails(movie);
+    card.onclick = () => openMovieDetails(movie);
+    card.querySelector('.quick-action').onclick = (e) => {
+        e.stopPropagation();
+        watchlist = watchlist.filter(m => m['#IMDB_ID'] !== movie['#IMDB_ID']);
+        history = history.filter(m => m['#IMDB_ID'] !== movie['#IMDB_ID']);
+        save(); renderVault(); renderHistory();
+        showToast('Removed');
+    };
     return card;
 }
 
-function saveData() {
+function save() {
     localStorage.setItem('watchlist', JSON.stringify(watchlist));
     localStorage.setItem('history', JSON.stringify(history));
 }
 
-// --- Sync System ---
-async function generateSyncCode() {
+// --- Sync Hub Logic (P2P via 6-digit code) ---
+function generateSyncCode() {
+    if (peer) peer.destroy();
+    
     const code = Math.floor(100000 + Math.random() * 900000).toString();
-    document.getElementById('sync-code-display').textContent = code;
-    try {
-        await fetch('https://api.restful-api.dev/objects', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: `cinetrack-sync-${code}`, data: { watchlist, history } })
-        });
-        showToast('Code ready!');
-    } catch (e) { showToast('Sync failed', 'error'); }
-}
+    const display = document.getElementById('sync-code-display');
+    const peerId = `${SYNC_PREFIX}${code}`;
+    
+    display.textContent = code;
+    display.style.opacity = '0.5';
 
-async function loadFromSyncCode() {
-    const code = document.getElementById('sync-input').value.trim();
-    if (code.length !== 6) return;
-    try {
-        const res = await fetch('https://api.restful-api.dev/objects');
-        const objects = await res.json();
-        const syncObj = objects.find(obj => obj.name === `cinetrack-sync-${code}`);
-        if (syncObj) {
-            watchlist = syncObj.data.watchlist || [];
-            history = syncObj.data.history || [];
-            saveData(); renderWatchlist(); renderHistory();
-            showToast('Vault imported!');
-        }
-    } catch (e) { showToast('Import failed', 'error'); }
-}
+    peer = new Peer(peerId);
 
-function startP2P() {
-    if (peer) return;
-    peer = new Peer();
-    peer.on('open', (id) => {
-        document.getElementById('p2p-my-id').textContent = id;
-        document.getElementById('p2p-share-view').classList.remove('hidden');
-        new QRCode(document.getElementById('p2p-qrcode'), { text: id, width: 160, height: 160 });
+    peer.on('open', () => {
+        display.style.opacity = '1';
+        showToast('Broadcasting Vault...');
     });
+
     peer.on('connection', (conn) => {
-        showToast('Device connected!');
-        setTimeout(() => conn.send({ type: 'VAULT', payload: { watchlist, history } }), 1000);
+        showToast('Device Connected');
+        conn.on('open', () => {
+            conn.send({ watchlist, history });
+            showToast('Collection Sent');
+        });
+    });
+
+    peer.on('error', (err) => {
+        if (err.type === 'unavailable-id') {
+            generateSyncCode(); // Try again if collision
+        } else {
+            showToast('P2P Error');
+            display.textContent = 'ERR';
+        }
     });
 }
 
-function stopP2P() { if (peer) peer.destroy(); peer = null; document.getElementById('p2p-share-view').classList.add('hidden'); }
+function loadFromSync() {
+    const input = document.getElementById('sync-input');
+    const code = input.value.trim();
+    if (code.length !== 6) {
+        showToast('Enter 6 Digits');
+        return;
+    }
 
-function copyShareLink() {
-    const id = document.getElementById('p2p-my-id').textContent;
-    navigator.clipboard.writeText(id);
-    showToast('ID copied!');
+    showToast('Connecting...');
+    const tempPeer = new Peer();
+    
+    tempPeer.on('open', () => {
+        const conn = tempPeer.connect(`${SYNC_PREFIX}${code}`);
+        
+        conn.on('data', (data) => {
+            if (data.watchlist || data.history) {
+                watchlist = data.watchlist || [];
+                history = data.history || [];
+                save(); renderVault(); renderHistory();
+                showToast('Import Success');
+                input.value = '';
+                tempPeer.destroy();
+            }
+        });
+
+        setTimeout(() => {
+            if (tempPeer.open && !conn.open) {
+                showToast('Code Not Found');
+                tempPeer.destroy();
+            }
+        }, 5000);
+    });
+
+    tempPeer.on('error', () => {
+        showToast('Connection Failed');
+        tempPeer.destroy();
+    });
 }
 
 function showToast(msg) {
     const t = document.createElement('div');
-    t.style.cssText = `position:fixed; bottom:2rem; left:50%; transform:translateX(-50%); background:#000; color:#fff; padding:0.8rem 1.5rem; border-radius:25px; z-index:9999; font-weight:800; font-size:0.9rem; box-shadow:0 10px 30px rgba(0,0,0,0.2);`;
+    t.style.cssText = `position:fixed; bottom:2rem; left:50%; transform:translateX(-50%); background:black; color:white; padding:0.6rem 1.2rem; border-radius:10px; z-index:9999; font-weight:700; box-shadow:0 10px 30px rgba(0,0,0,0.1); font-size:0.8rem; pointer-events:none; opacity:0; transition: all 0.3s ease;`;
     t.textContent = msg;
     document.body.appendChild(t);
-    setTimeout(() => t.remove(), 3000);
+    setTimeout(() => t.style.opacity = '1', 10);
+    setTimeout(() => {
+        t.style.opacity = '0';
+        setTimeout(() => t.remove(), 300);
+    }, 2500);
 }

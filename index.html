@@ -4,120 +4,119 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Sach.in | Movie series</title>
+    <title>Sach.in | Cinematic Collection</title>
+    <meta name="description" content="A minimalistic, high-performance movie watchlist and P2P sharing platform.">
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
     <script src="https://cdn.rawgit.com/davidshimjs/qrcodejs/gh-pages/qrcode.min.js"></script>
 </head>
 
 <body>
-    <!-- Desktop Header -->
     <header>
-        <nav class="nav-container">
-            <div class="logo">Sach.in</div>
+        <div class="nav-container">
+            <div class="logo">Sach<span>.in</span></div>
 
-            <div class="search-box">
+            <div class="search-wrap">
                 <i class="fas fa-search search-icon"></i>
-                <input type="text" id="main-search" placeholder="Search movies & shows...">
-                <div id="desktop-search-results" class="glass-dropdown hidden"></div>
+                <input type="text" id="main-search" placeholder="Search for movies or series...">
+                <div id="search-dropdown" class="results-dropdown hidden"></div>
             </div>
 
             <div class="nav-links">
-                <button class="nav-btn active" data-tab="vault"><i class="fas fa-layer-group"></i> Vault</button>
-                <button class="nav-btn" data-tab="history"><i class="fas fa-history"></i> History</button>
-                <button class="nav-btn" data-tab="sync"><i class="fas fa-sync"></i> Sync</button>
+                <button class="nav-btn active" data-tab="vault"><i class="fas fa-layer-group"></i>watchlist</button>
+                <button class="nav-btn" data-tab="history"><i class="fas fa-check-circle"></i> Finished</button>
+                <button class="nav-btn" data-tab="sync"><i class="fas fa-broadcast-tower"></i> Connect</button>
             </div>
 
-            <div class="mobile-search-trigger" id="open-mobile-search">
+            <div class="mobile-search-toggle" id="mobile-search-btn">
                 <i class="fas fa-search"></i>
             </div>
-        </nav>
+        </div>
     </header>
 
     <main class="container">
         <!-- Vault Section -->
         <section id="vault-section">
-            <h1 class="section-title">Watchlist</h1>
+            <div class="section-header">
+                <h1>Watchlist</h1>
+            </div>
             <div id="watchlist-grid" class="movie-grid"></div>
         </section>
 
         <!-- History Section -->
         <section id="history-section" class="hidden">
-            <h1 class="section-title">Watched</h1>
+            <div class="section-header">
+                <h1>Finished</h1>
+            </div>
             <div id="history-grid" class="movie-grid"></div>
         </section>
 
         <!-- Sync Section -->
         <section id="sync-section" class="hidden">
-            <h1 class="section-title">Synchronization</h1>
-            <div class="movie-grid" style="grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem;">
-                <div style="background:var(--bg-sec); padding:2.5rem; border-radius:32px; text-align:center;">
-                    <h3>Cloud Sync</h3>
+            <div class="section-header">
+                <h1>Connect</h1>
+            </div>
+            <div class="movie-grid" style="grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));">
+                <div
+                    style="background:var(--surface); padding:2.5rem; border-radius:24px; border:1px solid var(--border);">
+                    <p
+                        style="color:var(--text-muted); font-weight:700; text-transform:uppercase; font-size:0.75rem; letter-spacing:1px; margin-bottom:1rem;">
+                        Your Share Code</p>
                     <div id="sync-code-display"
-                        style="font-size:3rem; font-weight:800; margin:1.5rem 0; letter-spacing:4px;">------</div>
-                    <button id="generate-sync" class="btn-primary">Generate 6-Digit Code</button>
+                        style="font-size:3rem; font-weight:800; margin:1rem 0; letter-spacing:4px;">------</div>
+                    <button id="generate-sync" class="btn-prime" style="width:100%">Generate Code</button>
+                    <p style="font-size:0.75rem; color:var(--text-muted); margin-top:1rem; font-weight:500;">Generate
+                    </p>
                 </div>
-                <div style="background:var(--bg-sec); padding:2.5rem; border-radius:32px; text-align:center;">
-                    <h3>Import Data</h3>
-                    <input type="text" id="sync-input" placeholder="Enter code"
-                        style="width:100%; padding:1rem; border-radius:16px; border:none; margin-bottom:1rem; outline:none; text-align:center; font-size:1.2rem; font-weight:700;">
-                    <button id="load-sync" class="btn-sec">Load from Code</button>
-                </div>
-                <div style="background:var(--bg-sec); padding:2.5rem; border-radius:32px; text-align:center;">
-                    <h3>Direct P2P</h3>
-                    <button id="start-p2p" class="btn-primary">Start Direct Share</button>
-                    <div id="p2p-share-view" class="hidden">
-                        <div id="p2p-qrcode"
-                            style="margin:1.5rem auto; padding:1rem; background:white; border-radius:24px; width:fit-content;">
-                        </div>
-                        <p id="p2p-my-id" style="font-size:0.8rem; color:var(--text-muted); margin-bottom:1.5rem;"></p>
-                        <button id="copy-share-link" class="btn-sec" style="margin-bottom:0.5rem">Copy Share
-                            Link</button>
-                        <button id="stop-p2p" class="btn-sec">Cancel Sharing</button>
-                    </div>
+
+                <div
+                    style="background:var(--surface); padding:2.5rem; border-radius:24px; border:1px solid var(--border);">
+                    <p
+                        style="color:var(--text-muted); font-weight:700; text-transform:uppercase; font-size:0.75rem; letter-spacing:1px; margin-bottom:1rem;">
+                        Import Collection</p>
+                    <input type="text" id="sync-input" placeholder="Enter 6-digit code"
+                        style="width:100%; padding:1rem; background:#fff; border:1px solid var(--border); border-radius:14px; color:black; margin:1rem 0; text-align:center; font-size:1.2rem; font-weight:700; outline:none;">
+                    <button id="load-sync" class="btn-ghost" style="width:100%">Import Now</button>
+                    <p style="font-size:0.75rem; color:var(--text-muted); margin-top:1rem; font-weight:500;">sync</p>
                 </div>
             </div>
         </section>
     </main>
 
-    <!-- Mobile Bottom Tab Bar -->
-    <nav class="mobile-nav">
-        <button class="mobile-tab active" data-tab="vault">
-            <i class="fas fa-layer-group"></i>
-            <span>Watchlist</span>
-        </button>
-        <button class="mobile-tab" data-tab="history">
-            <i class="fas fa-history"></i>
-            <span>Watched</span>
-        </button>
-        <button class="mobile-tab" data-tab="sync">
-            <i class="fas fa-sync"></i>
-            <span>Sync</span>
-        </button>
+    <!-- Mobile Navigation -->
+    <nav class="tab-bar">
+        <button class="tab-item active" data-tab="vault"><i
+                class="fas fa-layer-group"></i><span>Watchlist</span></button>
+        <button class="tab-item" data-tab="history"><i class="fas fa-check-circle"></i><span>Finished</span></button>
+        <button class="tab-item" data-tab="sync"><i class="fas fa-broadcast-tower"></i><span>Connect</span></button>
     </nav>
 
     <!-- Mobile Search Overlay -->
     <div class="search-overlay" id="search-overlay">
         <div class="search-header">
-            <button id="close-mobile-search" style="background:none; border:none; font-size:1.2rem;"><i
+            <button id="close-search" style="background:none; border:none; color:black; font-size:1.2rem;"><i
                     class="fas fa-arrow-left"></i></button>
             <input type="text" id="mobile-search-input" placeholder="Search movies...">
         </div>
-        <div id="mobile-search-results" style="padding:1rem; overflow-y:auto; flex:1;"></div>
+        <div id="mobile-results" style="flex:1; overflow-y:auto;"></div>
     </div>
 
-    <!-- Universal Modal -->
-    <div class="modal-overlay" id="universal-modal">
+    <!-- Details Modal -->
+    <div class="modal-overlay" id="main-modal">
         <div class="modal-content">
-            <img id="modal-img" class="modal-poster" src="">
-            <div class="modal-info">
-                <h2 id="modal-title"></h2>
-                <div style="display:flex; flex-direction:column; gap:1rem;">
-                    <button id="modal-add-btn" class="btn-primary">Add to Watchlist</button>
-                    <button id="modal-watched-btn" class="btn-sec">Mark as Watched</button>
-                    <button id="modal-close" class="btn-sec">Close Details</button>
+            <div class="modal-poster-side">
+                <img id="modal-img" src="" alt="Poster">
+            </div>
+            <div class="modal-info-side">
+                <h2 id="modal-title" class="modal-title"></h2>
+                <div id="modal-desc"
+                    style="color:var(--text-muted); font-size:1rem; margin-bottom:2rem; font-weight:500;"></div>
+                <div class="modal-actions">
+                    <button id="add-to-vault" class="btn-prime">Add to Vault</button>
+                    <button id="mark-watched" class="btn-ghost">Mark as Finished</button>
+                    <button id="close-modal" class="btn-ghost">Close</button>
                 </div>
             </div>
         </div>
