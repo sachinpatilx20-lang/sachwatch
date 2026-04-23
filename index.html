@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sach.in | Your Premium Movie Vault</title>
+    <meta name="description"
+        content="The most elegant way to manage your movie watchlist. Real-time IMDb sync, glassmorphism design, and cross-device synchronization.">
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+
+<body>
+    <div class="background-blobs">
+        <div class="blob blob-1"></div>
+        <div class="blob blob-2"></div>
+        <div class="blob blob-3"></div>
+    </div>
+
+    <header>
+        <nav class="glass-nav">
+            <div class="logo" id="logo-refresh">
+                <i class="fas fa-clapperboard"></i>
+                <span>Sach<span>.in</span></span>
+            </div>
+            <div class="search-container">
+                <i class="fas fa-search search-icon"></i>
+                <input type="text" id="movie-search" placeholder="Search for movies or shows..." autocomplete="off">
+                <div id="search-results" class="glass-dropdown hidden"></div>
+            </div>
+            <div class="nav-links">
+                <button id="tab-watchlist" class="nav-btn active" data-tab="watchlist">
+                    <i class="fas fa-bookmark"></i> Watchlist
+                </button>
+                <button id="tab-history" class="nav-btn" data-tab="history">
+                    <i class="fas fa-check-circle"></i> History
+                </button>
+                <button id="open-sync" class="sync-btn" title="Sync Devices">
+                    <i class="fas fa-sync-alt"></i>
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <main class="container">
+        <!-- Watchlist Section -->
+        <section id="watchlist-section" class="active">
+            <div class="section-header">
+                <h2>My Watchlist</h2>
+                <div class="stats">
+                    <span id="watchlist-count">0 Movies</span>
+                </div>
+            </div>
+            <div id="watchlist-grid" class="movie-grid">
+                <div class="empty-state">
+                    <i class="fas fa-film"></i>
+                    <p>Your vault is empty. Start adding movies to your watchlist!</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- History Section -->
+        <section id="history-section">
+            <div class="section-header">
+                <h2>Watched</h2>
+                <div class="stats">
+                    <span id="history-count">0 Movies</span>
+                </div>
+            </div>
+            <div id="history-grid" class="movie-grid">
+                <div class="empty-state">
+                    <i class="fas fa-history"></i>
+                    <p>You haven't watched anything yet. Mark movies as watched to see them here.</p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Movie Details Modal -->
+    <div id="movie-modal" class="modal hidden">
+        <div class="modal-overlay"></div>
+        <div class="modal-content">
+            <button class="close-modal"><i class="fas fa-times"></i></button>
+            <div class="modal-body">
+                <div class="modal-poster">
+                    <img id="modal-img" src="" alt="Poster">
+                </div>
+                <div class="modal-info">
+                    <h2 id="modal-title">Movie Title</h2>
+                    <div class="modal-meta">
+                        <div class="meta-tag"><i class="fas fa-calendar"></i> <span id="modal-year"></span></div>
+                        <div class="meta-tag rating"><i class="fas fa-star"></i> <span id="modal-rating"></span></div>
+                    </div>
+                    <p id="modal-actors"></p>
+                    <div class="modal-actions">
+                        <button id="modal-add-btn" class="primary-btn">
+                            <i class="fas fa-plus"></i> Watchlist
+                        </button>
+                        <button id="modal-watched-btn" class="secondary-btn">
+                            <i class="fas fa-check"></i> Watched
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sync Modal -->
+    <div id="sync-modal" class="modal hidden">
+        <div class="modal-overlay"></div>
+        <div class="modal-content">
+            <button class="close-modal"><i class="fas fa-times"></i></button>
+            <div class="sync-form">
+                <h2>Sync Vault</h2>
+                <p>Transfer your data to another device using a 6-digit code.</p>
+                
+                <div class="sync-section">
+                    <small>Your Sync Code</small>
+                    <div id="sync-code-display" class="code-display">------</div>
+                    <button id="generate-sync" class="secondary-btn">Generate New Code</button>
+                </div>
+
+                <div style="margin: 2rem 0; border-top: 1px solid var(--glass-border);"></div>
+
+                <div class="sync-section">
+                    <p>Enter a code to import data</p>
+                    <div class="sync-input-group">
+                        <input type="text" id="sync-input" maxlength="6" placeholder="000000">
+                        <button id="load-sync" class="primary-btn">Import</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+
+</html>
