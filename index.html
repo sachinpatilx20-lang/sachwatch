@@ -3,173 +3,121 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sach.in | Elite Movie Vault</title>
-    <meta name="description" content="Experience the future of movie management. P2P sharing, IMDb integration, and ultra-premium aesthetics.">
-    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Sach.in | Movie series</title>
     <link rel="stylesheet" href="style.css">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
-    <!-- Dependencies -->
-    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
+    <script src="https://cdn.rawgit.com/davidshimjs/qrcodejs/gh-pages/qrcode.min.js"></script>
 </head>
 
 <body>
-    <!-- Animated Background -->
-    <div class="bg-vibe">
-        <div class="blob blob-1"></div>
-        <div class="blob blob-2"></div>
-    </div>
-
+    <!-- Desktop Header -->
     <header>
-        <nav class="glass-nav">
-            <div class="logo" id="logo-refresh">
-                <i class="fas fa-play-circle"></i>
-                <span>Sach.in</span>
-            </div>
-            
-            <div class="search-container">
+        <nav class="nav-container">
+            <div class="logo">Sach.in</div>
+
+            <div class="search-box">
                 <i class="fas fa-search search-icon"></i>
-                <input type="text" id="movie-search" placeholder="Discover movies & shows..." autocomplete="off">
-                <div id="search-results" class="glass-dropdown hidden"></div>
+                <input type="text" id="main-search" placeholder="Search movies & shows...">
+                <div id="desktop-search-results" class="glass-dropdown hidden"></div>
             </div>
 
             <div class="nav-links">
-                <button class="nav-btn active" data-tab="watchlist">
-                    <i class="fas fa-layer-group"></i> Watchlist
-                </button>
-                <button class="nav-btn" data-tab="history">
-                    <i class="fas fa-circle-check"></i> Watched
-                </button>
-                <button id="open-sync" class="sync-btn" title="Sync & P2P">
-                    <i class="fas fa-arrows-rotate"></i>
-                </button>
+                <button class="nav-btn active" data-tab="vault"><i class="fas fa-layer-group"></i> Vault</button>
+                <button class="nav-btn" data-tab="history"><i class="fas fa-history"></i> History</button>
+                <button class="nav-btn" data-tab="sync"><i class="fas fa-sync"></i> Sync</button>
+            </div>
+
+            <div class="mobile-search-trigger" id="open-mobile-search">
+                <i class="fas fa-search"></i>
             </div>
         </nav>
     </header>
 
     <main class="container">
-        <!-- Watchlist -->
-        <section id="watchlist-section" class="active">
-            <div class="section-header">
-                <div>
-                    <div class="stats" id="watchlist-count">0 Titles</div>
-                    <h2>My Watchlist</h2>
-                </div>
-            </div>
-            <div id="watchlist-grid" class="movie-grid">
-                <!-- Skeleton/Empty state will be here -->
-            </div>
+        <!-- Vault Section -->
+        <section id="vault-section">
+            <h1 class="section-title">Watchlist</h1>
+            <div id="watchlist-grid" class="movie-grid"></div>
         </section>
 
-        <!-- History -->
+        <!-- History Section -->
         <section id="history-section" class="hidden">
-            <div class="section-header">
-                <div>
-                    <div class="stats" id="history-count">0 Titles</div>
-                    <h2>Watched</h2>
+            <h1 class="section-title">Watched</h1>
+            <div id="history-grid" class="movie-grid"></div>
+        </section>
+
+        <!-- Sync Section -->
+        <section id="sync-section" class="hidden">
+            <h1 class="section-title">Synchronization</h1>
+            <div class="movie-grid" style="grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem;">
+                <div style="background:var(--bg-sec); padding:2.5rem; border-radius:32px; text-align:center;">
+                    <h3>Cloud Sync</h3>
+                    <div id="sync-code-display"
+                        style="font-size:3rem; font-weight:800; margin:1.5rem 0; letter-spacing:4px;">------</div>
+                    <button id="generate-sync" class="btn-primary">Generate 6-Digit Code</button>
                 </div>
-            </div>
-            <div id="history-grid" class="movie-grid">
-                <!-- Skeleton/Empty state will be here -->
+                <div style="background:var(--bg-sec); padding:2.5rem; border-radius:32px; text-align:center;">
+                    <h3>Import Data</h3>
+                    <input type="text" id="sync-input" placeholder="Enter code"
+                        style="width:100%; padding:1rem; border-radius:16px; border:none; margin-bottom:1rem; outline:none; text-align:center; font-size:1.2rem; font-weight:700;">
+                    <button id="load-sync" class="btn-sec">Load from Code</button>
+                </div>
+                <div style="background:var(--bg-sec); padding:2.5rem; border-radius:32px; text-align:center;">
+                    <h3>Direct P2P</h3>
+                    <button id="start-p2p" class="btn-primary">Start Direct Share</button>
+                    <div id="p2p-share-view" class="hidden">
+                        <div id="p2p-qrcode"
+                            style="margin:1.5rem auto; padding:1rem; background:white; border-radius:24px; width:fit-content;">
+                        </div>
+                        <p id="p2p-my-id" style="font-size:0.8rem; color:var(--text-muted); margin-bottom:1.5rem;"></p>
+                        <button id="copy-share-link" class="btn-sec" style="margin-bottom:0.5rem">Copy Share
+                            Link</button>
+                        <button id="stop-p2p" class="btn-sec">Cancel Sharing</button>
+                    </div>
+                </div>
             </div>
         </section>
     </main>
 
-    <!-- Movie Details Modal -->
-    <div id="movie-modal" class="modal hidden">
-        <div class="modal-overlay"></div>
-        <div class="modal-content">
-            <button class="close-modal"><i class="fas fa-xmark"></i></button>
-            <div class="modal-body">
-                <div class="modal-poster">
-                    <img id="modal-img" src="" alt="Poster">
-                </div>
-                <div class="modal-info">
-                    <h2 id="modal-title">Movie Title</h2>
-                    <div class="modal-meta">
-                        <div class="meta-tag"><i class="far fa-calendar"></i> <span id="modal-year"></span></div>
-                        <div class="meta-tag rating"><i class="fas fa-star"></i> <span id="modal-rating"></span></div>
-                    </div>
-                    <p id="modal-actors"></p>
-                    <div class="modal-actions">
-                        <button id="modal-add-btn" class="primary-btn">Add to Watchlist</button>
-                        <button id="modal-watched-btn" class="secondary-btn">Mark Watched</button>
-                    </div>
-                </div>
-            </div>
+    <!-- Mobile Bottom Tab Bar -->
+    <nav class="mobile-nav">
+        <button class="mobile-tab active" data-tab="vault">
+            <i class="fas fa-layer-group"></i>
+            <span>Watchlist</span>
+        </button>
+        <button class="mobile-tab" data-tab="history">
+            <i class="fas fa-history"></i>
+            <span>Watched</span>
+        </button>
+        <button class="mobile-tab" data-tab="sync">
+            <i class="fas fa-sync"></i>
+            <span>Sync</span>
+        </button>
+    </nav>
+
+    <!-- Mobile Search Overlay -->
+    <div class="search-overlay" id="search-overlay">
+        <div class="search-header">
+            <button id="close-mobile-search" style="background:none; border:none; font-size:1.2rem;"><i
+                    class="fas fa-arrow-left"></i></button>
+            <input type="text" id="mobile-search-input" placeholder="Search movies...">
         </div>
+        <div id="mobile-search-results" style="padding:1rem; overflow-y:auto; flex:1;"></div>
     </div>
 
-    <!-- Sync & P2P Modal -->
-    <div id="sync-modal" class="modal hidden">
-        <div class="modal-overlay"></div>
-        <div class="modal-content" style="max-width: 600px;">
-            <button class="close-modal"><i class="fas fa-xmark"></i></button>
-            <div class="sync-form">
-                <h2 style="text-align:center; margin-bottom: 2rem;">Vault Sync</h2>
-                
-                <div class="sync-tabs">
-                    <button class="sync-tab-btn active" data-tab="p2p">Direct P2P</button>
-                    <button class="sync-tab-btn" data-tab="cloud">Cloud Sync</button>
-                </div>
-
-                <!-- P2P Section -->
-                <div id="p2p-panel" class="sync-section">
-                    <div id="p2p-init-view">
-                        <p style="text-align:center; margin-bottom: 1.5rem; color: var(--text-secondary);">Direct device-to-device transfer. Fastest and most secure.</p>
-                        <button id="start-p2p" class="primary-btn" style="width:100%">
-                            <i class="fas fa-wifi"></i> Start Direct Share
-                        </button>
-                    </div>
-
-                    <div id="p2p-share-view" class="hidden">
-                        <div id="p2p-protocol-warning" class="hidden warning-box">
-                            <i class="fas fa-triangle-exclamation"></i>
-                            <p>Running locally (file://). Scan may fail; use manual ID entry below.</p>
-                        </div>
-                        <div id="p2p-qrcode" class="qrcode-container"></div>
-                        
-                        <div style="text-align:center; margin: 1.5rem 0;">
-                            <small style="color:var(--text-secondary)">Other device's ID:</small>
-                            <div id="p2p-my-id" style="font-family:monospace; font-size: 1.2rem; font-weight:800; color:var(--accent); margin-top:0.5rem;">---</div>
-                        </div>
-
-                        <div style="display:flex; align-items:center; justify-content:center; gap:0.5rem; margin-bottom:2rem;">
-                            <span class="status-dot"></span>
-                            <span id="p2p-status-text">Waiting...</span>
-                        </div>
-                        <button id="stop-p2p" class="secondary-btn" style="width:100%">Cancel Share</button>
-                    </div>
-
-                    <div style="margin: 2rem 0; border-top: 1px dashed var(--glass-border);"></div>
-
-                    <div id="p2p-receive-view">
-                        <p style="margin-bottom: 1rem;">Receive from another device</p>
-                        <div style="display:flex; gap:1rem;">
-                            <input type="text" id="p2p-connect-input" placeholder="Enter Peer ID" style="flex:1; padding:0.8rem; border-radius:12px; background:rgba(255,255,255,0.05); border:1px solid var(--glass-border); color:white;">
-                            <button id="p2p-connect-btn" class="primary-btn">Connect</button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Cloud Panel -->
-                <div id="cloud-panel" class="sync-section hidden">
-                    <p style="text-align:center; color: var(--text-secondary);">Temporary cloud storage via 6-digit codes.</p>
-                    <div id="sync-code-display" class="code-display">------</div>
-                    <button id="generate-sync" class="secondary-btn" style="width:100%; margin-bottom: 2rem;">Generate New Code</button>
-                    
-                    <div style="border-top: 1px solid var(--glass-border); padding-top: 2rem;">
-                        <p style="margin-bottom: 1rem;">Import from code</p>
-                        <div style="display:flex; gap:1rem;">
-                            <input type="text" id="sync-input" maxlength="6" placeholder="000000" style="flex:1; padding:0.8rem; border-radius:12px; background:rgba(255,255,255,0.05); border:1px solid var(--glass-border); color:white; text-align:center; font-weight:800;">
-                            <button id="load-sync" class="primary-btn">Import</button>
-                        </div>
-                    </div>
+    <!-- Universal Modal -->
+    <div class="modal-overlay" id="universal-modal">
+        <div class="modal-content">
+            <img id="modal-img" class="modal-poster" src="">
+            <div class="modal-info">
+                <h2 id="modal-title"></h2>
+                <div style="display:flex; flex-direction:column; gap:1rem;">
+                    <button id="modal-add-btn" class="btn-primary">Add to Watchlist</button>
+                    <button id="modal-watched-btn" class="btn-sec">Mark as Watched</button>
+                    <button id="modal-close" class="btn-sec">Close Details</button>
                 </div>
             </div>
         </div>
