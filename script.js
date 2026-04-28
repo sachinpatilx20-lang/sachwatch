@@ -109,15 +109,24 @@ async function fetchMovies(query, container) {
 
 function renderSearchResults(movies, container) {
     container.innerHTML = '';
-    movies.forEach(movie => {
+    movies.forEach((movie, i) => {
         const row = document.createElement('div');
-        row.className = 'result-row';
-        row.style.cssText = `padding: 1rem; display: flex; gap: 1rem; align-items: center; border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.3s ease;`;
+        row.style.cssText = `
+            padding: 0.8rem 1rem;
+            display: flex;
+            gap: 0.8rem;
+            align-items: center;
+            border-bottom: 1px solid var(--border);
+            cursor: pointer;
+            transition: background 0.2s ease;
+            animation: cardIn 0.3s ${0.03 * i}s var(--ease-out) backwards;
+        `;
+        const posterSrc = movie['#IMG_POSTER'] || '';
         row.innerHTML = `
-            <img src="${movie['#IMG_POSTER'] || ''}" style="width:50px; height:70px; border-radius:8px; object-fit:cover;">
-            <div style="flex:1">
-                <h4 style="font-size:0.95rem; font-weight:700;">${movie['#TITLE']}</h4>
-                <p style="font-size:0.8rem; color:var(--text-muted); font-weight:600;">${movie['#YEAR']}</p>
+            <img src="${posterSrc}" style="width:42px; height:60px; border-radius:6px; object-fit:cover; background:var(--surface);">
+            <div style="flex:1; min-width:0;">
+                <h4 style="font-size:0.88rem; font-weight:700; letter-spacing:-0.2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${movie['#TITLE']}</h4>
+                <p style="font-size:0.75rem; color:var(--text-muted); font-weight:500; margin-top:0.1rem;">${movie['#YEAR']}</p>
             </div>
         `;
         row.onmouseover = () => row.style.background = 'var(--surface)';
@@ -138,7 +147,7 @@ function openMovieDetails(movie) {
     document.getElementById('modal-img').src = movie['#IMG_POSTER'] || '';
     document.getElementById('modal-title').textContent = movie['#TITLE'];
     document.getElementById('modal-desc').innerHTML = `
-        <span style="display:inline-block; margin-right:0.5rem; background:var(--accent); color:white; padding:0.2rem 0.4rem; border-radius:4px; font-size:0.7rem; font-weight:700;">${movie['#YEAR']}</span>
+        <span class="year-badge">${movie['#YEAR']}</span>
         <span>${movie['#ACTORS'] || 'Film Details'}</span>
     `;
 
@@ -148,14 +157,14 @@ function openMovieDetails(movie) {
     const addBtn = document.getElementById('add-to-vault');
     const watchBtn = document.getElementById('mark-watched');
 
-    addBtn.textContent = inWatchlist ? 'In Vault' : 'Add to Vault';
+    addBtn.textContent = inWatchlist ? 'Added' : 'Add';
     addBtn.disabled = inWatchlist;
     addBtn.onclick = () => {
         watchlist.unshift(movie); save(); renderVault();
         closeModal(); showToast('Added to Vault');
     };
 
-    watchBtn.textContent = inHistory ? 'Finished' : 'Mark Finished';
+    watchBtn.textContent = inHistory ? 'Finished' : 'Finished';
     watchBtn.disabled = inHistory;
     watchBtn.onclick = () => {
         watchlist = watchlist.filter(m => m['#IMDB_ID'] !== movie['#IMDB_ID']);
@@ -170,9 +179,9 @@ function openMovieDetails(movie) {
         const rBtn = document.createElement('button');
         rBtn.id = 'remove-btn';
         rBtn.className = 'btn-ghost';
-        rBtn.style.color = '#ff4444';
-        rBtn.style.marginTop = '0.5rem';
-        rBtn.textContent = 'Remove Forever';
+        rBtn.style.color = '#999';
+        rBtn.style.borderColor = 'transparent';
+        rBtn.textContent = 'Remove';
         rBtn.onclick = () => {
             watchlist = watchlist.filter(m => m['#IMDB_ID'] !== movie['#IMDB_ID']);
             history = history.filter(m => m['#IMDB_ID'] !== movie['#IMDB_ID']);
@@ -188,33 +197,50 @@ function openMovieDetails(movie) {
 function closeModal() { mainModal.classList.remove('active'); }
 
 function renderVault() {
-    watchlistGrid.innerHTML = watchlist.length ? '' : `
-        <div style="grid-column:1/-1; text-align:center; padding:4rem 1rem; color:var(--text-muted);">
-            <i class="fas fa-layer-group" style="font-size:2rem; margin-bottom:1rem; opacity:0.1;"></i>
-            <h2 style="font-weight:700; color:var(--text); font-size:1.2rem;">Your Vault is Empty</h2>
-            <p style="font-weight:500; font-size:0.9rem;">Search for a movie to start</p>
-        </div>
-    `;
-    watchlist.forEach(m => watchlistGrid.appendChild(createCard(m)));
+    watchlistGrid.innerHTML = '';
+    if (!watchlist.length) {
+        watchlistGrid.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-layer-group empty-state-icon"></i>
+                <h2>Your vault is empty</h2>
+                <p>Search for a movie to get started</p>
+            </div>
+        `;
+        return;
+    }
+    watchlist.forEach((m, i) => {
+        const card = createCard(m);
+        card.style.animationDelay = `${i * 0.05}s`;
+        watchlistGrid.appendChild(card);
+    });
 }
 
 function renderHistory() {
-    historyGrid.innerHTML = history.length ? '' : `
-        <div style="grid-column:1/-1; text-align:center; padding:4rem 1rem; color:var(--text-muted);">
-            <i class="fas fa-check-circle" style="font-size:2rem; margin-bottom:1rem; opacity:0.1;"></i>
-            <h2 style="font-weight:700; color:var(--text); font-size:1.2rem;">No History</h2>
-            <p style="font-weight:500; font-size:0.9rem;">Finished movies appear here</p>
-        </div>
-    `;
-    history.forEach(m => historyGrid.appendChild(createCard(m)));
+    historyGrid.innerHTML = '';
+    if (!history.length) {
+        historyGrid.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-check-circle empty-state-icon"></i>
+                <h2>No history yet</h2>
+                <p>Finished movies will appear here</p>
+            </div>
+        `;
+        return;
+    }
+    history.forEach((m, i) => {
+        const card = createCard(m);
+        card.style.animationDelay = `${i * 0.05}s`;
+        historyGrid.appendChild(card);
+    });
 }
 
 function createCard(movie) {
     const card = document.createElement('div');
     card.className = 'movie-card';
+    const posterSrc = movie['#IMG_POSTER'] || '';
     card.innerHTML = `
         <div class="poster-wrap">
-            <img src="${movie['#IMG_POSTER'] || ''}" loading="lazy" alt="${movie['#TITLE']}">
+            <img src="${posterSrc}" loading="lazy" alt="${movie['#TITLE']}">
             <button class="quick-action" title="Remove"><i class="fas fa-times"></i></button>
         </div>
         <div class="card-info">
@@ -290,8 +316,18 @@ function loadFromSync() {
         
         conn.on('data', (data) => {
             if (data.watchlist || data.history) {
-                watchlist = data.watchlist || [];
-                history = data.history || [];
+                const incomingWatchlist = data.watchlist || [];
+                const incomingHistory = data.history || [];
+                const existingIds = new Set([
+                    ...watchlist.map(m => m['#IMDB_ID']),
+                    ...history.map(m => m['#IMDB_ID'])
+                ]);
+                incomingWatchlist.forEach(m => {
+                    if (!existingIds.has(m['#IMDB_ID'])) watchlist.push(m);
+                });
+                incomingHistory.forEach(m => {
+                    if (!existingIds.has(m['#IMDB_ID'])) history.push(m);
+                });
                 save(); renderVault(); renderHistory();
                 showToast('Import Success');
                 input.value = '';
@@ -314,13 +350,24 @@ function loadFromSync() {
 }
 
 function showToast(msg) {
+    // Remove any existing toast
+    const existing = document.querySelector('.toast');
+    if (existing) existing.remove();
+
     const t = document.createElement('div');
-    t.style.cssText = `position:fixed; bottom:2rem; left:50%; transform:translateX(-50%); background:black; color:white; padding:0.6rem 1.2rem; border-radius:10px; z-index:9999; font-weight:700; box-shadow:0 10px 30px rgba(0,0,0,0.1); font-size:0.8rem; pointer-events:none; opacity:0; transition: all 0.3s ease;`;
+    t.className = 'toast';
     t.textContent = msg;
     document.body.appendChild(t);
-    setTimeout(() => t.style.opacity = '1', 10);
+
+    // Trigger reflow then animate in
+    requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+            t.classList.add('visible');
+        });
+    });
+
     setTimeout(() => {
-        t.style.opacity = '0';
-        setTimeout(() => t.remove(), 300);
+        t.classList.remove('visible');
+        setTimeout(() => t.remove(), 350);
     }, 2500);
 }

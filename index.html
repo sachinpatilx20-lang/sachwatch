@@ -20,14 +20,14 @@
 
             <div class="search-wrap">
                 <i class="fas fa-search search-icon"></i>
-                <input type="text" id="main-search" placeholder="Search for movies or series...">
+                <input type="text" id="main-search" placeholder="Search movies or series...">
                 <div id="search-dropdown" class="results-dropdown hidden"></div>
             </div>
 
             <div class="nav-links">
-                <button class="nav-btn active" data-tab="vault"><i class="fas fa-layer-group"></i>watchlist</button>
-                <button class="nav-btn" data-tab="history"><i class="fas fa-check-circle"></i> Finished</button>
-                <button class="nav-btn" data-tab="sync"><i class="fas fa-broadcast-tower"></i> Connect</button>
+                <button class="nav-btn active" data-tab="vault"><i class="fas fa-layer-group"></i>Watchlist</button>
+                <button class="nav-btn" data-tab="history"><i class="fas fa-check-circle"></i>Finished</button>
+                <button class="nav-btn" data-tab="sync"><i class="fas fa-broadcast-tower"></i>Connect</button>
             </div>
 
             <div class="mobile-search-toggle" id="mobile-search-btn">
@@ -40,7 +40,7 @@
         <!-- Vault Section -->
         <section id="vault-section">
             <div class="section-header">
-                <h1>Watchlist</h1>
+
             </div>
             <div id="watchlist-grid" class="movie-grid"></div>
         </section>
@@ -48,7 +48,7 @@
         <!-- History Section -->
         <section id="history-section" class="hidden">
             <div class="section-header">
-                <h1>Finished</h1>
+
             </div>
             <div id="history-grid" class="movie-grid"></div>
         </section>
@@ -56,30 +56,22 @@
         <!-- Sync Section -->
         <section id="sync-section" class="hidden">
             <div class="section-header">
-                <h1>Connect</h1>
+
             </div>
-            <div class="movie-grid" style="grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));">
-                <div
-                    style="background:var(--surface); padding:2.5rem; border-radius:24px; border:1px solid var(--border);">
-                    <p
-                        style="color:var(--text-muted); font-weight:700; text-transform:uppercase; font-size:0.75rem; letter-spacing:1px; margin-bottom:1rem;">
-                        Your Share Code</p>
-                    <div id="sync-code-display"
-                        style="font-size:3rem; font-weight:800; margin:1rem 0; letter-spacing:4px;">------</div>
+            <div class="sync-grid">
+                <div class="sync-card">
+                    <p class="sync-label">Your Share Code</p>
+                    <div id="sync-code-display" class="sync-code">——</div>
                     <button id="generate-sync" class="btn-prime" style="width:100%">Generate Code</button>
-                    <p style="font-size:0.75rem; color:var(--text-muted); margin-top:1rem; font-weight:500;">Generate
-                    </p>
+                    <p class="sync-hint">Share this code with another device to transfer your collection.</p>
                 </div>
 
-                <div
-                    style="background:var(--surface); padding:2.5rem; border-radius:24px; border:1px solid var(--border);">
-                    <p
-                        style="color:var(--text-muted); font-weight:700; text-transform:uppercase; font-size:0.75rem; letter-spacing:1px; margin-bottom:1rem;">
-                        Import Collection</p>
-                    <input type="text" id="sync-input" placeholder="Enter 6-digit code"
-                        style="width:100%; padding:1rem; background:#fff; border:1px solid var(--border); border-radius:14px; color:black; margin:1rem 0; text-align:center; font-size:1.2rem; font-weight:700; outline:none;">
+                <div class="sync-card">
+                    <p class="sync-label">Import Collection</p>
+                    <input type="text" id="sync-input" class="sync-input" placeholder="Enter 6-digit code"
+                        maxlength="6">
                     <button id="load-sync" class="btn-ghost" style="width:100%">Import Now</button>
-                    <p style="font-size:0.75rem; color:var(--text-muted); margin-top:1rem; font-weight:500;">sync</p>
+                    <p class="sync-hint">Enter the share code from another device to import their collection.</p>
                 </div>
             </div>
         </section>
@@ -96,8 +88,7 @@
     <!-- Mobile Search Overlay -->
     <div class="search-overlay" id="search-overlay">
         <div class="search-header">
-            <button id="close-search" style="background:none; border:none; color:black; font-size:1.2rem;"><i
-                    class="fas fa-arrow-left"></i></button>
+            <button id="close-search"><i class="fas fa-arrow-left"></i></button>
             <input type="text" id="mobile-search-input" placeholder="Search movies...">
         </div>
         <div id="mobile-results" style="flex:1; overflow-y:auto;"></div>
@@ -111,8 +102,7 @@
             </div>
             <div class="modal-info-side">
                 <h2 id="modal-title" class="modal-title"></h2>
-                <div id="modal-desc"
-                    style="color:var(--text-muted); font-size:1rem; margin-bottom:2rem; font-weight:500;"></div>
+                <div id="modal-desc" class="modal-meta"></div>
                 <div class="modal-actions">
                     <button id="add-to-vault" class="btn-prime">Add</button>
                     <button id="mark-watched" class="btn-ghost">Mark as Finished</button>
