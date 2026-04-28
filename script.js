@@ -81,6 +81,25 @@ function initEventListeners() {
     document.getElementById('generate-sync').onclick = generateSyncCode;
     document.getElementById('load-sync').onclick = loadFromSync;
 
+    // Link Overlay
+    const linkOverlay = document.getElementById('link-overlay');
+    const closeLinkOverlay = document.getElementById('close-link-overlay');
+
+    const resetLinkOverlay = () => {
+        linkOverlay.classList.remove('active');
+        document.getElementById('link-loading').classList.add('hidden');
+        document.getElementById('link-preview').classList.add('hidden');
+    };
+
+    if (closeLinkOverlay) {
+        closeLinkOverlay.onclick = resetLinkOverlay;
+    }
+    if (linkOverlay) {
+        linkOverlay.onclick = (e) => {
+            if (e.target === linkOverlay) resetLinkOverlay();
+        };
+    }
+
     // Close dropdown on click outside
     document.addEventListener('click', (e) => {
         if (mainSearch && !mainSearch.contains(e.target) && searchDropdown && !searchDropdown.contains(e.target)) {
@@ -93,63 +112,224 @@ function initEventListeners() {
         if (e.key === 'Escape') {
             closeModal();
             document.getElementById('search-overlay').classList.remove('active');
+            document.getElementById('link-overlay').classList.remove('active');
             if (searchDropdown) searchDropdown.classList.add('hidden');
         }
     });
 }
 
 // --- Movie Core ---
+// --- Movie Core ---
 async function fetchMovies(query, container) {
-    try {
-        const res = await fetch(`https://imdb.iamidiotareyoutoo.com/search?q=${encodeURIComponent(query)}`);
-        const data = await res.json();
-        if (data.ok && data.description) renderSearchResults(data.description, container);
-    } catch (err) { console.error('Fetch Error:', err); }
+    // 1. Local Search
+    const q = query.toLowerCase();
+    const filterFn = m => {
+        const titleMatch = m['#TITLE'].toLowerCase().includes(q);
+        const actorStrMatch = (m['#ACTORS'] || '').toLowerCase().includes(q);
+        const tagsMatch = (m._actorTags || []).some(tag => tag.toLowerCase().includes(q));
+        return titleMatch || actorStrMatch || tagsMatch;
+    };
+    const localMatches = [
+        ...watchlist.filter(filterFn),
+        ...history.filter(filterFn)
+    ].slice(0, 8); // Slightly higher limit for local results
+
+    // 2. URL Detection
+    const isUrl = /^https?:\/\//i.test(query);
+
+    // 3. IMDb Search
+    let imdbResults = [];
+    if (!isUrl && query.length > 2) {
+        try {
+            const res = await fetch(`https://imdb.iamidiotareyoutoo.com/search?q=${encodeURIComponent(query)}`);
+            const data = await res.json();
+            if (data.ok && data.description) imdbResults = data.description;
+        } catch (err) { console.error('IMDb Fetch Error:', err); }
+    }
+
+    renderUnifiedSearch(query, localMatches, imdbResults, isUrl, container);
 }
 
-function renderSearchResults(movies, container) {
+function renderUnifiedSearch(query, local, online, isUrl, container) {
     container.innerHTML = '';
-    movies.forEach((movie, i) => {
-        const row = document.createElement('div');
-        row.style.cssText = `
-            padding: 0.8rem 1rem;
-            display: flex;
-            gap: 0.8rem;
-            align-items: center;
-            border-bottom: 1px solid var(--border);
-            cursor: pointer;
-            transition: background 0.2s ease;
-            animation: cardIn 0.3s ${0.03 * i}s var(--ease-out) backwards;
-        `;
-        const posterSrc = movie['#IMG_POSTER'] || '';
-        row.innerHTML = `
-            <img src="${posterSrc}" style="width:42px; height:60px; border-radius:6px; object-fit:cover; background:var(--surface);">
-            <div style="flex:1; min-width:0;">
-                <h4 style="font-size:0.88rem; font-weight:700; letter-spacing:-0.2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${movie['#TITLE']}</h4>
-                <p style="font-size:0.75rem; color:var(--text-muted); font-weight:500; margin-top:0.1rem;">${movie['#YEAR']}</p>
+    
+    // Header for Local results if they exist
+    if (local.length > 0) {
+        const h = document.createElement('div');
+        h.style.cssText = 'padding: 0.6rem 1rem; font-size: 0.65rem; font-weight: 800; text-transform: uppercase; color: var(--text-muted); letter-spacing: 1px; border-bottom: 1px solid var(--border);';
+        h.textContent = 'Local Library';
+        container.appendChild(h);
+        
+        local.forEach(m => renderSearchItem(m, container, true));
+    }
+
+    // Microlink Option
+    if (isUrl) {
+        const linkRow = document.createElement('div');
+        linkRow.className = 'search-item';
+        linkRow.style.cssText = 'padding: 1rem; display: flex; align-items: center; gap: 1rem; border-bottom: 1px solid var(--border); cursor: pointer; background: var(--accent-dim);';
+        linkRow.innerHTML = `
+            <div style="width:36px; height:36px; border-radius:10px; background:var(--accent); color:#fff; display:flex; align-items:center; justify-content:center; font-size:0.9rem;">
+                <i class="fas fa-link"></i>
+            </div>
+            <div style="flex:1;">
+                <h4 style="font-size:0.88rem; font-weight:700;">(add url)</h4>
+                <p style="font-size:0.75rem; color:var(--text-muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${query}</p>
             </div>
         `;
-        row.onmouseover = () => row.style.background = 'var(--surface)';
-        row.onmouseout = () => row.style.background = 'transparent';
-        row.onclick = () => {
+        linkRow.onclick = () => {
             container.classList.add('hidden');
             if (mainSearch) mainSearch.value = '';
             if (mobileSearchInput) mobileSearchInput.value = '';
             document.getElementById('search-overlay').classList.remove('active');
-            openMovieDetails(movie);
+            
+            // Trigger Microlink fetch
+            const linkOverlay = document.getElementById('link-overlay');
+            linkOverlay.classList.add('active');
+            fetchFromLink(query);
         };
-        container.appendChild(row);
-    });
+        container.appendChild(linkRow);
+    }
+
+    // Header for Online results
+    if (online.length > 0) {
+        const h = document.createElement('div');
+        h.style.cssText = 'padding: 0.6rem 1rem; font-size: 0.65rem; font-weight: 800; text-transform: uppercase; color: var(--text-muted); letter-spacing: 1px; border-bottom: 1px solid var(--border);';
+        h.textContent = 'Online Search';
+        container.appendChild(h);
+        
+        online.forEach(m => renderSearchItem(m, container, false));
+    }
+
+    if (local.length === 0 && online.length === 0 && !isUrl) {
+        container.innerHTML = '<div style="padding: 2rem; text-align: center; color: var(--text-muted); font-size: 0.85rem;">No results found</div>';
+    }
+
     container.classList.remove('hidden');
 }
 
+function renderSearchItem(movie, container, isLocal) {
+    const row = document.createElement('div');
+    row.className = 'search-item';
+    row.style.cssText = `
+        padding: 0.8rem 1rem;
+        display: flex;
+        gap: 0.8rem;
+        align-items: center;
+        border-bottom: 1px solid var(--border);
+        cursor: pointer;
+        transition: background 0.2s ease;
+        position: relative;
+    `;
+    const posterSrc = movie['#IMG_POSTER'] || '';
+    row.innerHTML = `
+        <img src="${posterSrc}" style="width:40px; height:56px; border-radius:6px; object-fit:cover; background:var(--surface);">
+        <div style="flex:1; min-width:0;">
+            <h4 style="font-size:0.88rem; font-weight:700; letter-spacing:-0.2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${movie['#TITLE']}</h4>
+            <p style="font-size:0.75rem; color:var(--text-muted); font-weight:500; margin-top:0.1rem;">${movie['#YEAR']} ${isLocal ? '· <span style="color:var(--accent); font-weight:700;">In Vault</span>' : ''}</p>
+        </div>
+    `;
+    row.onmouseover = () => row.style.background = 'var(--surface)';
+    row.onmouseout = () => row.style.background = 'transparent';
+    row.onclick = () => {
+        container.classList.add('hidden');
+        if (mainSearch) mainSearch.value = '';
+        if (mobileSearchInput) mobileSearchInput.value = '';
+        document.getElementById('search-overlay').classList.remove('active');
+        openMovieDetails(movie);
+    };
+    container.appendChild(row);
+}
+
 function openMovieDetails(movie) {
+    const isLink = !!movie._source_url;
     document.getElementById('modal-img').src = movie['#IMG_POSTER'] || '';
     document.getElementById('modal-title').textContent = movie['#TITLE'];
     document.getElementById('modal-desc').innerHTML = `
         <span class="year-badge">${movie['#YEAR']}</span>
         <span>${movie['#ACTORS'] || 'Film Details'}</span>
     `;
+
+    // Reset visibility
+    const linkActions = document.getElementById('modal-link-actions');
+    const editSection = document.getElementById('modal-edit-section');
+    const actorsSection = document.getElementById('modal-actors-section');
+    
+    linkActions.classList.toggle('hidden', !isLink);
+    actorsSection.classList.toggle('hidden', !isLink);
+    editSection.classList.add('hidden'); // Always hidden initially
+
+    if (isLink) {
+        // Copy URL
+        document.getElementById('modal-copy-url').onclick = () => {
+            navigator.clipboard.writeText(movie._source_url).then(() => showToast('URL Copied'));
+        };
+        // Open URL
+        document.getElementById('modal-open-url').onclick = () => {
+            window.open(movie._source_url, '_blank');
+        };
+        // Toggle Edit
+        document.getElementById('modal-edit-toggle').onclick = () => {
+            editSection.classList.toggle('hidden');
+            if (!editSection.classList.contains('hidden')) {
+                document.getElementById('modal-edit-title').value = movie['#TITLE'];
+                document.getElementById('modal-edit-desc').value = movie['#ACTORS'] || '';
+            }
+        };
+        // Save Edit
+        document.getElementById('modal-edit-save').onclick = () => {
+            movie['#TITLE'] = document.getElementById('modal-edit-title').value || movie['#TITLE'];
+            movie['#ACTORS'] = document.getElementById('modal-edit-desc').value || movie['#ACTORS'];
+            save();
+            document.getElementById('modal-title').textContent = movie['#TITLE'];
+            document.getElementById('modal-desc').innerHTML = `
+                <span class="year-badge">${movie['#YEAR']}</span>
+                <span>${movie['#ACTORS']}</span>
+            `;
+            editSection.classList.add('hidden');
+            renderVault();
+            renderHistory();
+            showToast('Changes Saved');
+        };
+
+        // Actors Tags Logic
+        if (!movie._actorTags) movie._actorTags = [];
+        const renderTags = () => {
+            const tagContainer = document.getElementById('modal-actor-tags');
+            tagContainer.innerHTML = '';
+            movie._actorTags.forEach((tag, idx) => {
+                const tagEl = document.createElement('div');
+                tagEl.className = 'actor-tag';
+                tagEl.innerHTML = `${tag}<button onclick="event.stopPropagation(); this.parentElement.remove(); window.removeModalTag('${movie['#IMDB_ID']}', ${idx})"><i class="fas fa-times"></i></button>`;
+                tagContainer.appendChild(tagEl);
+            });
+        };
+        
+        window.removeModalTag = (id, idx) => {
+            movie._actorTags.splice(idx, 1);
+            save();
+            renderTags();
+            renderVault();
+            renderHistory();
+        };
+
+        document.getElementById('modal-add-actor').onclick = () => {
+            const input = document.getElementById('modal-actor-input');
+            const val = input.value.trim();
+            if (val && !movie._actorTags.includes(val)) {
+                movie._actorTags.push(val);
+                save();
+                renderTags();
+                renderVault();
+                renderHistory();
+                input.value = '';
+            }
+        };
+        document.getElementById('modal-actor-input').onkeydown = (e) => {
+            if (e.key === 'Enter') document.getElementById('modal-add-actor').click();
+        };
+        renderTags();
+    }
 
     const inWatchlist = watchlist.some(m => m['#IMDB_ID'] === movie['#IMDB_ID']);
     const inHistory = history.some(m => m['#IMDB_ID'] === movie['#IMDB_ID']);
@@ -202,7 +382,7 @@ function renderVault() {
         watchlistGrid.innerHTML = `
             <div class="empty-state">
                 <i class="fas fa-layer-group empty-state-icon"></i>
-                <h2>Your vault is empty</h2>
+                <h2>(empty)</h2>
                 <p>Search for a movie to get started</p>
             </div>
         `;
@@ -238,12 +418,15 @@ function createCard(movie) {
     const card = document.createElement('div');
     card.className = 'movie-card';
     const posterSrc = movie['#IMG_POSTER'] || '';
+    const aspectStyle = movie._aspectRatio ? `aspect-ratio: ${movie._aspectRatio};` : '';
+    const tagsHtml = (movie._actorTags || []).map(tag => `<span class="card-tag">${tag}</span>`).join('');
     card.innerHTML = `
-        <div class="poster-wrap">
+        <div class="poster-wrap" style="${aspectStyle}">
             <img src="${posterSrc}" loading="lazy" alt="${movie['#TITLE']}">
             <button class="quick-action" title="Remove"><i class="fas fa-times"></i></button>
         </div>
         <div class="card-info">
+            <div class="card-tags">${tagsHtml}</div>
             <h3>${movie['#TITLE']}</h3>
             <p>${movie['#YEAR']}</p>
         </div>
@@ -348,6 +531,180 @@ function loadFromSync() {
         tempPeer.destroy();
     });
 }
+
+// --- Multi-Source Metadata Fetch (inspired by links app) ---
+let linkSelectedThumb = '';
+let linkCurrentMeta = null;
+
+async function fetchLinkMetadata(url) {
+    let results = {
+        title: url,
+        description: '',
+        images: [],
+        url: url
+    };
+
+    const resolveUrl = (relative) => {
+        try { return new URL(relative, url).href; } catch (e) { return relative; }
+    };
+
+    // YouTube fast path
+    if (url.includes('youtube.com/watch') || url.includes('youtu.be/')) {
+        try {
+            let ytUrl = url;
+            if (url.includes('youtu.be/')) {
+                const id = url.split('youtu.be/')[1].split('?')[0];
+                ytUrl = `https://www.youtube.com/watch?v=${id}`;
+            }
+            const res = await fetch(`https://www.youtube.com/oembed?url=${encodeURIComponent(ytUrl)}&format=json`);
+            const data = await res.json();
+            if (data.title) {
+                results.title = data.title;
+                results.description = `YouTube · ${data.author_name}`;
+                if (data.thumbnail_url) results.images.push(data.thumbnail_url);
+            }
+        } catch (e) {}
+    }
+
+    // Parallel fetchers for max coverage
+    await Promise.allSettled([
+        fetch(`https://noembed.com/embed?url=${encodeURIComponent(url)}`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.title && results.title === url) results.title = data.title;
+                if (data.author_name && !results.description) results.description = `By ${data.author_name}`;
+                if (data.thumbnail_url) results.images.push(data.thumbnail_url);
+            }),
+        fetch(`https://api.microlink.io/?url=${encodeURIComponent(url)}`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    const m = data.data;
+                    if (m.title && results.title === url) results.title = m.title;
+                    if (m.description && !results.description) results.description = m.description;
+                    if (m.image?.url) results.images.push(m.image.url);
+                    if (m.logo?.url) results.images.push(m.logo.url);
+                }
+            }),
+        fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`)
+            .then(res => res.json())
+            .then(data => {
+                const doc = new DOMParser().parseFromString(data.contents, 'text/html');
+                const getM = (s) => doc.querySelector(`meta[property="${s}"], meta[name="${s}"]`)?.getAttribute('content');
+
+                const title = getM('og:title') || getM('twitter:title') || doc.title;
+                if (title && results.title === url) results.title = title;
+
+                const desc = getM('og:description') || getM('twitter:description') || getM('description');
+                if (desc && !results.description) results.description = desc;
+
+                const og = getM('og:image') || getM('twitter:image');
+                if (og) results.images.push(resolveUrl(og));
+
+                // Grab icons too
+                ['apple-touch-icon', 'icon', 'shortcut icon'].forEach(rel => {
+                    const href = doc.querySelector(`link[rel="${rel}"]`)?.getAttribute('href');
+                    if (href) results.images.push(resolveUrl(href));
+                });
+            })
+    ]).catch(err => console.warn('Parallel fetch error:', err));
+
+    // Fallback title
+    if (results.title === url) {
+        try { results.title = new URL(url).hostname; } catch (e) {}
+    }
+
+    // Dedupe images
+    results.images = [...new Set(results.images.filter(Boolean))];
+
+    // Fallback screenshot
+    if (results.images.length === 0) {
+        results.images.push(`https://s.wordpress.com/mshots/v1/${encodeURIComponent(url)}?w=1200`);
+    }
+
+    return results;
+}
+
+async function fetchFromLink(url) {
+    if (!url) return;
+
+    const loading = document.getElementById('link-loading');
+    const preview = document.getElementById('link-preview');
+    preview.classList.add('hidden');
+    loading.classList.remove('hidden');
+
+    try {
+        const meta = await fetchLinkMetadata(url);
+        linkCurrentMeta = meta;
+        loading.classList.add('hidden');
+
+        // Show preview
+        document.getElementById('link-preview-title').textContent = meta.title;
+        document.getElementById('link-preview-desc').textContent = meta.description || 'No description available';
+
+        // Thumbnail picker
+        const picker = document.getElementById('link-thumb-picker');
+        const status = document.getElementById('link-thumb-status');
+        picker.innerHTML = '';
+
+        if (meta.images.length === 1 && meta.images[0].includes('mshots')) {
+            status.textContent = 'No images found — using screenshot:';
+        } else {
+            status.textContent = `Select a thumbnail (${meta.images.length} found):`;
+        }
+
+        linkSelectedThumb = meta.images[0] || '';
+
+        meta.images.forEach((img, i) => {
+            const div = document.createElement('div');
+            div.className = 'link-thumb-option' + (i === 0 ? ' selected' : '');
+            div.innerHTML = `<img src="${img}" onerror="this.parentElement.remove()">`;
+            div.onclick = () => {
+                picker.querySelectorAll('.link-thumb-option').forEach(o => o.classList.remove('selected'));
+                div.classList.add('selected');
+                linkSelectedThumb = img;
+            };
+            picker.appendChild(div);
+        });
+
+        // Confirm button
+        const confirmBtn = document.getElementById('link-confirm-btn');
+        confirmBtn.onclick = () => {
+            // Detect the selected thumbnail's natural aspect ratio
+            const selectedEl = picker.querySelector('.link-thumb-option.selected img');
+            let ratio = null;
+            if (selectedEl && selectedEl.naturalWidth && selectedEl.naturalHeight) {
+                ratio = `${selectedEl.naturalWidth} / ${selectedEl.naturalHeight}`;
+            }
+
+            const movie = {
+                '#TITLE': linkCurrentMeta.title || 'Untitled',
+                '#YEAR': new URL(linkCurrentMeta.url).hostname,
+                '#IMG_POSTER': linkSelectedThumb,
+                '#IMDB_ID': 'link-' + btoa(linkCurrentMeta.url).slice(0, 16),
+                '#ACTORS': linkCurrentMeta.description || '',
+                '_source_url': linkCurrentMeta.url,
+                '_aspectRatio': ratio
+            };
+            watchlist.unshift(movie);
+            save();
+            renderVault();
+            showToast('Added to Vault');
+
+            // Reset overlay
+            document.getElementById('link-overlay').classList.remove('active');
+            input.value = '';
+            preview.classList.add('hidden');
+        };
+
+        preview.classList.remove('hidden');
+    } catch (err) {
+        console.error('Fetch Error:', err);
+        loading.classList.add('hidden');
+        showToast('Fetch failed');
+    }
+}
+
 
 function showToast(msg) {
     // Remove any existing toast

@@ -20,7 +20,7 @@
 
             <div class="search-wrap">
                 <i class="fas fa-search search-icon"></i>
-                <input type="text" id="main-search" placeholder="Search movies or series...">
+                <input type="text" id="main-search" placeholder="(search movie series links)">
                 <div id="search-dropdown" class="results-dropdown hidden"></div>
             </div>
 
@@ -94,6 +94,30 @@
         <div id="mobile-results" style="flex:1; overflow-y:auto;"></div>
     </div>
 
+    <!-- Link Input Overlay -->
+    <div class="link-overlay" id="link-overlay">
+        <div class="link-overlay-content">
+            <div class="link-overlay-header">
+                <h3>(add url)</h3>
+                <button id="close-link-overlay"><i class="fas fa-times"></i></button>
+            </div>
+            <div id="link-loading" class="link-loading hidden">
+                <div class="link-spinner"></div>
+                <span>Extracting ...</span>
+            </div>
+            <!-- Preview & Thumbnail Picker (shown after fetch) -->
+            <div id="link-preview" class="link-preview hidden">
+                <div class="link-preview-meta">
+                    <h4 id="link-preview-title"></h4>
+                    <p id="link-preview-desc"></p>
+                </div>
+                <p id="link-thumb-status" class="link-thumb-status">Select a thumbnail:</p>
+                <div id="link-thumb-picker" class="link-thumb-picker"></div>
+                <button id="link-confirm-btn" class="btn-prime" style="width:100%; margin-top:1rem;">Add</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Details Modal -->
     <div class="modal-overlay" id="main-modal">
         <div class="modal-content">
@@ -101,11 +125,44 @@
                 <img id="modal-img" src="" alt="Poster">
             </div>
             <div class="modal-info-side">
+                <!-- Standard view -->
                 <h2 id="modal-title" class="modal-title"></h2>
                 <div id="modal-desc" class="modal-meta"></div>
+
+                <!-- Link-specific: URL actions -->
+                <div id="modal-link-actions" class="modal-link-actions hidden">
+                    <button id="modal-copy-url" class="btn-icon" title="Copy URL"><i class="fas fa-copy"></i></button>
+                    <button id="modal-open-url" class="btn-icon" title="Open URL"><i
+                            class="fas fa-external-link-alt"></i></button>
+                    <button id="modal-edit-toggle" class="btn-icon" title="Edit"><i class="fas fa-pen"></i></button>
+                </div>
+
+                <!-- Link-specific: Edit section (hidden by default) -->
+                <div id="modal-edit-section" class="modal-edit-section hidden">
+                    <div class="modal-edit-field">
+                        <label>Title</label>
+                        <input type="text" id="modal-edit-title" placeholder="Title">
+                    </div>
+                    <div class="modal-edit-field">
+                        <label>Description</label>
+                        <input type="text" id="modal-edit-desc" placeholder="Description">
+                    </div>
+                    <button id="modal-edit-save" class="btn-prime" style="width:100%">Save Changes</button>
+                </div>
+
+                <!-- Link-specific: Actor tags -->
+                <div id="modal-actors-section" class="modal-actors-section hidden">
+                    <label>Actors</label>
+                    <div id="modal-actor-tags" class="modal-actor-tags"></div>
+                    <div class="modal-actor-input-wrap">
+                        <input type="text" id="modal-actor-input" placeholder="Add actor name...">
+                        <button id="modal-add-actor" class="btn-icon-sm"><i class="fas fa-plus"></i></button>
+                    </div>
+                </div>
+
                 <div class="modal-actions">
                     <button id="add-to-vault" class="btn-prime">Add</button>
-                    <button id="mark-watched" class="btn-ghost">Mark as Finished</button>
+                    <button id="mark-watched" class="btn-ghost">Finished</button>
                     <button id="close-modal" class="btn-ghost">Close</button>
                 </div>
             </div>
