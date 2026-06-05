@@ -1,6 +1,20 @@
 // --- System State ---
-let watchlist = JSON.parse(localStorage.getItem('watchlist')) || [];
-let history = JSON.parse(localStorage.getItem('history')) || [];
+function normalizeMovie(m) {
+    if (!m) return null;
+    return {
+        title: m.title || m['#TITLE'] || 'Untitled',
+        year: m.year || m['#YEAR'] || '—',
+        poster: m.poster || m['#IMG_POSTER'] || '',
+        imdbId: m.imdbId || m['#IMDB_ID'] || '',
+        actors: m.actors || m['#ACTORS'] || '',
+        sourceUrl: m.sourceUrl || m._source_url || null,
+        aspectRatio: m.aspectRatio || m._aspectRatio || null,
+        actorTags: m.actorTags || m._actorTags || []
+    };
+}
+
+let watchlist = (JSON.parse(localStorage.getItem('watchlist')) || []).map(normalizeMovie).filter(Boolean);
+let history = (JSON.parse(localStorage.getItem('history')) || []).map(normalizeMovie).filter(Boolean);
 let searchTimeout;
 let peer = null;
 
@@ -16,27 +30,45 @@ const mobileResults = document.getElementById('mobile-results');
 const mainModal = document.getElementById('main-modal');
 
 // --- Start App ---
+function switchSection(target) {
+    const navBtns = document.querySelectorAll('.nav-btn');
+    const tabItems = document.querySelectorAll('.tab-item');
+    const sections = document.querySelectorAll('main section');
+
+    [...navBtns, ...tabItems].forEach(b => b.classList.remove('active'));
+    document.querySelectorAll(`[data-tab="${target}"]`).forEach(b => b.classList.add('active'));
+    sections.forEach(s => {
+        s.classList.add('hidden');
+        if (s.id === `${target}-section`) s.classList.remove('hidden');
+    });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     renderVault();
     renderHistory();
     initEventListeners();
+    
+    // Auto P2P Connect if "?sync=XXXXXX" in URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const syncParam = urlParams.get('sync');
+    if (syncParam && syncParam.length === 6) {
+        switchSection('sync');
+        const syncInput = document.getElementById('sync-input');
+        if (syncInput) {
+            syncInput.value = syncParam;
+            showToast('Connecting share code ' + syncParam + '...');
+            setTimeout(() => {
+                loadFromSync();
+            }, 800);
+        }
+    }
 });
 
 function initEventListeners() {
     // Navigation Logic
     const navBtns = document.querySelectorAll('.nav-btn');
     const tabItems = document.querySelectorAll('.tab-item');
-    const sections = document.querySelectorAll('main section');
-
-    const switchSection = (target) => {
-        [...navBtns, ...tabItems].forEach(b => b.classList.remove('active'));
-        document.querySelectorAll(`[data-tab="${target}"]`).forEach(b => b.classList.add('active'));
-        sections.forEach(s => {
-            s.classList.add('hidden');
-            if (s.id === `${target}-section`) s.classList.remove('hidden');
-        });
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-    };
 
     navBtns.forEach(btn => btn.onclick = () => switchSection(btn.dataset.tab));
     tabItems.forEach(btn => btn.onclick = () => switchSection(btn.dataset.tab));
@@ -119,14 +151,13 @@ function initEventListeners() {
 }
 
 // --- Movie Core ---
-// --- Movie Core ---
 async function fetchMovies(query, container) {
     // 1. Local Search
     const q = query.toLowerCase();
     const filterFn = m => {
-        const titleMatch = m['#TITLE'].toLowerCase().includes(q);
-        const actorStrMatch = (m['#ACTORS'] || '').toLowerCase().includes(q);
-        const tagsMatch = (m._actorTags || []).some(tag => tag.toLowerCase().includes(q));
+        const titleMatch = (m.title || '').toLowerCase().includes(q);
+        const actorStrMatch = (m.actors || '').toLowerCase().includes(q);
+        const tagsMatch = (m.actorTags || []).some(tag => tag.toLowerCase().includes(q));
         return titleMatch || actorStrMatch || tagsMatch;
     };
     const localMatches = [
@@ -143,7 +174,9 @@ async function fetchMovies(query, container) {
         try {
             const res = await fetch(`https://imdb.iamidiotareyoutoo.com/search?q=${encodeURIComponent(query)}`);
             const data = await res.json();
-            if (data.ok && data.description) imdbResults = data.description;
+            if (data.ok && data.description) {
+                imdbResults = data.description.map(normalizeMovie).filter(Boolean);
+            }
         } catch (err) { console.error('IMDb Fetch Error:', err); }
     }
 
@@ -173,7 +206,7 @@ function renderUnifiedSearch(query, local, online, isUrl, container) {
                 <i class="fas fa-link"></i>
             </div>
             <div style="flex:1;">
-                <h4 style="font-size:0.88rem; font-weight:700;">(add url)</h4>
+                <h4 style="font-size:0.88rem; font-weight:700;">Import Movie Link</h4>
                 <p style="font-size:0.75rem; color:var(--text-muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${query}</p>
             </div>
         `;
@@ -221,12 +254,12 @@ function renderSearchItem(movie, container, isLocal) {
         transition: background 0.2s ease;
         position: relative;
     `;
-    const posterSrc = movie['#IMG_POSTER'] || '';
+    const posterSrc = movie.poster || '';
     row.innerHTML = `
         <img src="${posterSrc}" style="width:40px; height:56px; border-radius:6px; object-fit:cover; background:var(--surface);">
         <div style="flex:1; min-width:0;">
-            <h4 style="font-size:0.88rem; font-weight:700; letter-spacing:-0.2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${movie['#TITLE']}</h4>
-            <p style="font-size:0.75rem; color:var(--text-muted); font-weight:500; margin-top:0.1rem;">${movie['#YEAR']} ${isLocal ? '· <span style="color:var(--accent); font-weight:700;">In Vault</span>' : ''}</p>
+            <h4 style="font-size:0.88rem; font-weight:700; letter-spacing:-0.2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${movie.title}</h4>
+            <p style="font-size:0.75rem; color:var(--text-muted); font-weight:500; margin-top:0.1rem;">${movie.year} ${isLocal ? '· <span style="color:var(--accent); font-weight:700;">On My List</span>' : ''}</p>
         </div>
     `;
     row.onmouseover = () => row.style.background = 'var(--surface)';
@@ -242,12 +275,12 @@ function renderSearchItem(movie, container, isLocal) {
 }
 
 function openMovieDetails(movie) {
-    const isLink = !!movie._source_url;
-    document.getElementById('modal-img').src = movie['#IMG_POSTER'] || '';
-    document.getElementById('modal-title').textContent = movie['#TITLE'];
+    const isLink = !!movie.sourceUrl;
+    document.getElementById('modal-img').src = movie.poster || '';
+    document.getElementById('modal-title').textContent = movie.title;
     document.getElementById('modal-desc').innerHTML = `
-        <span class="year-badge">${movie['#YEAR']}</span>
-        <span>${movie['#ACTORS'] || 'Film Details'}</span>
+        <span class="year-badge">${movie.year}</span>
+        <span>${movie.actors || 'Film Details'}</span>
     `;
 
     // Reset visibility
@@ -262,29 +295,29 @@ function openMovieDetails(movie) {
     if (isLink) {
         // Copy URL
         document.getElementById('modal-copy-url').onclick = () => {
-            navigator.clipboard.writeText(movie._source_url).then(() => showToast('URL Copied'));
+            navigator.clipboard.writeText(movie.sourceUrl).then(() => showToast('URL Copied'));
         };
         // Open URL
         document.getElementById('modal-open-url').onclick = () => {
-            window.open(movie._source_url, '_blank');
+            window.open(movie.sourceUrl, '_blank');
         };
         // Toggle Edit
         document.getElementById('modal-edit-toggle').onclick = () => {
             editSection.classList.toggle('hidden');
             if (!editSection.classList.contains('hidden')) {
-                document.getElementById('modal-edit-title').value = movie['#TITLE'];
-                document.getElementById('modal-edit-desc').value = movie['#ACTORS'] || '';
+                document.getElementById('modal-edit-title').value = movie.title;
+                document.getElementById('modal-edit-desc').value = movie.actors || '';
             }
         };
         // Save Edit
         document.getElementById('modal-edit-save').onclick = () => {
-            movie['#TITLE'] = document.getElementById('modal-edit-title').value || movie['#TITLE'];
-            movie['#ACTORS'] = document.getElementById('modal-edit-desc').value || movie['#ACTORS'];
+            movie.title = document.getElementById('modal-edit-title').value || movie.title;
+            movie.actors = document.getElementById('modal-edit-desc').value || movie.actors;
             save();
-            document.getElementById('modal-title').textContent = movie['#TITLE'];
+            document.getElementById('modal-title').textContent = movie.title;
             document.getElementById('modal-desc').innerHTML = `
-                <span class="year-badge">${movie['#YEAR']}</span>
-                <span>${movie['#ACTORS']}</span>
+                <span class="year-badge">${movie.year}</span>
+                <span>${movie.actors}</span>
             `;
             editSection.classList.add('hidden');
             renderVault();
@@ -293,20 +326,20 @@ function openMovieDetails(movie) {
         };
 
         // Actors Tags Logic
-        if (!movie._actorTags) movie._actorTags = [];
+        if (!movie.actorTags) movie.actorTags = [];
         const renderTags = () => {
             const tagContainer = document.getElementById('modal-actor-tags');
             tagContainer.innerHTML = '';
-            movie._actorTags.forEach((tag, idx) => {
+            movie.actorTags.forEach((tag, idx) => {
                 const tagEl = document.createElement('div');
                 tagEl.className = 'actor-tag';
-                tagEl.innerHTML = `${tag}<button onclick="event.stopPropagation(); this.parentElement.remove(); window.removeModalTag('${movie['#IMDB_ID']}', ${idx})"><i class="fas fa-times"></i></button>`;
+                tagEl.innerHTML = `${tag}<button onclick="event.stopPropagation(); this.parentElement.remove(); window.removeModalTag('${movie.imdbId}', ${idx})"><i class="fas fa-times"></i></button>`;
                 tagContainer.appendChild(tagEl);
             });
         };
         
         window.removeModalTag = (id, idx) => {
-            movie._actorTags.splice(idx, 1);
+            movie.actorTags.splice(idx, 1);
             save();
             renderTags();
             renderVault();
@@ -316,8 +349,8 @@ function openMovieDetails(movie) {
         document.getElementById('modal-add-actor').onclick = () => {
             const input = document.getElementById('modal-actor-input');
             const val = input.value.trim();
-            if (val && !movie._actorTags.includes(val)) {
-                movie._actorTags.push(val);
+            if (val && !movie.actorTags.includes(val)) {
+                movie.actorTags.push(val);
                 save();
                 renderTags();
                 renderVault();
@@ -331,25 +364,25 @@ function openMovieDetails(movie) {
         renderTags();
     }
 
-    const inWatchlist = watchlist.some(m => m['#IMDB_ID'] === movie['#IMDB_ID']);
-    const inHistory = history.some(m => m['#IMDB_ID'] === movie['#IMDB_ID']);
+    const inWatchlist = watchlist.some(m => m.imdbId === movie.imdbId);
+    const inHistory = history.some(m => m.imdbId === movie.imdbId);
 
     const addBtn = document.getElementById('add-to-vault');
     const watchBtn = document.getElementById('mark-watched');
 
-    addBtn.textContent = inWatchlist ? 'Added' : 'Add';
+    addBtn.textContent = inWatchlist ? 'On My List' : 'Add to My List';
     addBtn.disabled = inWatchlist;
     addBtn.onclick = () => {
         watchlist.unshift(movie); save(); renderVault();
-        closeModal(); showToast('Added to Vault');
+        closeModal(); showToast('Added to My List');
     };
 
-    watchBtn.textContent = inHistory ? 'Finished' : 'Finished';
+    watchBtn.textContent = inHistory ? 'Completed' : 'Mark Completed';
     watchBtn.disabled = inHistory;
     watchBtn.onclick = () => {
-        watchlist = watchlist.filter(m => m['#IMDB_ID'] !== movie['#IMDB_ID']);
+        watchlist = watchlist.filter(m => m.imdbId !== movie.imdbId);
         history.unshift(movie); save(); renderVault(); renderHistory();
-        closeModal(); showToast('Marked as Finished');
+        closeModal(); showToast('Marked as Completed');
     };
 
     // Remove Option
@@ -359,14 +392,14 @@ function openMovieDetails(movie) {
         const rBtn = document.createElement('button');
         rBtn.id = 'remove-btn';
         rBtn.className = 'btn-ghost';
-        rBtn.style.color = '#999';
+        rBtn.style.color = '#ff4a4a';
         rBtn.style.borderColor = 'transparent';
         rBtn.textContent = 'Remove';
         rBtn.onclick = () => {
-            watchlist = watchlist.filter(m => m['#IMDB_ID'] !== movie['#IMDB_ID']);
-            history = history.filter(m => m['#IMDB_ID'] !== movie['#IMDB_ID']);
+            watchlist = watchlist.filter(m => m.imdbId !== movie.imdbId);
+            history = history.filter(m => m.imdbId !== movie.imdbId);
             save(); renderVault(); renderHistory();
-            closeModal(); showToast('Removed');
+            closeModal(); showToast('Removed from My List');
         };
         document.querySelector('.modal-actions').appendChild(rBtn);
     }
@@ -378,17 +411,65 @@ function closeModal() { mainModal.classList.remove('active'); }
 
 function renderVault() {
     watchlistGrid.innerHTML = '';
+    const heroBanner = document.getElementById('hero-banner');
+    
     if (!watchlist.length) {
+        if (heroBanner) {
+            heroBanner.classList.add('hidden');
+            heroBanner.innerHTML = '';
+        }
         watchlistGrid.innerHTML = `
             <div class="empty-state">
-                <i class="fas fa-layer-group empty-state-icon"></i>
-                <h2>(empty)</h2>
-                <p>Search for a movie to get started</p>
+                <i class="fas fa-play empty-state-icon"></i>
+                <h2>Your list is empty</h2>
+                <p>Search for a movie or TV show to start building your library</p>
             </div>
         `;
         return;
     }
-    watchlist.forEach((m, i) => {
+    
+    // Feature the first movie in the list as a Cinematic Hero Banner
+    if (heroBanner) {
+        const featured = watchlist[0];
+        heroBanner.classList.remove('hidden');
+        const posterSrc = featured.poster || '';
+        const tagsHtml = (featured.actorTags || []).map(tag => `<span class="hero-tag">${tag}</span>`).join('');
+        
+        heroBanner.innerHTML = `
+            <div class="hero-backdrop" style="background-image: linear-gradient(to top, var(--bg) 5%, rgba(7, 7, 10, 0.4) 50%, rgba(7, 7, 10, 0.8) 100%), url('${posterSrc}');"></div>
+            <div class="hero-content">
+                <span class="hero-badge-featured"><i class="fas fa-star"></i> Featured on My List</span>
+                <h1 class="hero-title">${featured.title}</h1>
+                <div class="hero-meta">
+                    <span class="hero-year">${featured.year}</span>
+                    <span class="hero-actors">${featured.actors || 'No details available'}</span>
+                </div>
+                <div class="hero-tags">${tagsHtml}</div>
+                <div class="hero-buttons">
+                    <button class="btn-prime hero-btn-watch" id="hero-watch-btn"><i class="fas fa-play"></i> View Details</button>
+                    <button class="btn-ghost hero-btn-remove" id="hero-remove-btn"><i class="fas fa-times"></i> Remove</button>
+                </div>
+            </div>
+        `;
+        
+        document.getElementById('hero-watch-btn').onclick = () => openMovieDetails(featured);
+        document.getElementById('hero-remove-btn').onclick = (e) => {
+            e.stopPropagation();
+            watchlist = watchlist.filter(m => m.imdbId !== featured.imdbId);
+            save();
+            renderVault();
+            showToast('Removed from My List');
+        };
+    }
+    
+    // Render the rest of the watchlist in the grid
+    const displayList = watchlist.slice(1);
+    
+    if (displayList.length === 0) {
+        return;
+    }
+
+    displayList.forEach((m, i) => {
         const card = createCard(m);
         card.style.animationDelay = `${i * 0.05}s`;
         watchlistGrid.appendChild(card);
@@ -400,9 +481,9 @@ function renderHistory() {
     if (!history.length) {
         historyGrid.innerHTML = `
             <div class="empty-state">
-                <i class="fas fa-check-circle empty-state-icon"></i>
-                <h2>No history yet</h2>
-                <p>Finished movies will appear here</p>
+                <i class="fas fa-history empty-state-icon"></i>
+                <h2>Nothing completed yet</h2>
+                <p>Movies and TV shows you finish will appear here</p>
             </div>
         `;
         return;
@@ -417,27 +498,27 @@ function renderHistory() {
 function createCard(movie) {
     const card = document.createElement('div');
     card.className = 'movie-card';
-    const posterSrc = movie['#IMG_POSTER'] || '';
-    const aspectStyle = movie._aspectRatio ? `aspect-ratio: ${movie._aspectRatio};` : '';
-    const tagsHtml = (movie._actorTags || []).map(tag => `<span class="card-tag">${tag}</span>`).join('');
+    const posterSrc = movie.poster || '';
+    const aspectStyle = movie.aspectRatio ? `aspect-ratio: ${movie.aspectRatio};` : '';
+    const tagsHtml = (movie.actorTags || []).map(tag => `<span class="card-tag">${tag}</span>`).join('');
     card.innerHTML = `
         <div class="poster-wrap" style="${aspectStyle}">
-            <img src="${posterSrc}" loading="lazy" alt="${movie['#TITLE']}">
+            <img src="${posterSrc}" loading="lazy" alt="${movie.title}">
             <button class="quick-action" title="Remove"><i class="fas fa-times"></i></button>
         </div>
         <div class="card-info">
             <div class="card-tags">${tagsHtml}</div>
-            <h3>${movie['#TITLE']}</h3>
-            <p>${movie['#YEAR']}</p>
+            <h3>${movie.title}</h3>
+            <p>${movie.year}</p>
         </div>
     `;
     card.onclick = () => openMovieDetails(movie);
     card.querySelector('.quick-action').onclick = (e) => {
         e.stopPropagation();
-        watchlist = watchlist.filter(m => m['#IMDB_ID'] !== movie['#IMDB_ID']);
-        history = history.filter(m => m['#IMDB_ID'] !== movie['#IMDB_ID']);
+        watchlist = watchlist.filter(m => m.imdbId !== movie.imdbId);
+        history = history.filter(m => m.imdbId !== movie.imdbId);
         save(); renderVault(); renderHistory();
-        showToast('Removed');
+        showToast('Removed from My List');
     };
     return card;
 }
@@ -453,6 +534,7 @@ function generateSyncCode() {
     
     const code = Math.floor(100000 + Math.random() * 900000).toString();
     const display = document.getElementById('sync-code-display');
+    const qrContainer = document.getElementById('p2p-qr');
     const peerId = `${SYNC_PREFIX}${code}`;
     
     display.textContent = code;
@@ -462,14 +544,29 @@ function generateSyncCode() {
 
     peer.on('open', () => {
         display.style.opacity = '1';
-        showToast('Broadcasting Vault...');
+        showToast('Broadcasting collection...');
+        
+        // Generate QR Code
+        if (qrContainer) {
+            qrContainer.innerHTML = '';
+            qrContainer.classList.remove('hidden');
+            const joinUrl = `${window.location.origin}${window.location.pathname}?sync=${code}`;
+            new QRCode(qrContainer, {
+                text: joinUrl,
+                width: 140,
+                height: 140,
+                colorDark : "#000000",
+                colorLight : "#ffffff",
+                correctLevel : QRCode.CorrectLevel.M
+            });
+        }
     });
 
     peer.on('connection', (conn) => {
         showToast('Device Connected');
         conn.on('open', () => {
             conn.send({ watchlist, history });
-            showToast('Collection Sent');
+            showToast('Collection shared successfully!');
         });
     });
 
@@ -477,8 +574,12 @@ function generateSyncCode() {
         if (err.type === 'unavailable-id') {
             generateSyncCode(); // Try again if collision
         } else {
-            showToast('P2P Error');
+            showToast('Sync Connection Failed');
             display.textContent = 'ERR';
+            if (qrContainer) {
+                qrContainer.classList.add('hidden');
+                qrContainer.innerHTML = '';
+            }
         }
     });
 }
@@ -499,20 +600,20 @@ function loadFromSync() {
         
         conn.on('data', (data) => {
             if (data.watchlist || data.history) {
-                const incomingWatchlist = data.watchlist || [];
-                const incomingHistory = data.history || [];
+                const incomingWatchlist = (data.watchlist || []).map(normalizeMovie).filter(Boolean);
+                const incomingHistory = (data.history || []).map(normalizeMovie).filter(Boolean);
                 const existingIds = new Set([
-                    ...watchlist.map(m => m['#IMDB_ID']),
-                    ...history.map(m => m['#IMDB_ID'])
+                    ...watchlist.map(m => m.imdbId),
+                    ...history.map(m => m.imdbId)
                 ]);
                 incomingWatchlist.forEach(m => {
-                    if (!existingIds.has(m['#IMDB_ID'])) watchlist.push(m);
+                    if (!existingIds.has(m.imdbId)) watchlist.push(m);
                 });
                 incomingHistory.forEach(m => {
-                    if (!existingIds.has(m['#IMDB_ID'])) history.push(m);
+                    if (!existingIds.has(m.imdbId)) history.push(m);
                 });
                 save(); renderVault(); renderHistory();
-                showToast('Import Success');
+                showToast('Import successful!');
                 input.value = '';
                 tempPeer.destroy();
             }
@@ -520,7 +621,7 @@ function loadFromSync() {
 
         setTimeout(() => {
             if (tempPeer.open && !conn.open) {
-                showToast('Code Not Found');
+                showToast('Share code not found or expired');
                 tempPeer.destroy();
             }
         }, 5000);
@@ -678,22 +779,24 @@ async function fetchFromLink(url) {
             }
 
             const movie = {
-                '#TITLE': linkCurrentMeta.title || 'Untitled',
-                '#YEAR': new URL(linkCurrentMeta.url).hostname,
-                '#IMG_POSTER': linkSelectedThumb,
-                '#IMDB_ID': 'link-' + btoa(linkCurrentMeta.url).slice(0, 16),
-                '#ACTORS': linkCurrentMeta.description || '',
-                '_source_url': linkCurrentMeta.url,
-                '_aspectRatio': ratio
+                title: linkCurrentMeta.title || 'Untitled',
+                year: new URL(linkCurrentMeta.url).hostname,
+                poster: linkSelectedThumb,
+                imdbId: 'link-' + btoa(linkCurrentMeta.url).slice(0, 16),
+                actors: linkCurrentMeta.description || '',
+                sourceUrl: linkCurrentMeta.url,
+                aspectRatio: ratio,
+                actorTags: []
             };
             watchlist.unshift(movie);
             save();
             renderVault();
-            showToast('Added to Vault');
+            showToast('Added to Watchlist');
 
             // Reset overlay
             document.getElementById('link-overlay').classList.remove('active');
-            input.value = '';
+            if (mainSearch) mainSearch.value = '';
+            if (mobileSearchInput) mobileSearchInput.value = '';
             preview.classList.add('hidden');
         };
 

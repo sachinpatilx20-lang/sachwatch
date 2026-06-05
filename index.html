@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Sach.in | Cinematic Collection</title>
+    <title>SachWatch | Cinematic Collection</title>
     <meta name="description" content="A minimalistic, high-performance movie watchlist and P2P sharing platform.">
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
@@ -16,18 +16,18 @@
 <body>
     <header>
         <div class="nav-container">
-            <div class="logo">Sach<span>.in</span></div>
+            <div class="logo">Sach<span>Watch</span></div>
 
             <div class="search-wrap">
                 <i class="fas fa-search search-icon"></i>
-                <input type="text" id="main-search" placeholder="(search movie series links)">
+                <input type="text" id="main-search" placeholder="Search movies, TV shows, or paste URL...">
                 <div id="search-dropdown" class="results-dropdown hidden"></div>
             </div>
 
             <div class="nav-links">
-                <button class="nav-btn active" data-tab="vault"><i class="fas fa-layer-group"></i>Watchlist</button>
-                <button class="nav-btn" data-tab="history"><i class="fas fa-check-circle"></i>Finished</button>
-                <button class="nav-btn" data-tab="sync"><i class="fas fa-broadcast-tower"></i>Connect</button>
+                <button class="nav-btn active" data-tab="vault"><i class="fas fa-play"></i>My List</button>
+                <button class="nav-btn" data-tab="history"><i class="fas fa-history"></i>Completed</button>
+                <button class="nav-btn" data-tab="sync"><i class="fas fa-tv"></i>Pair Devices</button>
             </div>
 
             <div class="mobile-search-toggle" id="mobile-search-btn">
@@ -39,9 +39,7 @@
     <main class="container">
         <!-- Vault Section -->
         <section id="vault-section">
-            <div class="section-header">
-
-            </div>
+            <div id="hero-banner" class="hero-banner hidden"></div>
             <div id="watchlist-grid" class="movie-grid"></div>
         </section>
 
@@ -60,18 +58,19 @@
             </div>
             <div class="sync-grid">
                 <div class="sync-card">
-                    <p class="sync-label">Your Share Code</p>
+                    <p class="sync-label">Your Pairing Code</p>
                     <div id="sync-code-display" class="sync-code">——</div>
+                    <div id="p2p-qr" class="p2p-qr hidden"></div>
                     <button id="generate-sync" class="btn-prime" style="width:100%">Generate Code</button>
-                    <p class="sync-hint">Share this code with another device to transfer your collection.</p>
+                    <p class="sync-hint">Use this code to pair another device and sync your library.</p>
                 </div>
 
                 <div class="sync-card">
-                    <p class="sync-label">Import Collection</p>
+                    <p class="sync-label">Pair with Code</p>
                     <input type="text" id="sync-input" class="sync-input" placeholder="Enter 6-digit code"
                         maxlength="6">
-                    <button id="load-sync" class="btn-ghost" style="width:100%">Import Now</button>
-                    <p class="sync-hint">Enter the share code from another device to import their collection.</p>
+                    <button id="load-sync" class="btn-ghost" style="width:100%">Pair Device</button>
+                    <p class="sync-hint">Enter the 6-digit code from your secondary device to sync libraries.</p>
                 </div>
             </div>
         </section>
@@ -79,10 +78,9 @@
 
     <!-- Mobile Navigation -->
     <nav class="tab-bar">
-        <button class="tab-item active" data-tab="vault"><i
-                class="fas fa-layer-group"></i><span>Watchlist</span></button>
-        <button class="tab-item" data-tab="history"><i class="fas fa-check-circle"></i><span>Finished</span></button>
-        <button class="tab-item" data-tab="sync"><i class="fas fa-broadcast-tower"></i><span>Connect</span></button>
+        <button class="tab-item active" data-tab="vault"><i class="fas fa-play"></i><span>My List</span></button>
+        <button class="tab-item" data-tab="history"><i class="fas fa-history"></i><span>Completed</span></button>
+        <button class="tab-item" data-tab="sync"><i class="fas fa-tv"></i><span>Pair Devices</span></button>
     </nav>
 
     <!-- Mobile Search Overlay -->
@@ -98,12 +96,12 @@
     <div class="link-overlay" id="link-overlay">
         <div class="link-overlay-content">
             <div class="link-overlay-header">
-                <h3>(add url)</h3>
+                <h3>Import Movie from URL</h3>
                 <button id="close-link-overlay"><i class="fas fa-times"></i></button>
             </div>
             <div id="link-loading" class="link-loading hidden">
                 <div class="link-spinner"></div>
-                <span>Extracting ...</span>
+                <span>Extracting metadata...</span>
             </div>
             <!-- Preview & Thumbnail Picker (shown after fetch) -->
             <div id="link-preview" class="link-preview hidden">
@@ -161,8 +159,8 @@
                 </div>
 
                 <div class="modal-actions">
-                    <button id="add-to-vault" class="btn-prime">Add</button>
-                    <button id="mark-watched" class="btn-ghost">Finished</button>
+                    <button id="add-to-vault" class="btn-prime">Add to My List</button>
+                    <button id="mark-watched" class="btn-ghost">Mark Completed</button>
                     <button id="close-modal" class="btn-ghost">Close</button>
                 </div>
             </div>
