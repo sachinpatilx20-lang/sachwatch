@@ -4,170 +4,313 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SachWatch | Cinematic Collection</title>
-    <meta name="description" content="A minimalistic, high-performance movie watchlist and P2P sharing platform.">
-    <link rel="stylesheet" href="style.css">
+    <title>Sach — Premium Links & Cinematic watchlist</title>
+    <meta name="description"
+        content="A pristine, minimalist link library and cinematic watchlist. Save links, track movies, and sync peer-to-peer.">
+    <!-- Clean Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <!-- Icons and Styles -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <!-- P2P and QR Code Libraries -->
     <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
     <script src="https://cdn.rawgit.com/davidshimjs/qrcodejs/gh-pages/qrcode.min.js"></script>
 </head>
 
-<body>
+<body class="dark-theme">
+
+    <!-- Loading Overlay -->
+    <div id="loader" class="modal-overlay hidden" style="background: rgba(9,11,17,0.95); z-index: 9999;">
+        <div style="text-align: center; color: var(--text-primary);">
+            <div class="loader-spinner"
+                style="border: 4px solid var(--border-color); border-top: 4px solid var(--accent-color); border-radius: 50%; width: 45px; height: 45px; animation: spin 1s linear infinite; margin: 0 auto 1.5rem;">
+            </div>
+            <p id="loader-text"
+                style="font-family: var(--font-heading); font-weight: 700; font-size: 0.95rem; letter-spacing: 0.5px;">
+                Fetching metadata...</p>
+        </div>
+    </div>
+
+    <style>
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+
+    <!-- Toast Notifications -->
+    <div id="toast-container"></div>
+
+    <!-- Sticky Header -->
     <header>
         <div class="nav-container">
-            <div class="logo">Sach<span>Watch</span></div>
+            <!-- Brand Logo -->
+            <div class="logo" id="logoHome">
+                <i class="fa-solid fa-play"></i>
+                <span></span>
+            </div>
 
-            <div class="search-wrap">
-                <i class="fas fa-search search-icon"></i>
-                <input type="text" id="main-search" placeholder="Search movies, TV shows, or paste URL...">
+            <!-- Smart Search (Unified local + IMDb suggestions) -->
+            <div class="header-search">
+                <div class="search-input-wrapper">
+                    <i class="fas fa-search search-icon-inside"></i>
+                    <input type="text" id="searchInput" placeholder="Search movies, TV shows, or paste URL..."
+                        autocomplete="off">
+                    <button id="searchClearBtn" class="search-clear-btn hidden" title="Clear">×</button>
+                </div>
+                <!-- Search Suggestions Dropdown -->
                 <div id="search-dropdown" class="results-dropdown hidden"></div>
             </div>
 
-            <div class="nav-links">
-                <button class="nav-btn active" data-tab="vault"><i class="fas fa-play"></i>My List</button>
-                <button class="nav-btn" data-tab="history"><i class="fas fa-history"></i>Completed</button>
-                <button class="nav-btn" data-tab="sync"><i class="fas fa-tv"></i>Pair Devices</button>
+            <!-- Desktop Navigation Links -->
+            <nav class="nav-links">
+                <button class="nav-btn" data-tab="sync"><i class="fas fa-tv"></i>Sync Devices</button>
+            </nav>
+
+            <!-- Desktop Theme & Actions -->
+            <div class="header-actions">
+                <button id="themeToggle" class="icon-btn" title="Toggle Theme">
+                    <i class="fas fa-sun" id="themeIcon"></i>
+                </button>
             </div>
 
-            <div class="mobile-search-toggle" id="mobile-search-btn">
-                <i class="fas fa-search"></i>
+            <!-- Mobile Search Icon -->
+            <div class="mobile-search-toggle" id="mobile-search-btn" style="cursor: pointer; display: none;">
+                <i class="fas fa-search" style="font-size: 1.25rem;"></i>
             </div>
         </div>
     </header>
 
-    <main class="container">
-        <!-- Vault Section -->
-        <section id="vault-section">
-            <div id="hero-banner" class="hero-banner hidden"></div>
-            <div id="watchlist-grid" class="movie-grid"></div>
-        </section>
+    <!-- App Container -->
+    <main class="app-container">
 
-        <!-- History Section -->
-        <section id="history-section" class="hidden">
-            <div class="section-header">
+        <!-- Library & History Sections -->
+        <div id="library-history-container">
 
+
+            <!-- Unified Filters & Tag pills bar -->
+            <div class="category-container">
+                <!-- Tag Filters -->
+                <div id="tagFilter" class="category-bar">
+                    <button class="cat-pill active" data-tag="all">All Tags</button>
+                </div>
             </div>
-            <div id="history-grid" class="movie-grid"></div>
-        </section>
+
+            <!-- Main Library Grid -->
+            <div id="linkGrid" class="link-grid">
+                <!-- Cards injected here dynamically -->
+                <div class="empty-state">
+                    <i class="fas fa-folder-open empty-state-icon"></i>
+                    <div class="empty-title">Nothing here yet</div>
+                    <div class="empty-sub">Paste a link above or search movies to begin.</div>
+                </div>
+            </div>
+        </div>
 
         <!-- Sync Section -->
-        <section id="sync-section" class="hidden">
-            <div class="section-header">
-
-            </div>
+        <section id="sync-section" class="hidden" style="margin-top: 1rem;">
             <div class="sync-grid">
+                <!-- Sync Host code generator -->
                 <div class="sync-card">
                     <p class="sync-label">Your Pairing Code</p>
                     <div id="sync-code-display" class="sync-code">——</div>
                     <div id="p2p-qr" class="p2p-qr hidden"></div>
-                    <button id="generate-sync" class="btn-prime" style="width:100%">Generate Code</button>
-                    <p class="sync-hint">Use this code to pair another device and sync your library.</p>
+                    <button id="generate-sync" class="btn primary" style="width:100%"><i
+                            class="fas fa-broadcast-tower"></i> Generate Code</button>
+                    <p class="sync-hint">Generate a code to broadcast your links and watchlist library to a secondary
+                        device.</p>
                 </div>
 
+                <!-- Sync Guest pairing form -->
                 <div class="sync-card">
                     <p class="sync-label">Pair with Code</p>
                     <input type="text" id="sync-input" class="sync-input" placeholder="Enter 6-digit code"
                         maxlength="6">
-                    <button id="load-sync" class="btn-ghost" style="width:100%">Pair Device</button>
-                    <p class="sync-hint">Enter the 6-digit code from your secondary device to sync libraries.</p>
+                    <button id="load-sync" class="btn secondary" style="width:100%"><i class="fas fa-link"></i> Pair
+                        Device</button>
+                    <p class="sync-hint">Enter the 6-digit code from your primary device to merge both collections.</p>
                 </div>
             </div>
+
+
         </section>
     </main>
 
-    <!-- Mobile Navigation -->
+    <!-- Mobile Navigation Tab Bar -->
     <nav class="tab-bar">
-        <button class="tab-item active" data-tab="vault"><i class="fas fa-play"></i><span>My List</span></button>
-        <button class="tab-item" data-tab="history"><i class="fas fa-history"></i><span>Completed</span></button>
-        <button class="tab-item" data-tab="sync"><i class="fas fa-tv"></i><span>Pair Devices</span></button>
+        <button class="tab-item" data-tab="sync"><i class="fas fa-tv"></i><span>Sync Devices</span></button>
     </nav>
 
     <!-- Mobile Search Overlay -->
     <div class="search-overlay" id="search-overlay">
         <div class="search-header">
             <button id="close-search"><i class="fas fa-arrow-left"></i></button>
-            <input type="text" id="mobile-search-input" placeholder="Search movies...">
+            <input type="text" id="mobile-search-input" placeholder="Search movies, TV or paste link..."
+                autocomplete="off">
         </div>
-        <div id="mobile-results" style="flex:1; overflow-y:auto;"></div>
+        <div id="mobile-results" style="flex:1; overflow-y:auto; padding-bottom: 2rem;"></div>
     </div>
 
-    <!-- Link Input Overlay -->
-    <div class="link-overlay" id="link-overlay">
-        <div class="link-overlay-content">
-            <div class="link-overlay-header">
-                <h3>Import Movie from URL</h3>
-                <button id="close-link-overlay"><i class="fas fa-times"></i></button>
-            </div>
-            <div id="link-loading" class="link-loading hidden">
-                <div class="link-spinner"></div>
-                <span>Extracting metadata...</span>
-            </div>
-            <!-- Preview & Thumbnail Picker (shown after fetch) -->
-            <div id="link-preview" class="link-preview hidden">
-                <div class="link-preview-meta">
-                    <h4 id="link-preview-title"></h4>
-                    <p id="link-preview-desc"></p>
+    <!-- Hidden Inputs for App Ingestion logic -->
+    <input type="url" id="urlInput" style="display: none;">
+    <input type="text" id="addTagsInput" style="display: none;">
+    <button id="addBtn" style="display: none;"></button>
+
+    <!-- Link Thumbnail Picker Modal -->
+    <div id="thumbModal" class="modal-overlay hidden">
+        <div class="modal-content border-panel" style="max-width: 480px; flex-direction: column;">
+            <div style="padding: 1.5rem; display: flex; flex-direction: column; height: 100%;">
+                <h2
+                    style="font-family: var(--font-heading); font-size: 1.15rem; font-weight: 800; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 1rem;">
+                    Select Thumbnail</h2>
+                <p id="thumbStatus" class="modal-subtitle"
+                    style="margin: 0.25rem 0 0.75rem; font-size: 0.82rem; color: var(--text-secondary);"></p>
+                <div id="thumbPicker" class="thumb-picker"></div>
+
+                <!-- Tag Input Option inside Thumbnail Picker -->
+                <div class="field" style="margin-top: 0.75rem;">
+                    <label
+                        style="font-family: var(--font-heading); font-weight: 800; font-size: 0.72rem; text-transform: uppercase; color: var(--text-secondary); margin-bottom: 0.25rem;">Tags</label>
+                    <div class="tag-input-wrapper" style="display: flex; gap: 8px;">
+                        <input type="text" id="addThumbTags" placeholder="Add Tag" style="flex: 1;">
+                        <button id="addThumbTagBtn" class="btn icon-btn" type="button"
+                            style="width: 38px; height: 38px; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; font-weight: bold; padding: 0;">+</button>
+                    </div>
+                    <div id="addThumbTagsList" class="form-tag-list"
+                        style="margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px;"></div>
                 </div>
-                <p id="link-thumb-status" class="link-thumb-status">Select a thumbnail:</p>
-                <div id="link-thumb-picker" class="link-thumb-picker"></div>
-                <button id="link-confirm-btn" class="btn-prime" style="width:100%; margin-top:1rem;">Add</button>
+
+                <div class="modal-actions" style="margin-top: 1.25rem;">
+                    <button id="confirmThumb" class="btn primary" style="width: 100%">Confirm</button>
+                    <div style="display: flex; gap: 8px; margin-top: 4px;">
+                        <button id="retryFetchBtn" class="btn secondary" style="flex: 1;">Try Again</button>
+                        <button id="closeModal" class="btn secondary" style="flex: 1;">Cancel</button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- Details Modal -->
-    <div class="modal-overlay" id="main-modal">
-        <div class="modal-content">
-            <div class="modal-poster-side">
-                <img id="modal-img" src="" alt="Poster">
+    <!-- Edit Link Modal (General Links) -->
+    <div id="editModal" class="modal-overlay hidden">
+        <div class="modal-content border-panel" style="max-width: 520px; flex-direction: column;">
+            <div style="padding: 1.5rem; display: flex; flex-direction: column; overflow-y: auto;">
+                <h2
+                    style="font-family: var(--font-heading); font-size: 1.15rem; font-weight: 800; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 1rem;">
+                    Edit Bookmark</h2>
+
+                <div class="edit-fields">
+                    <div class="field">
+                        <label
+                            style="font-family: var(--font-heading); font-weight: 800; font-size: 0.72rem; text-transform: uppercase; color: var(--text-secondary); margin-bottom: 0.25rem;">Title</label>
+                        <input type="text" id="editTitle" placeholder="Title">
+                    </div>
+                    <div class="field" style="margin-top: 0.75rem;">
+                        <label
+                            style="font-family: var(--font-heading); font-weight: 800; font-size: 0.72rem; text-transform: uppercase; color: var(--text-secondary); margin-bottom: 0.25rem;">Description</label>
+                        <textarea id="editDesc" placeholder="Description" style="min-height: 80px;"></textarea>
+                    </div>
+                    <div class="field" style="margin-top: 0.75rem;">
+                        <label
+                            style="font-family: var(--font-heading); font-weight: 800; font-size: 0.72rem; text-transform: uppercase; color: var(--text-secondary); margin-bottom: 0.25rem;">Tags</label>
+                        <div class="tag-input-wrapper">
+                            <input type="text" id="editTags" placeholder="Add Tag">
+                            <button id="editTagBtn" class="btn icon-btn" type="button">+</button>
+                        </div>
+                        <div id="editTagsList" class="form-tag-list"></div>
+                    </div>
+                    <div class="thumbnail-section" style="margin-top: 1rem;">
+                        <label
+                            style="font-family: var(--font-heading); font-weight: 800; font-size: 0.72rem; text-transform: uppercase; color: var(--text-secondary); margin-bottom: 0.25rem;">Thumbnail</label>
+                        <div id="editThumbPicker" class="thumb-picker"></div>
+                        <div class="screenshot-tools">
+                            <h3>Refresh Screenshot</h3>
+                            <div class="crop-presets">
+                                <button class="btn tiny active" data-crop="1200">Full (1200w)</button>
+                                <button class="btn tiny" data-crop="800">Wide (800w)</button>
+                                <button class="btn tiny" data-crop="400">Square (400w)</button>
+                            </div>
+                            <button id="genScreenshotBtn" class="btn secondary" style="width: 100%; margin-top: 6px;"><i
+                                    class="fas fa-camera"></i> Fetch screenshot</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-actions" style="margin-top: 1.5rem; display: flex; flex-direction: row; gap: 8px;">
+                    <button id="closeEditModal" class="btn secondary" style="flex: 1;">Cancel</button>
+                    <button id="saveEditBtn" class="btn primary" style="flex: 1;">Save Changes</button>
+                </div>
             </div>
+        </div>
+    </div>
+
+    <!-- Details Modal (Unified Movie watchlist + Link quick view) -->
+    <div class="modal-overlay hidden" id="main-modal">
+        <div class="modal-content">
+            <!-- Poster Side -->
+            <div class="modal-poster-side">
+                <img id="modal-img" src="" alt="Poster"
+                    onerror="this.src='https://via.placeholder.com/300x450?text=Poster+Unavailable'">
+            </div>
+            <!-- Info Side -->
             <div class="modal-info-side">
-                <!-- Standard view -->
                 <h2 id="modal-title" class="modal-title"></h2>
                 <div id="modal-desc" class="modal-meta"></div>
 
-                <!-- Link-specific: URL actions -->
+                <!-- Web Link actions -->
                 <div id="modal-link-actions" class="modal-link-actions hidden">
-                    <button id="modal-copy-url" class="btn-icon" title="Copy URL"><i class="fas fa-copy"></i></button>
-                    <button id="modal-open-url" class="btn-icon" title="Open URL"><i
-                            class="fas fa-external-link-alt"></i></button>
-                    <button id="modal-edit-toggle" class="btn-icon" title="Edit"><i class="fas fa-pen"></i></button>
+                    <button id="modal-open-url" class="btn secondary" style="flex: 1;"><i
+                            class="fas fa-external-link-alt"></i> Open</button>
+                    <button id="modal-copy-url" class="btn secondary" style="flex: 1;"><i class="fas fa-copy"></i> Copy
+                        Link</button>
+                    <button id="modal-edit-toggle" class="btn secondary" title="Edit Properties"><i
+                            class="fas fa-pen"></i> Edit</button>
                 </div>
 
-                <!-- Link-specific: Edit section (hidden by default) -->
+                <!-- Web Link inline details editor -->
                 <div id="modal-edit-section" class="modal-edit-section hidden">
                     <div class="modal-edit-field">
                         <label>Title</label>
                         <input type="text" id="modal-edit-title" placeholder="Title">
                     </div>
                     <div class="modal-edit-field">
-                        <label>Description</label>
-                        <input type="text" id="modal-edit-desc" placeholder="Description">
+                        <label>Description / Actors</label>
+                        <input type="text" id="modal-edit-desc" placeholder="Details">
                     </div>
-                    <button id="modal-edit-save" class="btn-prime" style="width:100%">Save Changes</button>
+                    <button id="modal-edit-save" class="btn primary" style="width:100%; margin-top: 6px;">Save
+                        Changes</button>
                 </div>
 
-                <!-- Link-specific: Actor tags -->
-                <div id="modal-actors-section" class="modal-actors-section hidden">
-                    <label>Actors</label>
+                <!-- Actors / Tags Editor -->
+                <div id="modal-actors-section" class="modal-actors-section">
+                    <label id="modal-tags-label">Actors</label>
                     <div id="modal-actor-tags" class="modal-actor-tags"></div>
                     <div class="modal-actor-input-wrap">
-                        <input type="text" id="modal-actor-input" placeholder="Add actor name...">
-                        <button id="modal-add-actor" class="btn-icon-sm"><i class="fas fa-plus"></i></button>
+                        <input type="text" id="modal-actor-input" placeholder="Add tags...">
+                        <button id="modal-add-actor" class="btn primary icon-btn-sm"
+                            style="width: 32px; height: 32px; border-radius: 8px;"><i class="fas fa-plus"></i></button>
                     </div>
                 </div>
 
+                <!-- Dialog actions (Add, watched, delete) -->
                 <div class="modal-actions">
-                    <button id="add-to-vault" class="btn-prime">Add to My List</button>
-                    <button id="mark-watched" class="btn-ghost">Mark Completed</button>
-                    <button id="close-modal" class="btn-ghost">Close</button>
+                    <div class="modal-actions-row" style="grid-template-columns: 1fr;">
+                        <button id="add-to-library" class="btn primary">Add to My List</button>
+                    </div>
+                    <button id="close-modal" class="btn secondary">Close</button>
                 </div>
             </div>
         </div>
     </div>
 
-    <script src="script.js"></script>
+    <!-- Application Script -->
+    <script src="app.js"></script>
 </body>
 
 </html>
