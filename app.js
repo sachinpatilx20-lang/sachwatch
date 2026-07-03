@@ -4,6 +4,28 @@
  * Smart Metadata extraction, and responsive grid layouts.
  */
 
+// Standalone utility for fetch with timeout that returns parsed JSON
+async function fetchWithTimeout(resource, options = {}) {
+    const { timeout = 2500 } = options;
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), timeout);
+    try {
+        const response = await fetch(resource, {
+            ...options,
+            signal: controller.signal
+        });
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        clearTimeout(id);
+        return data;
+    } catch (e) {
+        clearTimeout(id);
+        throw e;
+    }
+}
+
 class SachApp {
     constructor() {
         this.items = [];
@@ -246,6 +268,8 @@ class SachApp {
             } else {
                 this.searchClearBtn.classList.add('hidden');
             }
+            // Update local catalog grid instantly
+            this.render();
             this.triggerSearch(query, this.searchDropdown);
         });
 
@@ -278,12 +302,47 @@ class SachApp {
                 document.getElementById('search-overlay').classList.remove('active');
                 this.mobileSearchInput.value = '';
                 this.mobileResults.innerHTML = '';
+                this.searchQuery = '';
+                this.render();
             };
         }
         if (this.mobileSearchInput) {
             this.mobileSearchInput.oninput = (e) => {
-                this.triggerSearch(e.target.value.trim(), this.mobileResults);
+                const query = e.target.value.trim();
+                this.searchQuery = query;
+                // Update local catalog grid instantly
+                this.render();
+                this.triggerSearch(query, this.mobileResults);
             };
+        }
+
+        // Enter key listeners to trigger immediate URL ingestion or focus search
+        const handleSearchEnter = (evt, inputEl, dropdownEl) => {
+            if (evt.key === 'Enter') {
+                const query = inputEl.value.trim();
+                if (!query) return;
+                
+                const isUrl = /^https?:\/\//i.test(query);
+                if (isUrl) {
+                    evt.preventDefault();
+                    dropdownEl.classList.add('hidden');
+                    inputEl.value = '';
+                    this.searchQuery = '';
+                    if (this.searchClearBtn) this.searchClearBtn.classList.add('hidden');
+                    document.getElementById('search-overlay').classList.remove('active');
+                    
+                    this.urlInput.value = query;
+                    this.handleAddLink();
+                } else {
+                    inputEl.blur();
+                    dropdownEl.classList.add('hidden');
+                }
+            }
+        };
+
+        this.searchInput.addEventListener('keydown', (evt) => handleSearchEnter(evt, this.searchInput, this.searchDropdown));
+        if (this.mobileSearchInput) {
+            this.mobileSearchInput.addEventListener('keydown', (evt) => handleSearchEnter(evt, this.mobileSearchInput, this.mobileResults));
         }
 
         // Global Esc key closer
@@ -452,68 +511,19 @@ class SachApp {
         }, 300);
     }
 
-    async fetchSuggestions(query, dropdownEl) {
-        const isUrl = /^https?:\/\//i.test(query);
-        let suggestionsHTML = '';
-
-        // 1. If it's a URL, show rapid URL import helper
-        if (isUrl) {
-            dropdownEl.innerHTML = `
-                <div class="search-item" id="btnImportUrlSuggest" style="background: var(--accent-dim);">
-                    <div style="width:32px; height:32px; border-radius:4px; background:var(--accent-gradient); color:#fff; display:flex; align-items:center; justify-content:center; font-size:0.8rem;">
-                        <i class="fas fa-link"></i>
-                    </div>
-                    <div style="flex:1; min-width:0;">
-                        <h4 style="font-size:0.85rem; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Import Web Link</h4>
-                        <p style="font-size:0.72rem; color:var(--text-secondary); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${query}</p>
-                    </div>
-                </div>
-            `;
-            dropdownEl.classList.remove('hidden');
-
-            document.getElementById('btnImportUrlSuggest').onclick = () => {
-                dropdownEl.classList.add('hidden');
-                this.searchInput.value = '';
-                this.searchQuery = '';
-                this.searchClearBtn.classList.add('hidden');
-                document.getElementById('search-overlay').classList.remove('active');
-
-                // Trigger ingestion directly without intermediate modals
-                this.urlInput.value = query;
-                this.handleAddLink();
-            };
+    renderSuggestions(query, localMatches, imdbResults, isLoadingOnline, dropdownEl) {
+        // Discard if the current search input value doesn't match the query
+        const currentVal = (dropdownEl === this.mobileResults) 
+            ? (this.mobileSearchInput ? this.mobileSearchInput.value.trim() : '')
+            : (this.searchInput ? this.searchInput.value.trim() : '');
+        
+        if (currentVal.toLowerCase() !== query.toLowerCase()) {
             return;
         }
 
-        // 2. Local matching items
-        const q = query.toLowerCase();
-        const localMatches = this.items.filter(item => {
-            return (item.title || '').toLowerCase().includes(q) ||
-                   (item.desc || '').toLowerCase().includes(q) ||
-                   (item.tags || []).some(tag => tag.toLowerCase().includes(q));
-        }).slice(0, 3);
-
-        // 3. Online IMDb query
-        let imdbResults = [];
-        try {
-            const res = await fetch(`https://imdb.iamidiotareyoutoo.com/search?q=${encodeURIComponent(query)}`);
-            const data = await res.json();
-            if (data.ok && data.description) {
-                imdbResults = data.description.map(m => ({
-                    title: m.title || m['#TITLE'] || 'Untitled',
-                    year: m.year || m['#YEAR'] || '—',
-                    poster: m.poster || m['#IMG_POSTER'] || '',
-                    imdbId: m.imdbId || m['#IMDB_ID'] || '',
-                    actors: m.actors || m['#ACTORS'] || ''
-                })).filter(Boolean).slice(0, 6);
-            }
-        } catch (e) {
-            console.warn("IMDb fetch failed:", e);
-        }
-
-        // Render suggest elements
         dropdownEl.innerHTML = '';
-        
+
+        // 1. Render Local Matches
         if (localMatches.length > 0) {
             const heading = document.createElement('div');
             heading.style.cssText = 'padding: 6px 12px; font-size: 0.65rem; font-weight: 800; text-transform: uppercase; color: var(--text-secondary); border-bottom: 1px solid var(--border-color);';
@@ -539,7 +549,21 @@ class SachApp {
             });
         }
 
-        if (imdbResults.length > 0) {
+        // 2. Render Online Matches or Loading State
+        if (isLoadingOnline) {
+            const heading = document.createElement('div');
+            heading.style.cssText = 'padding: 6px 12px; font-size: 0.65rem; font-weight: 800; text-transform: uppercase; color: var(--text-secondary); border-bottom: 1px solid var(--border-color); margin-top: 4px;';
+            heading.textContent = 'Online Movie Matches';
+            dropdownEl.appendChild(heading);
+
+            const loaderRow = document.createElement('div');
+            loaderRow.style.cssText = 'padding: 1rem; text-align: center; color: var(--text-secondary); font-size: 0.8rem; display: flex; align-items: center; justify-content: center; gap: 8px;';
+            loaderRow.innerHTML = `
+                <div class="loader-spinner" style="border: 2px solid var(--border-color); border-top: 2px solid var(--accent-color); border-radius: 50%; width: 16px; height: 16px; animation: spin 0.8s linear infinite;"></div>
+                <span>Searching IMDb...</span>
+            `;
+            dropdownEl.appendChild(loaderRow);
+        } else if (imdbResults.length > 0) {
             const heading = document.createElement('div');
             heading.style.cssText = 'padding: 6px 12px; font-size: 0.65rem; font-weight: 800; text-transform: uppercase; color: var(--text-secondary); border-bottom: 1px solid var(--border-color); margin-top: 4px;';
             heading.textContent = 'Online Movie Matches';
@@ -560,7 +584,6 @@ class SachApp {
                     dropdownEl.classList.add('hidden');
                     document.getElementById('search-overlay').classList.remove('active');
                     
-                    // Formulate a temporary item to load details
                     const movieItem = {
                         id: 'movie_' + movie.imdbId,
                         type: 'movie',
@@ -579,12 +602,81 @@ class SachApp {
             });
         }
 
-        if (localMatches.length === 0 && imdbResults.length === 0) {
+        // 3. No Results State
+        if (localMatches.length === 0 && imdbResults.length === 0 && !isLoadingOnline) {
             dropdownEl.innerHTML = '<div style="padding: 1rem; text-align: center; color: var(--text-secondary); font-size: 0.8rem;">No results found</div>';
         }
 
         dropdownEl.classList.remove('hidden');
-        this.render();
+    }
+
+    async fetchSuggestions(query, dropdownEl) {
+        const isUrl = /^https?:\/\//i.test(query);
+
+        // 1. If it's a URL, show rapid URL import helper
+        if (isUrl) {
+            dropdownEl.innerHTML = `
+                <div class="search-item" id="btnImportUrlSuggest" style="background: var(--accent-dim);">
+                    <div style="width:32px; height:32px; border-radius:4px; background:var(--accent-gradient); color:#fff; display:flex; align-items:center; justify-content:center; font-size:0.8rem;">
+                        <i class="fas fa-link"></i>
+                    </div>
+                    <div style="flex:1; min-width:0;">
+                        <h4 style="font-size:0.85rem; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Import Web Link</h4>
+                        <p style="font-size:0.72rem; color:var(--text-secondary); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${query}</p>
+                    </div>
+                </div>
+            `;
+            dropdownEl.classList.remove('hidden');
+
+            const btn = document.getElementById('btnImportUrlSuggest');
+            if (btn) {
+                btn.onclick = () => {
+                    dropdownEl.classList.add('hidden');
+                    if (this.searchInput) {
+                        this.searchInput.value = '';
+                        if (this.searchClearBtn) this.searchClearBtn.classList.add('hidden');
+                    }
+                    if (this.mobileSearchInput) this.mobileSearchInput.value = '';
+                    this.searchQuery = '';
+                    document.getElementById('search-overlay').classList.remove('active');
+
+                    // Trigger ingestion directly
+                    this.urlInput.value = query;
+                    this.handleAddLink();
+                };
+            }
+            return;
+        }
+
+        // 2. Local matching items
+        const q = query.toLowerCase();
+        const localMatches = this.items.filter(item => {
+            return (item.title || '').toLowerCase().includes(q) ||
+                   (item.desc || '').toLowerCase().includes(q) ||
+                   (item.tags || []).some(tag => tag.toLowerCase().includes(q));
+        }).slice(0, 3);
+
+        // Render local matches instantly
+        this.renderSuggestions(query, localMatches, [], true, dropdownEl);
+
+        // 3. Online IMDb query
+        try {
+            const data = await fetchWithTimeout(`https://imdb.iamidiotareyoutoo.com/search?q=${encodeURIComponent(query)}`, { timeout: 4000 });
+            let imdbResults = [];
+            if (data.ok && data.description) {
+                imdbResults = data.description.map(m => ({
+                    title: m.title || m['#TITLE'] || 'Untitled',
+                    year: m.year || m['#YEAR'] || '—',
+                    poster: m.poster || m['#IMG_POSTER'] || '',
+                    imdbId: m.imdbId || m['#IMDB_ID'] || '',
+                    actors: m.actors || m['#ACTORS'] || ''
+                })).filter(Boolean).slice(0, 6);
+            }
+            this.renderSuggestions(query, localMatches, imdbResults, false, dropdownEl);
+        } catch (e) {
+            console.warn("IMDb fetch failed or timed out:", e);
+            this.renderSuggestions(query, localMatches, [], false, dropdownEl);
+        }
     }
 
     // Link Metadata Extractor
@@ -678,8 +770,7 @@ class SachApp {
                     const id = url.split('youtu.be/')[1].split('?')[0];
                     ytUrl = `https://www.youtube.com/watch?v=${id}`;
                 }
-                const res = await fetch(`https://www.youtube.com/oembed?url=${encodeURIComponent(ytUrl)}&format=json`);
-                const data = await res.json();
+                const data = await fetchWithTimeout(`https://www.youtube.com/oembed?url=${encodeURIComponent(ytUrl)}&format=json`, { timeout: 2500 });
                 if (data.title) {
                     results.title = data.title;
                     results.description = `YouTube Video by ${data.author_name}`;
@@ -691,15 +782,13 @@ class SachApp {
 
         // Parallel metadata lookups
         await Promise.allSettled([
-            fetch(`https://noembed.com/embed?url=${encodeURIComponent(url)}`)
-                .then(res => res.json())
+            fetchWithTimeout(`https://noembed.com/embed?url=${encodeURIComponent(url)}`, { timeout: 2000 })
                 .then(data => {
                     if (data.title && results.title === url) results.title = data.title;
                     if (data.author_name && results.description.startsWith('Fetching')) results.description = `Shared by ${data.author_name}`;
                     if (data.thumbnail_url) results.images.push(data.thumbnail_url);
                 }),
-            fetch(`https://api.microlink.io/?url=${encodeURIComponent(url)}`)
-                .then(res => res.json())
+            fetchWithTimeout(`https://api.microlink.io/?url=${encodeURIComponent(url)}`, { timeout: 2000 })
                 .then(data => {
                     if (data.status === 'success') {
                         const m = data.data;
@@ -709,8 +798,7 @@ class SachApp {
                         if (m.logo?.url) results.images.push(m.logo.url);
                     }
                 }),
-            fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`)
-                .then(res => res.json())
+            fetchWithTimeout(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`, { timeout: 1800 })
                 .then(data => {
                     const doc = new DOMParser().parseFromString(data.contents, 'text/html');
                     const getM = (s) => doc.querySelector(`meta[property="${s}"], meta[name="${s}"]`)?.getAttribute('content');
@@ -1049,6 +1137,7 @@ class SachApp {
     render() {
         if (!this.linkGrid) return;
         this.updateTagPillBar();
+        this.renderHeroBanner();
 
         let filtered = [...this.items];
 
@@ -1077,13 +1166,43 @@ class SachApp {
 
         if (filtered.length === 0) {
             const searching = this.searchQuery.trim() || this.activeTag !== 'all';
-            this.linkGrid.innerHTML = `
-                <div class="empty-state">
-                    <i class="fas ${searching ? 'fa-search' : 'fa-folder-open'} empty-state-icon"></i>
-                    <div class="empty-title">${searching ? 'No matches found' : 'Nothing here yet'}</div>
-                    <div class="empty-sub">${searching ? 'Try adjusting your queries or filters.' : 'Paste a link above or search movies to begin.'}</div>
-                </div>
-            `;
+            if (searching) {
+                this.linkGrid.innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-search empty-state-icon"></i>
+                        <div class="empty-title">No matches found</div>
+                        <div class="empty-sub">Try adjusting your queries or filters.</div>
+                    </div>
+                `;
+            } else {
+                this.linkGrid.innerHTML = `
+                    <div class="empty-state-welcome">
+                        <div class="welcome-header">
+                            <i class="fas fa-folder-open welcome-icon"></i>
+                            <h2>Start Your Premium Collection</h2>
+                            <p>Paste a website URL or search movie titles in the search bar above. Try importing these popular quick-links instantly:</p>
+                        </div>
+                        <div class="quick-add-grid">
+                            <div class="quick-add-card" onclick="window.sachApp.quickImport('https://www.youtube.com')">
+                                <i class="fab fa-youtube qa-icon yt"></i>
+                                <span>YouTube</span>
+                            </div>
+                            <div class="quick-add-card" onclick="window.sachApp.quickImport('https://www.imdb.com')">
+                                <i class="fas fa-film qa-icon imdb"></i>
+                                <span>IMDb</span>
+                            </div>
+                            <div class="quick-add-card" onclick="window.sachApp.quickImport('https://github.com')">
+                                <i class="fab fa-github qa-icon github"></i>
+                                <span>GitHub</span>
+                            </div>
+                            <div class="quick-add-card" onclick="window.sachApp.quickImport('https://news.ycombinator.com')">
+                                <i class="fab fa-y-combinator qa-icon yc"></i>
+                                <span>Hacker News</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
             return;
         }
 
@@ -1101,13 +1220,25 @@ class SachApp {
                 ? `window.open('${item.url.replace(/'/g, "\\'")}',' _blank')` 
                 : `window.sachApp.openDetailsById('${item.id}')`;
 
+            const hostOrYear = isLink ? item.year : `<i class="fas fa-calendar-alt"></i> ${item.year}`;
+            const tagsHTML = (item.tags || []).slice(0, 2).map(t => `<span class="card-tag-pill">${t}</span>`).join('');
+            const iconBadge = isLink ? `<i class="fas fa-link"></i>` : `<i class="fas fa-film"></i>`;
+
             return `
                 <div class="card type-${item.type}" data-id="${item.id}" onclick="${clickHandler}">
                     <button class="quick-action" title="Delete" onclick="event.stopPropagation(); window.sachApp.removeLink('${item.id}')">
                         <i class="fas fa-times"></i>
                     </button>
                     <div class="card-img-wrapper">
-                        <img src="${item.thumb || 'https://via.placeholder.com/400x225?text=Poster+Unavailable'}" class="card-img" loading="lazy" onerror="this.src='https://via.placeholder.com/400x225?text=Image+Unavailable'">
+                        <img src="${item.thumb || 'https://via.placeholder.com/400x225?text=Poster+Unavailable'}" class="card-img" loading="lazy" onerror="this.onerror=null; this.src='https://via.placeholder.com/400x225?text=Image+Unavailable'">
+                        <div class="card-info-overlay">
+                            <div class="card-info-header">
+                                <span class="card-type-icon">${iconBadge}</span>
+                                <span class="card-host-text">${hostOrYear}</span>
+                            </div>
+                            <h3 class="card-overlay-title">${item.title}</h3>
+                            ${tagsHTML ? `<div class="card-overlay-tags">${tagsHTML}</div>` : ''}
+                        </div>
                     </div>
                 </div>
             `;
@@ -1314,6 +1445,8 @@ class SachApp {
                     this.showToast(`Merged ${this.items.length - originalCount} new records successfully!`, "success");
                     this.syncInput.value = '';
                     tempPeer.destroy();
+                    // Switch back to library tab so the user sees the synced results
+                    setTimeout(() => this.switchTab('library'), 1000);
                 }
             });
 
@@ -1341,7 +1474,84 @@ class SachApp {
                 this.showToast(`Connecting to sync code ${syncParam}...`);
                 setTimeout(() => this.loadFromSync(), 800);
             }
+            // Clear the query parameter from the URL to prevent repeating connection attempts on reload
+            const newUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+            window.history.replaceState({ path: newUrl }, '', newUrl);
         }
+    }
+
+    renderHeroBanner() {
+        const container = document.getElementById('heroBannerContainer');
+        if (!container) return;
+
+        // Only show hero banner on Library tab, and when search query is empty
+        if (this.activeTab !== 'library' || this.searchQuery.trim() !== '') {
+            container.innerHTML = '';
+            container.style.display = 'none';
+            return;
+        }
+
+        container.style.display = 'block';
+
+        if (this.items.length === 0) {
+            // Default premium fallback billboard
+            container.innerHTML = `
+                <div class="hero-banner">
+                    <div class="hero-backdrop" style="background-image: linear-gradient(to right, rgba(20,20,20,0.9) 30%, rgba(20,20,20,0.3) 100%), url('https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?q=80&w=1200')"></div>
+                    <div class="hero-content">
+                        <span class="hero-badge-featured"><i class="fas fa-star"></i> Welcome to Sach</span>
+                        <h1 class="hero-title">Your Cinematic Watchlist & Link Library</h1>
+                        <p class="hero-meta">Save bookmarks, organize movie lists, and synchronize peer-to-peer instantly.</p>
+                        <div class="hero-buttons">
+                            <button class="btn primary hero-btn-watch" onclick="document.getElementById('searchInput').focus();"><i class="fas fa-plus"></i> Add First Item</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            return;
+        }
+
+        // Find the latest item (prefer movies for cinematic feel)
+        let featured = this.items.find(i => i.type === 'movie');
+        if (!featured) featured = this.items[0]; // Fallback to latest link
+
+        const isMovie = featured.type === 'movie';
+        const backdropUrl = featured.thumb || 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?q=80&w=1200';
+        const badgeText = isMovie ? 'Featured Movie' : 'Featured Bookmark';
+        const badgeIcon = isMovie ? 'fa-film' : 'fa-link';
+        const buttonText = isMovie ? 'View Details' : 'Open Link';
+        const buttonIcon = isMovie ? 'fa-info-circle' : 'fa-external-link-alt';
+
+        const actionHandler = isMovie
+            ? `window.sachApp.openDetailsById('${featured.id}')`
+            : `window.open('${featured.url.replace(/'/g, "\\'")}', '_blank')`;
+
+        const tagsHTML = (featured.tags || []).slice(0, 3).map(t => `<span class="hero-tag">${t}</span>`).join('');
+
+        container.innerHTML = `
+            <div class="hero-banner">
+                <div class="hero-backdrop" style="background-image: linear-gradient(to right, rgba(20,20,20,0.9) 40%, rgba(20,20,20,0.4) 100%), url('${backdropUrl}')"></div>
+                <div class="hero-content">
+                    <span class="hero-badge-featured"><i class="fas ${badgeIcon}"></i> ${badgeText}</span>
+                    <h1 class="hero-title">${featured.title}</h1>
+                    <p class="hero-meta">
+                        <span class="hero-year">${featured.year}</span>
+                        <span class="hero-actors">${featured.desc || 'No description available.'}</span>
+                    </p>
+                    ${tagsHTML ? `<div class="hero-tags">${tagsHTML}</div>` : ''}
+                    <div class="hero-buttons">
+                        <button class="btn primary hero-btn-watch" onclick="${actionHandler}">
+                            <i class="fas ${buttonIcon}"></i> ${buttonText}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    quickImport(url) {
+        this.urlInput.value = url;
+        this.handleAddLink();
     }
 
 

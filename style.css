@@ -90,9 +90,9 @@ body {
 }
 
 .app-container {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 0 1.5rem 3rem;
+    max-width: 100%;
+    margin: 0;
+    padding: 0 4% 3rem;
 }
 
 .border-panel {
@@ -124,9 +124,9 @@ body.light-theme header {
 }
 
 .nav-container {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 0 1.5rem;
+    max-width: 100%;
+    margin: 0;
+    padding: 0 4%;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -1541,3 +1541,224 @@ body.light-theme .tab-item.active {
         padding: 1.25rem;
     }
 }
+
+/* Glassmorphism search input border glow and outline */
+.search-input-wrapper:focus-within {
+    box-shadow: 0 0 12px rgba(229, 9, 20, 0.25) !important;
+}
+
+/* Card hover overlay styling */
+.card-info-overlay {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(to top, rgba(10,10,10,0.95) 0%, rgba(10,10,10,0.65) 65%, transparent 100%);
+    padding: 0.85rem 0.75rem 0.65rem;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    opacity: 0;
+    transform: translateY(12px);
+    transition: opacity 0.3s cubic-bezier(0.25, 0.8, 0.25, 1), transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+    pointer-events: none;
+    z-index: 6;
+}
+
+.card:hover .card-info-overlay {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.card-info-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.62rem;
+    color: var(--text-muted);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+body.light-theme .card-info-header {
+    color: var(--text-secondary);
+}
+
+.card-type-icon {
+    color: var(--accent-color);
+}
+
+.card-host-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 80%;
+}
+
+.card-overlay-title {
+    font-family: var(--font-heading);
+    font-size: 0.76rem;
+    font-weight: 800;
+    color: #ffffff;
+    line-height: 1.25;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+body.light-theme .card-overlay-title {
+    color: #ffffff; /* keep text readable against dark gradient backdrop */
+}
+
+.card-overlay-tags {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+    margin-top: 2px;
+}
+
+.card-tag-pill {
+    font-size: 0.56rem;
+    font-weight: 800;
+    background: rgba(255, 255, 255, 0.15);
+    color: #ffffff;
+    padding: 1px 5px;
+    border-radius: 2px;
+    text-transform: uppercase;
+}
+
+/* Premium Empty State welcome dashboard */
+.empty-state-welcome {
+    grid-column: 1 / -1;
+    background: linear-gradient(135deg, rgba(24, 24, 24, 0.8) 0%, rgba(16, 16, 16, 0.95) 100%);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 3.5rem 2rem;
+    text-align: center;
+    box-shadow: var(--shadow-md);
+    backdrop-filter: blur(15px);
+    -webkit-backdrop-filter: blur(15px);
+    margin-top: 1rem;
+    animation: fadeIn 0.6s ease;
+}
+
+body.light-theme .empty-state-welcome {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(243, 243, 243, 0.95) 100%);
+}
+
+.welcome-header {
+    max-width: 580px;
+    margin: 0 auto 2.5rem;
+}
+
+.welcome-icon {
+    font-size: 2.8rem;
+    color: var(--accent-color);
+    margin-bottom: 1.25rem;
+    animation: welcomeBounce 2.5s infinite ease-in-out;
+}
+
+.welcome-header h2 {
+    font-family: var(--font-heading);
+    font-size: 1.9rem;
+    font-weight: 900;
+    margin-bottom: 0.75rem;
+    letter-spacing: -0.75px;
+    text-transform: uppercase;
+}
+
+.welcome-header p {
+    color: var(--text-secondary);
+    font-size: 0.88rem;
+    line-height: 1.5;
+}
+
+.quick-add-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 1.25rem;
+    max-width: 680px;
+    margin: 0 auto;
+}
+
+.quick-add-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 1.5rem 1rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+body.light-theme .quick-add-card {
+    background: rgba(0, 0, 0, 0.02);
+}
+
+.quick-add-card:hover {
+    transform: translateY(-6px);
+    background: rgba(255, 255, 255, 0.06);
+    border-color: var(--accent-color);
+    box-shadow: var(--shadow-md);
+}
+
+body.light-theme .quick-add-card:hover {
+    background: #ffffff;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.06);
+}
+
+.qa-icon {
+    font-size: 2rem;
+    transition: transform 0.3s ease;
+}
+
+.quick-add-card:hover .qa-icon {
+    transform: scale(1.12);
+}
+
+.qa-icon.yt { color: #ff0000; }
+.qa-icon.imdb { color: #f5c518; }
+.qa-icon.github { color: var(--text-primary); }
+.qa-icon.yc { color: #ff6600; }
+
+.quick-add-card span {
+    font-family: var(--font-heading);
+    font-weight: 800;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+
+@keyframes welcomeBounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-8px); }
+}
+
+/* Micro-animations and active glows */
+.cat-pill {
+    transition: transform 0.2s ease, background-color 0.2s ease;
+}
+
+.cat-pill:hover {
+    transform: scale(1.03);
+}
+
+.cat-pill:active {
+    transform: scale(0.97);
+}
+
+.nav-btn {
+    transition: transform 0.2s ease, color 0.2s ease, background-color 0.2s ease;
+}
+
+.nav-btn:hover {
+    transform: translateY(-1px);
+}
+

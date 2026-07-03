@@ -70,6 +70,7 @@
 
             <!-- Desktop Navigation Links -->
             <nav class="nav-links">
+                <button class="nav-btn active" data-tab="library"><i class="fas fa-folder-open"></i>My List</button>
                 <button class="nav-btn" data-tab="sync"><i class="fas fa-tv"></i>Sync Devices</button>
             </nav>
 
@@ -93,6 +94,8 @@
         <!-- Library & History Sections -->
         <div id="library-history-container">
 
+            <!-- Billboard Hero Banner (Injected dynamically) -->
+            <div id="heroBannerContainer"></div>
 
             <!-- Unified Filters & Tag pills bar -->
             <div class="category-container">
@@ -144,6 +147,7 @@
 
     <!-- Mobile Navigation Tab Bar -->
     <nav class="tab-bar">
+        <button class="tab-item active" data-tab="library"><i class="fas fa-folder-open"></i><span>My List</span></button>
         <button class="tab-item" data-tab="sync"><i class="fas fa-tv"></i><span>Sync Devices</span></button>
     </nav>
 
@@ -256,7 +260,7 @@
             <!-- Poster Side -->
             <div class="modal-poster-side">
                 <img id="modal-img" src="" alt="Poster"
-                    onerror="this.src='https://via.placeholder.com/300x450?text=Poster+Unavailable'">
+                    onerror="this.onerror=null; this.src='https://via.placeholder.com/300x450?text=Poster+Unavailable'">
             </div>
             <!-- Info Side -->
             <div class="modal-info-side">
