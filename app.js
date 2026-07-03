@@ -34,8 +34,7 @@ async function fetchWithTimeout(resource, options = {}) {
 class SachApp {
     constructor() {
         this.items = [];
-        this.sections = [];           // Custom user-created shelf sections
-        this.activeTab = 'home';      // 'home', 'library', 'sync'
+        this.activeTab = 'home';      // 'home', 'sync'
         this.activeType = 'all';
         this.activeTag = 'all';
         this.searchQuery = '';
@@ -46,12 +45,16 @@ class SachApp {
         this.searchTimeout = null;
         this.searchCache = new Map();
         this.suggestionAbortController = null;
+        this.renderFrameId = null;
 
         this.initData();
-        this.sections = this.loadSections();  // Load sections after data
         this.initElements();
         this.initEvents();
         this.setTheme(this.theme);
+        
+        // Mark views dirty initially for full first-pass render
+        this.dirtyLibrary = true;
+        
         this.render();
         
         // Auto P2P Connect if "?sync=XXXXXX" in URL
@@ -175,6 +178,7 @@ class SachApp {
 
     saveItems() {
         localStorage.setItem('sach_data', JSON.stringify(this.items));
+        this.dirtyLibrary = true;
     }
 
     initElements() {
@@ -193,11 +197,6 @@ class SachApp {
         this.searchInput = document.getElementById('searchInput');
         this.searchClearBtn = document.getElementById('searchClearBtn');
         this.searchDropdown = document.getElementById('search-dropdown');
-        
-        this.mobileSearchInput = document.getElementById('mobile-search-input');
-        this.mobileSearchBtn = document.getElementById('mobile-search-btn');
-        this.mobileResults = document.getElementById('mobile-results');
-        this.closeSearchBtn = document.getElementById('close-search');
 
         // Nav and Section wrappers
         this.syncSection = document.getElementById('sync-section');
@@ -235,6 +234,8 @@ class SachApp {
         this.generateSyncBtn = document.getElementById('generate-sync');
         this.syncInput = document.getElementById('sync-input');
         this.loadSyncBtn = document.getElementById('load-sync');
+        this.syncStatusIndicator = document.getElementById('sync-status-indicator');
+        this.syncStatusText = document.getElementById('sync-status-text');
     }
 
     initEvents() {
@@ -250,8 +251,11 @@ class SachApp {
             } else {
                 this.searchClearBtn.classList.add('hidden');
             }
-            // Update local catalog grid instantly
-            this.render();
+            // Update local catalog grid with frame-alignment
+            if (this.renderFrameId) cancelAnimationFrame(this.renderFrameId);
+            this.renderFrameId = requestAnimationFrame(() => {
+                this.render();
+            });
             this.triggerSearch(query, this.searchDropdown);
         });
 
@@ -266,7 +270,10 @@ class SachApp {
             this.searchClearBtn.classList.add('hidden');
             this.searchDropdown.classList.add('hidden');
             this.searchDropdown.innerHTML = '';
-            this.render();
+            if (this.renderFrameId) cancelAnimationFrame(this.renderFrameId);
+            this.renderFrameId = requestAnimationFrame(() => {
+                this.render();
+            });
             this.searchInput.focus();
         });
 
@@ -276,35 +283,6 @@ class SachApp {
                 this.searchDropdown.classList.add('hidden');
             }
         });
-
-        if (this.mobileSearchBtn) {
-            this.mobileSearchBtn.onclick = () => {
-                document.getElementById('search-overlay').classList.add('active');
-                this.mobileSearchInput.focus();
-            };
-        }
-        if (this.closeSearchBtn) {
-            this.closeSearchBtn.onclick = () => {
-                document.getElementById('search-overlay').classList.remove('active');
-                this.mobileSearchInput.value = '';
-                this.mobileResults.innerHTML = '';
-                this.searchQuery = '';
-                this.render();
-            };
-        }
-        if (this.mobileSearchInput) {
-            this.mobileSearchInput.oninput = (e) => {
-                const query = e.target.value.trim();
-                this.searchQuery = query;
-                // Update local catalog grid instantly
-                this.render();
-                this.triggerSearch(query, this.mobileResults);
-            };
-            this.mobileSearchInput.addEventListener('focus', (e) => {
-                const query = e.target.value.trim();
-                this.triggerSearch(query, this.mobileResults);
-            });
-        }
 
         // Enter key listeners to trigger immediate URL ingestion or focus search
         const handleSearchEnter = (evt, inputEl, dropdownEl) => {
@@ -319,7 +297,6 @@ class SachApp {
                     inputEl.value = '';
                     this.searchQuery = '';
                     if (this.searchClearBtn) this.searchClearBtn.classList.add('hidden');
-                    document.getElementById('search-overlay').classList.remove('active');
                     
                     this.urlInput.value = this.normalizeUrl(query);
                     this.handleAddLink();
@@ -331,9 +308,6 @@ class SachApp {
         };
 
         this.searchInput.addEventListener('keydown', (evt) => handleSearchEnter(evt, this.searchInput, this.searchDropdown));
-        if (this.mobileSearchInput) {
-            this.mobileSearchInput.addEventListener('keydown', (evt) => handleSearchEnter(evt, this.mobileSearchInput, this.mobileResults));
-        }
 
         // Global Esc key closer
         document.addEventListener('keydown', (e) => {
@@ -373,8 +347,6 @@ class SachApp {
         // Logo click — reload the page
         const logoHome = document.getElementById('logoHome');
         if (logoHome) logoHome.onclick = () => window.location.reload();
-        const logoHomeMobile = document.getElementById('logoHomeMobile');
-        if (logoHomeMobile) logoHomeMobile.onclick = () => window.location.reload();
     }
 
     showLoader(show, text = "Fetching metadata...") {
@@ -404,8 +376,6 @@ class SachApp {
     closeAllModals() {
         if (this.mainModal) this.hideModal(this.mainModal);
         if (this.searchDropdown) this.searchDropdown.classList.add('hidden');
-        const overlay = document.getElementById('search-overlay');
-        if (overlay) overlay.classList.remove('active');
     }
 
     showModal(m) {
@@ -433,11 +403,9 @@ class SachApp {
 
         // Hide show sections
         const homeSection = document.getElementById('home-section');
-        const librarySection = document.getElementById('library-section');
         const syncSection = document.getElementById('sync-section');
 
         if (homeSection) homeSection.classList.toggle('hidden', tab !== 'home');
-        if (librarySection) librarySection.classList.toggle('hidden', tab !== 'library');
         if (syncSection) syncSection.classList.toggle('hidden', tab !== 'sync');
 
         if (tab === 'sync') {
@@ -479,7 +447,7 @@ class SachApp {
             const ideasHtml = `
                 <div style="padding: 10px 12px 6px; font-size: 0.65rem; font-weight: 800; text-transform: uppercase; color: var(--text-secondary); border-bottom: 1px solid var(--border-color); margin-top: 4px;">Quick Search Ideas</div>
                 <div style="padding: 10px 12px; display: flex; flex-wrap: wrap; gap: 6px;">
-                    ${ideas.map(idea => `<span class="card-tag-pill" style="cursor:pointer; padding: 4px 10px; font-size: 0.72rem; background: rgba(255,255,255,0.06); border: 1px solid var(--border-color); border-radius: 12px;" onclick="event.stopPropagation(); window.sachApp.quickSearchFill('${idea}', '${dropdownEl.id}')">${idea}</span>`).join('')}
+                    ${ideas.map(idea => `<span class="card-tag-pill" style="cursor:pointer; padding: 4px 10px; font-size: 0.72rem; background: var(--surface2); border: 1px solid var(--border-color); border-radius: var(--r-xs);" onclick="event.stopPropagation(); window.sachApp.quickSearchFill('${idea}', '${dropdownEl.id}')">${idea}</span>`).join('')}
                 </div>
             `;
 
@@ -511,10 +479,7 @@ class SachApp {
                         this.searchInput.value = '';
                         if (this.searchClearBtn) this.searchClearBtn.classList.add('hidden');
                     }
-                    if (this.mobileSearchInput) this.mobileSearchInput.value = '';
                     this.searchQuery = '';
-                    const overlay = document.getElementById('search-overlay');
-                    if (overlay) overlay.classList.remove('active');
 
                     this.urlInput.value = this.normalizeUrl(query);
                     this.handleAddLink();
@@ -546,9 +511,7 @@ class SachApp {
 
     renderSuggestions(query, localMatches, imdbResults, isLoadingOnline, dropdownEl) {
         // Discard if the current search input value doesn't match the query
-        const currentVal = (dropdownEl === this.mobileResults) 
-            ? (this.mobileSearchInput ? this.mobileSearchInput.value.trim() : '')
-            : (this.searchInput ? this.searchInput.value.trim() : '');
+        const currentVal = this.searchInput ? this.searchInput.value.trim() : '';
         
         if (currentVal.toLowerCase() !== query.toLowerCase()) {
             return;
@@ -575,7 +538,6 @@ class SachApp {
                 `;
                 row.onclick = () => {
                     dropdownEl.classList.add('hidden');
-                    document.getElementById('search-overlay').classList.remove('active');
                     this.openDetails(item);
                 };
                 dropdownEl.appendChild(row);
@@ -607,7 +569,7 @@ class SachApp {
                 row.className = 'search-item';
                 const isAlreadySaved = this.items.some(i => movie.imdbId && i.imdbId && i.imdbId.toLowerCase() === movie.imdbId.toLowerCase());
                 row.innerHTML = `
-                    <img src="${movie.poster || 'https://via.placeholder.com/30x45?text=🎞️'}" width="30" height="45" style="border-radius:4px; object-fit:cover;">
+                    <img src="${movie.poster || 'https://via.placeholder.com/30x45?text=🎞️'}" width="30" height="45" loading="lazy" decoding="async" style="border-radius:4px; object-fit:cover;">
                     <div style="flex:1; min-width:0;">
                         <h4 style="font-size:0.85rem; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${movie.title}</h4>
                         <p style="font-size:0.72rem; color:var(--text-secondary);">${movie.year} ${isAlreadySaved ? '· <span style="color:var(--accent-color); font-weight:bold;">On list</span>' : ''}</p>
@@ -615,7 +577,6 @@ class SachApp {
                 `;
                 row.onclick = () => {
                     dropdownEl.classList.add('hidden');
-                    document.getElementById('search-overlay').classList.remove('active');
                     
                     const movieItem = {
                         id: 'movie_' + movie.imdbId,
@@ -654,10 +615,7 @@ class SachApp {
                 btnMovie.onclick = (e) => {
                     e.stopPropagation();
                     dropdownEl.classList.add('hidden');
-                    const overlay = document.getElementById('search-overlay');
-                    if (overlay) overlay.classList.remove('active');
                     if (this.searchInput) this.searchInput.value = '';
-                    if (this.mobileSearchInput) this.mobileSearchInput.value = '';
                     this.searchQuery = '';
                     this.render();
                     
@@ -681,10 +639,7 @@ class SachApp {
                 btnLink.onclick = (e) => {
                     e.stopPropagation();
                     dropdownEl.classList.add('hidden');
-                    const overlay = document.getElementById('search-overlay');
-                    if (overlay) overlay.classList.remove('active');
                     if (this.searchInput) this.searchInput.value = '';
-                    if (this.mobileSearchInput) this.mobileSearchInput.value = '';
                     this.searchQuery = '';
                     this.render();
                     
@@ -823,6 +778,26 @@ class SachApp {
         const images = meta.images || [];
         const selected = (images.length > 0) ? images[0] : `https://s.wordpress.com/mshots/v1/${encodeURIComponent(url)}?w=1200`;
         
+        const autoTags = [];
+        const domain = this.getHostname(url).toLowerCase();
+        if (domain.includes('youtube.com') || domain.includes('youtu.be')) {
+            autoTags.push('YouTube');
+        } else if (domain.includes('github.com')) {
+            autoTags.push('GitHub');
+        } else if (domain.includes('imdb.com')) {
+            autoTags.push('IMDb');
+        } else if (domain.includes('news.ycombinator.com') || domain.includes('ycombinator.com')) {
+            autoTags.push('Hacker News');
+        } else if (domain.includes('medium.com')) {
+            autoTags.push('Medium');
+        } else if (domain.includes('reddit.com')) {
+            autoTags.push('Reddit');
+        } else if (domain.includes('wikipedia.org')) {
+            autoTags.push('Wikipedia');
+        } else if (domain.includes('stackoverflow.com')) {
+            autoTags.push('StackOverflow');
+        }
+
         const item = {
             id: 'sv_' + Date.now(),
             type: 'link',
@@ -830,7 +805,7 @@ class SachApp {
             desc: meta.description || '',
             thumb: selected,
             url: url,
-            tags: [],
+            tags: autoTags,
             date: Date.now(),
             completed: false,
             year: this.getHostname(url)
@@ -1135,51 +1110,15 @@ class SachApp {
 
     // Grid rendering logic
     render() {
+        if (this.activeTab !== 'home') return;
+
         if (!this.linkGrid) return;
 
-        // Render views based on activeTab
-        if (this.activeTab === 'home') {
-            this.renderHeroBanner();
-            this.renderCarousels();
-            return;
-        }
+        // If library items have changed, rebuild the library catalog DOM elements
+        if (this.dirtyLibrary) {
+            this.updateTagPillBar();
 
-        // Active tab is library grid
-        this.updateTagPillBar();
-        this.renderHeroBanner();
-
-        let filtered = [...this.items];
-
-        // 1. Tag filters
-        if (this.activeTag !== 'all') {
-            filtered = filtered.filter(i => (i.tags || []).includes(this.activeTag));
-        }
-
-        // 2. Text search local filter
-        if (this.searchQuery.trim()) {
-            const q = this.searchQuery.toLowerCase();
-            filtered = filtered.filter(i => {
-                return (i.title || '').toLowerCase().includes(q) ||
-                       (i.desc || '').toLowerCase().includes(q) ||
-                       (i.tags || []).some(t => t.toLowerCase().includes(q)) ||
-                       (i.year || '').toLowerCase().includes(q);
-            });
-        }
-
-        // Sorting: Newest first
-        filtered.sort((a, b) => (b.date || 0) - (a.date || 0));
-
-        if (filtered.length === 0) {
-            const searching = this.searchQuery.trim() || this.activeTag !== 'all';
-            if (searching) {
-                this.linkGrid.innerHTML = `
-                    <div class="empty-state">
-                        <i class="fas fa-search empty-state-icon"></i>
-                        <div class="empty-title">No matches found</div>
-                        <div class="empty-sub">Try adjusting your queries or filters.</div>
-                    </div>
-                `;
-            } else {
+            if (this.items.length === 0) {
                 this.linkGrid.innerHTML = `
                     <div class="empty-state-welcome">
                         <div class="welcome-header">
@@ -1207,13 +1146,60 @@ class SachApp {
                         </div>
                     </div>
                 `;
+            } else {
+                const sorted = [...this.items].sort((a, b) => (b.date || 0) - (a.date || 0));
+                
+                // Add an empty state container to toggle inline
+                const gridHTML = sorted.map(item => this.createCardHtml(item)).join('') + `
+                    <div id="library-search-empty" class="empty-state hidden">
+                        <i class="fas fa-search empty-state-icon"></i>
+                        <div class="empty-title">No matches found</div>
+                        <div class="empty-sub">Try adjusting your queries or filters.</div>
+                    </div>
+                `;
+                this.linkGrid.innerHTML = gridHTML;
             }
-            return;
+            this.dirtyLibrary = false;
         }
 
-        // Render card lists
-        const gridHTML = filtered.map(item => this.createCardHtml(item)).join('');
-        this.linkGrid.innerHTML = gridHTML;
+        // Apply filters inline by toggling hidden class on existing elements (takes < 1ms)
+        if (this.items.length > 0) {
+            const q = this.searchQuery.toLowerCase().trim();
+            const activeTag = this.activeTag;
+            let visibleCount = 0;
+
+            const cards = this.linkGrid.querySelectorAll('.card');
+            cards.forEach(card => {
+                const id = card.dataset.id;
+                const item = this.items.find(i => i.id === id);
+                if (!item) {
+                    card.classList.add('hidden');
+                    return;
+                }
+
+                // Check active tag filter
+                const matchesTag = (activeTag === 'all' || (item.tags || []).includes(activeTag));
+                
+                // Check search filter
+                let matchesSearch = true;
+                if (q) {
+                    matchesSearch = (item.title || '').toLowerCase().includes(q) ||
+                                    (item.desc || '').toLowerCase().includes(q) ||
+                                    (item.tags || []).some(t => t.toLowerCase().includes(q)) ||
+                                    (item.year || '').toLowerCase().includes(q);
+                }
+
+                const visible = matchesTag && matchesSearch;
+                card.classList.toggle('hidden', !visible);
+                if (visible) visibleCount++;
+            });
+
+            // Toggle empty search results screen
+            const emptyEl = document.getElementById('library-search-empty');
+            if (emptyEl) {
+                emptyEl.classList.toggle('hidden', visibleCount > 0);
+            }
+        }
     }
 
     createCardHtml(item) {
@@ -1238,7 +1224,7 @@ class SachApp {
                     <i class="fas fa-times"></i>
                 </button>
                 <div class="card-img-wrapper">
-                    <img src="${item.thumb || 'https://via.placeholder.com/400x225?text=Poster+Unavailable'}" class="card-img" loading="lazy" onerror="this.onerror=null; this.src='https://via.placeholder.com/400x225?text=Image+Unavailable'">
+                    <img src="${item.thumb || 'https://via.placeholder.com/400x225?text=Poster+Unavailable'}" class="card-img" loading="lazy" decoding="async" onerror="this.onerror=null; this.src='https://via.placeholder.com/400x225?text=Image+Unavailable'">
                     <div class="card-info-overlay">
                         <div class="card-info-header">
                             <span class="card-type-icon">${iconBadge}</span>
@@ -1250,123 +1236,6 @@ class SachApp {
                 </div>
             </div>
         `;
-    }
-
-    renderCarousels() {
-        const shelfMovies = document.getElementById('shelf-movies');
-        const shelfLinks = document.getElementById('shelf-links');
-        if (!shelfMovies || !shelfLinks) return;
-
-        const movies = this.items.filter(i => i.type === 'movie').sort((a,b) => b.date - a.date);
-        const links  = this.items.filter(i => i.type === 'link').sort((a,b) => b.date - a.date);
-
-        shelfMovies.innerHTML = movies.length
-            ? movies.map(item => this.createCardHtml(item)).join('')
-            : `<div class="shelf-empty">No movies or series yet. Search to add!</div>`;
-
-        shelfLinks.innerHTML = links.length
-            ? links.map(item => this.createCardHtml(item)).join('')
-            : `<div class="shelf-empty">No bookmarks yet. Paste a URL to add!</div>`;
-
-        // Render user-created custom sections
-        this.renderCustomSections();
-    }
-
-    /* ─────────────────────────────────────────
-       CUSTOM SECTIONS
-    ───────────────────────────────────────── */
-    loadSections() {
-        try {
-            return JSON.parse(localStorage.getItem('sach_sections') || '[]');
-        } catch(e) { return []; }
-    }
-
-    saveSections() {
-        localStorage.setItem('sach_sections', JSON.stringify(this.sections));
-    }
-
-    createSection(name) {
-        const trimmed = (name || '').trim();
-        if (!trimmed) return;
-        if (this.sections.find(s => s.name.toLowerCase() === trimmed.toLowerCase())) {
-            this.showToast('Section already exists!', 'error');
-            return;
-        }
-        this.sections.push({ id: 'sec_' + Date.now(), name: trimmed });
-        this.saveSections();
-        this.renderCustomSections();
-        this.showToast(`"${trimmed}" section created!`, 'success');
-    }
-
-    deleteSection(id) {
-        this.sections = this.sections.filter(s => s.id !== id);
-        this.saveSections();
-        this.renderCustomSections();
-        this.showToast('Section removed', 'success');
-    }
-
-    renderCustomSections() {
-        const home = document.getElementById('home-section');
-        if (!home) return;
-
-        // Remove previous custom section blocks and create-section UI
-        home.querySelectorAll('.custom-shelf-block, .create-section-wrap').forEach(el => el.remove());
-
-        // Render each custom section
-        this.sections.forEach(section => {
-            const sectionItems = this.items
-                .filter(i => (i.tags || []).map(t => t.toLowerCase()).includes(section.name.toLowerCase()))
-                .sort((a,b) => b.date - a.date);
-
-            const railHTML = sectionItems.length
-                ? sectionItems.map(item => this.createCardHtml(item)).join('')
-                : `<div class="shelf-empty">No items yet — tag any item with "<strong style="color:var(--accent-3)">${section.name}</strong>"</div>`;
-
-            const block = document.createElement('div');
-            block.className = 'shelf-block custom-shelf-block';
-            block.dataset.sectionId = section.id;
-            block.innerHTML = `
-                <div class="shelf-hd">
-                    <h3 class="shelf-title"><i class="fas fa-layer-group"></i> ${section.name}</h3>
-                    <button class="section-del-btn" onclick="event.stopPropagation(); window.sachApp.deleteSection('${section.id}')" title="Remove section">
-                        <i class="fas fa-xmark"></i>
-                    </button>
-                </div>
-                <div class="shelf-rail carousel-shelf">${railHTML}</div>
-            `;
-            home.appendChild(block);
-        });
-
-        // Create-section UI
-        const wrap = document.createElement('div');
-        wrap.className = 'create-section-wrap';
-        wrap.innerHTML = `
-            <div class="create-section-form" id="create-section-form">
-                <input type="text" id="new-section-name" class="new-section-input" placeholder="Section name…" maxlength="40">
-                <button class="btn primary tiny" id="new-section-ok"><i class="fas fa-check"></i> Create</button>
-                <button class="btn ghost tiny" id="new-section-cancel"><i class="fas fa-xmark"></i></button>
-            </div>
-            <button class="create-section-btn" id="create-section-trigger">
-                <i class="fas fa-plus"></i> New Section
-            </button>
-        `;
-        home.appendChild(wrap);
-
-        // Wire events
-        const trigger   = document.getElementById('create-section-trigger');
-        const form      = document.getElementById('create-section-form');
-        const input     = document.getElementById('new-section-name');
-        const okBtn     = document.getElementById('new-section-ok');
-        const cancelBtn = document.getElementById('new-section-cancel');
-
-        const showForm = () => { trigger.classList.add('hidden'); form.classList.add('open'); input.focus(); };
-        const hideForm = () => { trigger.classList.remove('hidden'); form.classList.remove('open'); input.value = ''; };
-        const doCreate = () => { this.createSection(input.value); hideForm(); };
-
-        if (trigger)   trigger.onclick   = showForm;
-        if (cancelBtn) cancelBtn.onclick  = hideForm;
-        if (okBtn)     okBtn.onclick      = doCreate;
-        if (input)     input.onkeydown    = (e) => { if (e.key === 'Enter') doCreate(); if (e.key === 'Escape') hideForm(); };
     }
 
 
@@ -1382,7 +1251,7 @@ class SachApp {
         if (!this.tagFilter) return;
 
         // Gather tags only from library web links
-        const currentTabItems = this.activeTab === 'library' ? this.items.filter(i => i.type === 'link') : [];
+        const currentTabItems = this.activeTab === 'home' ? this.items.filter(i => i.type === 'link') : [];
 
         const allTags = currentTabItems.flatMap(i => i.tags || []);
         const uniqueTags = [...new Set(allTags)].filter(Boolean).sort();
@@ -1412,12 +1281,14 @@ class SachApp {
 
         display.textContent = code;
         display.style.opacity = '0.5';
+        this.updateSyncStatus('broadcasting', 'Preparing broadcast...');
 
         this.peer = new Peer(peerId);
 
         this.peer.on('open', () => {
             display.style.opacity = '1';
             this.showToast("Broadcasting library...");
+            this.updateSyncStatus('broadcasting', `Broadcasting code: ${code}`);
 
             if (qrContainer) {
                 qrContainer.innerHTML = '';
@@ -1436,9 +1307,14 @@ class SachApp {
 
         this.peer.on('connection', (conn) => {
             this.showToast("Device Connected!");
+            this.updateSyncStatus('connected', 'Syncing with device...');
             conn.on('open', () => {
                 conn.send({ items: this.items });
                 this.showToast("Library synchronized successfully!", "success");
+                this.updateSyncStatus('connected', 'Library synchronized!');
+                setTimeout(() => {
+                    this.updateSyncStatus('broadcasting', `Broadcasting code: ${code}`);
+                }, 3000);
             });
         });
 
@@ -1448,6 +1324,7 @@ class SachApp {
             } else {
                 this.showToast("Sync connection failed.", "error");
                 display.textContent = 'ERR';
+                this.updateSyncStatus('disconnected', 'Broadcast connection failed');
                 if (qrContainer) {
                     qrContainer.classList.add('hidden');
                     qrContainer.innerHTML = '';
@@ -1464,6 +1341,7 @@ class SachApp {
         }
 
         this.showToast("Connecting...");
+        this.updateSyncStatus('broadcasting', `Connecting to pairing code ${code}...`);
         const tempPeer = new Peer();
 
         tempPeer.on('open', () => {
@@ -1526,24 +1404,30 @@ class SachApp {
                     this.saveItems();
                     this.render();
                     this.showToast(`Merged ${this.items.length - originalCount} new records successfully!`, "success");
+                    this.updateSyncStatus('connected', 'Sync finished successfully!');
                     this.syncInput.value = '';
                     tempPeer.destroy();
-                    // Switch back to library tab so the user sees the synced results
-                    setTimeout(() => this.switchTab('library'), 100);
+                    setTimeout(() => this.updateSyncStatus('disconnected', 'Offline / Ready'), 4000);
+                    // Switch back to home tab so the user sees the synced results
+                    setTimeout(() => this.switchTab('home'), 100);
                 }
             });
 
             setTimeout(() => {
                 if (tempPeer.open && !conn.open) {
                     this.showToast("Pair code not found or expired.", "error");
+                    this.updateSyncStatus('disconnected', 'Connection expired');
                     tempPeer.destroy();
+                    setTimeout(() => this.updateSyncStatus('disconnected', 'Offline / Ready'), 4000);
                 }
             }, 6000);
         });
 
         tempPeer.on('error', () => {
             this.showToast("Connection failed.", "error");
+            this.updateSyncStatus('disconnected', 'Connection failed');
             tempPeer.destroy();
+            setTimeout(() => this.updateSyncStatus('disconnected', 'Offline / Ready'), 4000);
         });
     }
 
@@ -1563,76 +1447,7 @@ class SachApp {
         }
     }
 
-    renderHeroBanner() {
-        const container = document.getElementById('heroBannerContainer');
-        if (!container) return;
 
-        // Hero banner is on home tab always; library tab uses its own section
-        if (this.activeTab !== 'home') {
-            container.innerHTML = '';
-            container.style.display = 'none';
-            return;
-        }
-
-        container.style.display = 'block';
-
-        if (this.items.length === 0) {
-            container.innerHTML = `
-                <div class="hero-banner hero-empty">
-                    <div class="hero-scrim"></div>
-                    <div class="hero-content">
-                        <div class="hero-badge-row">
-                            <span class="hero-type-badge"><i class="fas fa-star"></i> Welcome to Sach</span>
-                        </div>
-                        <h2 class="hero-title">Your Cinematic Library</h2>
-                        <p class="hero-desc">Search for movies, shows, or paste any URL to start building your collection.</p>
-                        <div class="hero-btn-row">
-                            <button class="btn primary" onclick="document.getElementById('mobile-search-btn').click(); setTimeout(() => document.getElementById('mobile-search-input').focus(), 100);">
-                                <i class="fas fa-plus"></i> Add First Item
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            `;
-            return;
-        }
-
-        // Prefer movies for cinematic feel, fallback to any item
-        let featured = this.items.find(i => i.type === 'movie') || this.items[0];
-        const isMovie = featured.type === 'movie';
-        const backdropUrl = featured.thumb || 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?q=80&w=1200';
-        const badgeIcon = isMovie ? 'fa-clapperboard' : 'fa-bookmark';
-        const badgeText = isMovie ? 'Movie &amp; TV' : 'Bookmark';
-        const buttonText = isMovie ? 'View Details' : 'Open Link';
-        const buttonIcon = isMovie ? 'fa-circle-info' : 'fa-arrow-up-right-from-square';
-
-        const actionHandler = isMovie
-            ? `window.sachApp.openDetailsById('${featured.id}')`
-            : `window.open('${featured.url.replace(/'/g, "\\'") }', '_blank')`;
-
-        container.innerHTML = `
-            <div class="hero-banner" onclick="${actionHandler}" style="cursor:pointer;">
-                <img src="${backdropUrl}" class="hero-bg-img" alt="" loading="lazy" onerror="this.style.display='none'">
-                <div class="hero-scrim"></div>
-                <div class="hero-content">
-                    <div class="hero-badge-row">
-                        <span class="hero-type-badge"><i class="fas ${badgeIcon}"></i> ${badgeText}</span>
-                        <span class="hero-year-pill">${featured.year || ''}</span>
-                    </div>
-                    <h2 class="hero-title">${featured.title}</h2>
-                    ${featured.desc ? `<p class="hero-desc">${featured.desc}</p>` : ''}
-                    <div class="hero-btn-row">
-                        <button class="btn primary" onclick="event.stopPropagation(); ${actionHandler}">
-                            <i class="fas ${buttonIcon}"></i> ${buttonText}
-                        </button>
-                        <button class="btn secondary" onclick="event.stopPropagation(); window.sachApp.switchTab('library');">
-                            <i class="fas fa-folder-open"></i> Library
-                        </button>
-                    </div>
-                </div>
-            </div>
-        `;
-    }
 
 
 
@@ -1691,10 +1506,10 @@ class SachApp {
 
     quickSearchFill(text, dropdownId) {
         const dropdownEl = document.getElementById(dropdownId);
-        const inputEl = (dropdownId === 'mobile-results') ? this.mobileSearchInput : this.searchInput;
+        const inputEl = this.searchInput;
         if (inputEl) {
             inputEl.value = text;
-            if (this.searchClearBtn && inputEl === this.searchInput) {
+            if (this.searchClearBtn) {
                 this.searchClearBtn.classList.remove('hidden');
             }
             this.searchQuery = text;
@@ -1706,10 +1521,31 @@ class SachApp {
     openRecentItem(itemId, dropdownId) {
         const dropdownEl = document.getElementById(dropdownId);
         if (dropdownEl) dropdownEl.classList.add('hidden');
-        const overlay = document.getElementById('search-overlay');
-        if (overlay) overlay.classList.remove('active');
         const item = this.items.find(i => i.id === itemId);
         if (item) this.openDetails(item);
+    }
+
+    scrollCarousel(elementId, direction) {
+        const carousel = document.getElementById(elementId);
+        if (carousel) {
+            const amount = carousel.clientWidth * 0.6 * direction;
+            carousel.scrollBy({ left: amount, behavior: 'smooth' });
+        }
+    }
+
+    updateSyncStatus(status, text) {
+        if (!this.syncStatusIndicator || !this.syncStatusText) return;
+        this.syncStatusIndicator.className = 'status-pulse';
+        if (status === 'connected') {
+            this.syncStatusIndicator.classList.add('connected');
+            this.syncStatusText.textContent = text || 'Connected';
+        } else if (status === 'broadcasting') {
+            this.syncStatusIndicator.classList.add('broadcasting');
+            this.syncStatusText.textContent = text || 'Broadcasting...';
+        } else {
+            this.syncStatusIndicator.classList.add('disconnected');
+            this.syncStatusText.textContent = text || 'Offline / Ready';
+        }
     }
 
     showToast(message, type = 'success') {

@@ -8,7 +8,7 @@
     <meta name="theme-color" content="#111113">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link rel="stylesheet" href="style.css">
     <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js" defer></script>
@@ -16,6 +16,12 @@
 </head>
 
 <body class="dark-theme">
+
+<!-- Ambient Background Glows -->
+<div class="ambient-glow" aria-hidden="true">
+    <div class="glow-sphere glow-sphere-1"></div>
+    <div class="glow-sphere glow-sphere-2"></div>
+</div>
 
 <!-- ═══════════════════════════════════════════
      LOADER OVERLAY
@@ -42,7 +48,7 @@
         <span class="logo-text">SACH</span>
     </button>
 
-    <!-- Desktop search -->
+    <!-- Unified search bar -->
     <div class="topbar-search header-search" id="topbar-search-wrap">
         <div class="search-input-wrapper topbar-search-inner">
             <i class="fas fa-magnifying-glass search-icon-inside"></i>
@@ -62,10 +68,6 @@
 
     <!-- Top-right actions -->
     <div class="topbar-actions header-actions">
-        <!-- Mobile search toggle (hidden on desktop) -->
-        <button id="mobile-search-btn" class="icon-action mobile-search-toggle" aria-label="Search" title="Search">
-            <i class="fas fa-magnifying-glass"></i>
-        </button>
         <!-- Theme toggle -->
         <button id="themeToggle" class="icon-action btn-utility" aria-label="Toggle theme" title="Toggle theme">
             <i class="fas fa-sun" id="themeIcon"></i>
@@ -78,32 +80,8 @@
      ═══════════════════════════════════════════ -->
 <div class="page-body">
 
-    <!-- ── HOME ──────────────────────────────── -->
+    <!-- ── HOME (MY LIBRARY) ──────────────────── -->
     <section id="home-section" class="view-section">
-
-        <!-- Hero Billboard -->
-        <div id="heroBannerContainer" class="hero-wrap"></div>
-
-        <!-- Movies shelf -->
-        <div class="shelf-block">
-            <div class="shelf-hd">
-                <h3 class="shelf-title"><i class="fas fa-clapperboard"></i> Watchlist</h3>
-            </div>
-            <div id="shelf-movies" class="shelf-rail carousel-shelf"></div>
-        </div>
-
-        <!-- Links shelf -->
-        <div class="shelf-block">
-            <div class="shelf-hd">
-                <h3 class="shelf-title"><i class="fas fa-bookmark"></i> Bookmarks</h3>
-            </div>
-            <div id="shelf-links" class="shelf-rail carousel-shelf"></div>
-        </div>
-
-    </section>
-
-    <!-- ── LIBRARY ────────────────────────────── -->
-    <section id="library-section" class="view-section hidden">
         <div class="lib-wrap">
             <div class="lib-hd">
                 <h2 class="lib-title">My Library</h2>
@@ -118,6 +96,11 @@
         <div class="sync-wrap">
             <h2 class="sync-heading">Sync Hub</h2>
             <p class="sync-sub">Share your library instantly between devices using peer-to-peer technology. No account needed.</p>
+            
+            <div class="status-indicator-row" style="margin-top: -0.75rem; margin-bottom: 1.25rem;">
+                <span class="status-pulse disconnected" id="sync-status-indicator"></span>
+                <span id="sync-status-text">Offline / Ready</span>
+            </div>
 
             <div class="sync-grid">
                 <!-- Generate code card -->
@@ -164,35 +147,13 @@
         <i class="fas fa-house"></i>
         <span>Home</span>
     </button>
-    <button class="nav-tab tab-item" data-tab="library" aria-label="My Library">
-        <i class="fas fa-folder-open"></i>
-        <span>Library</span>
-    </button>
     <button class="nav-tab tab-item" data-tab="sync" aria-label="Sync">
         <i class="fas fa-rotate"></i>
         <span>Sync</span>
     </button>
 </nav>
 
-<!-- ═══════════════════════════════════════════
-     MOBILE SEARCH OVERLAY
-     ═══════════════════════════════════════════ -->
-<div id="search-overlay" class="search-overlay" aria-label="Search panel" role="dialog">
-    <div class="search-overlay-hd search-header">
-        <button id="close-search" class="back-pill" aria-label="Close search">
-            <i class="fas fa-arrow-left"></i>
-        </button>
-        <input
-            id="mobile-search-input"
-            type="search"
-            class="overlay-search-input"
-            placeholder="Search movies, shows, or paste a link…"
-            autocomplete="off"
-            spellcheck="false"
-        >
-    </div>
-    <div id="mobile-results" class="overlay-results"></div>
-</div>
+
 
 <!-- ═══════════════════════════════════════════
      HIDDEN FORM INPUTS (for JS ingestion)
