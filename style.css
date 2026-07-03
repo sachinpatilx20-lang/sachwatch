@@ -2226,3 +2226,108 @@ body.light-theme .tag-density-row {
     }
 }
 
+/* ==========================================================================
+   MOBILE-FIRST CINEMATIC PLATFORM OVERRIDES
+   ========================================================================== */
+
+/* Active Tactile Haptic Press Feedback for Mobile Touch Screens */
+@media (hover: none) {
+    .card:active {
+        transform: scale(0.96) !important;
+        opacity: 0.9;
+    }
+    .btn:active, .icon-btn:active {
+        transform: scale(0.95) !important;
+    }
+    .tab-item:active {
+        transform: scale(0.9) !important;
+    }
+    .cat-pill:active {
+        transform: scale(0.94) !important;
+    }
+}
+
+/* Tab Bar Mobile Safe-Area Notch Optimization & Glassmorphism dot indicator */
+.tab-bar {
+    padding-bottom: env(safe-area-inset-bottom, 12px) !important;
+    height: calc(64px + env(safe-area-inset-bottom, 0px)) !important;
+    background: rgba(15, 15, 15, 0.8) !important;
+    backdrop-filter: blur(25px) !important;
+    -webkit-backdrop-filter: blur(25px) !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
+    box-shadow: 0 -4px 30px rgba(0, 0, 0, 0.5) !important;
+}
+
+.tab-item {
+    position: relative;
+    transition: transform 0.15s ease, color 0.15s ease;
+}
+
+.tab-item.active::after {
+    content: '';
+    position: absolute;
+    bottom: 6px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 4px;
+    height: 4px;
+    background: var(--accent-color);
+    border-radius: 50%;
+}
+
+/* iOS Bottom Drawer / Half-Sheet Modal details popup */
+@media (max-width: 768px) {
+    .modal-overlay {
+        align-items: flex-end !important;
+        padding: 0 !important;
+        background: rgba(0, 0, 0, 0.75) !important;
+        backdrop-filter: blur(10px) !important;
+        -webkit-backdrop-filter: blur(10px) !important;
+    }
+
+    .modal-content {
+        width: 100% !important;
+        max-width: 100% !important;
+        border-radius: 24px 24px 0 0 !important;
+        max-height: 85vh !important;
+        margin: 0 !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        border-bottom: none !important;
+        transform: translateY(100%);
+        transition: transform 0.35s cubic-bezier(0.33, 1, 0.68, 1) !important;
+        background: #111217 !important;
+        box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.8) !important;
+        overflow-y: auto !important;
+    }
+
+    .modal-overlay.active .modal-content {
+        transform: translateY(0) !important;
+    }
+
+    .modal-drag-handle {
+        display: block !important;
+        width: 36px;
+        height: 5px;
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 3px;
+        margin: 12px auto 8px !important;
+    }
+
+    .modal-poster-side {
+        flex: 0 0 180px !important;
+        height: 180px !important;
+        background: #0a0a0a !important;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
+    }
+
+    .modal-poster-side img {
+        height: 100% !important;
+        width: 100% !important;
+        object-fit: contain !important;
+    }
+
+    .modal-info-side {
+        padding: 1.5rem 1.25rem 2rem !important;
+    }
+}
+
