@@ -6,9 +6,14 @@
 
 // Standalone utility for fetch with timeout that returns parsed JSON
 async function fetchWithTimeout(resource, options = {}) {
-    const { timeout = 2500 } = options;
+    const { timeout = 2500, signal } = options;
     const controller = new AbortController();
     const id = setTimeout(() => controller.abort(), timeout);
+    
+    if (signal) {
+        signal.addEventListener('abort', () => controller.abort());
+    }
+    
     try {
         const response = await fetch(resource, {
             ...options,
@@ -34,15 +39,12 @@ class SachApp {
         this.activeTag = 'all';
         this.searchQuery = '';
         
-        this.tempTags = []; // Temp tag storage for add link
         this.currentUrl = '';
-        this.currentMetadata = null;
-        this.selectedThumb = '';
-        this.editingId = null;
-        this.currentCrop = 1200;
         this.theme = localStorage.getItem('sach_theme') || 'dark';
         this.peer = null;
         this.searchTimeout = null;
+        this.searchCache = new Map();
+        this.suggestionAbortController = null;
 
         this.initData();
         this.initElements();
@@ -199,28 +201,7 @@ class SachApp {
         this.libraryHistoryContainer = document.getElementById('library-history-container');
         this.syncSection = document.getElementById('sync-section');
 
-        // Modals - Link Thumbnail Selector
-        this.thumbModal = document.getElementById('thumbModal');
-        this.thumbPicker = document.getElementById('thumbPicker');
-        this.thumbStatus = document.getElementById('thumbStatus');
-        this.confirmThumbBtn = document.getElementById('confirmThumb');
-        this.closeModalBtn = document.getElementById('closeModal');
-        this.retryFetchBtn = document.getElementById('retryFetchBtn');
-        this.addThumbTagsInput = document.getElementById('addThumbTags');
-        this.addThumbTagBtn = document.getElementById('addThumbTagBtn');
-        this.addThumbTagsList = document.getElementById('addThumbTagsList');
 
-        // Modals - Link Editor
-        this.editModal = document.getElementById('editModal');
-        this.editTitle = document.getElementById('editTitle');
-        this.editDesc = document.getElementById('editDesc');
-        this.editTagsInput = document.getElementById('editTags');
-        this.editTagBtn = document.getElementById('editTagBtn');
-        this.editTagsList = document.getElementById('editTagsList');
-        this.editThumbPicker = document.getElementById('editThumbPicker');
-        this.genScreenshotBtn = document.getElementById('genScreenshotBtn');
-        this.closeEditModalBtn = document.getElementById('closeEditModal');
-        this.saveEditBtn = document.getElementById('saveEditBtn');
 
         // Modals - Unified Detail Modal
         this.mainModal = document.getElementById('main-modal');
@@ -273,6 +254,13 @@ class SachApp {
             this.triggerSearch(query, this.searchDropdown);
         });
 
+        this.searchInput.addEventListener('focus', (e) => {
+            const query = e.target.value.trim();
+            if (query) {
+                this.triggerSearch(query, this.searchDropdown);
+            }
+        });
+
         this.searchClearBtn.addEventListener('click', () => {
             this.searchInput.value = '';
             this.searchQuery = '';
@@ -290,11 +278,10 @@ class SachApp {
             }
         });
 
-        // Mobile search toggle
         if (this.mobileSearchBtn) {
             this.mobileSearchBtn.onclick = () => {
                 document.getElementById('search-overlay').classList.add('active');
-                setTimeout(() => this.mobileSearchInput.focus(), 250);
+                this.mobileSearchInput.focus();
             };
         }
         if (this.closeSearchBtn) {
@@ -314,6 +301,12 @@ class SachApp {
                 this.render();
                 this.triggerSearch(query, this.mobileResults);
             };
+            this.mobileSearchInput.addEventListener('focus', (e) => {
+                const query = e.target.value.trim();
+                if (query) {
+                    this.triggerSearch(query, this.mobileResults);
+                }
+            });
         }
 
         // Enter key listeners to trigger immediate URL ingestion or focus search
@@ -322,7 +315,7 @@ class SachApp {
                 const query = inputEl.value.trim();
                 if (!query) return;
                 
-                const isUrl = /^https?:\/\//i.test(query);
+                const isUrl = this.isLikelyUrl(query);
                 if (isUrl) {
                     evt.preventDefault();
                     dropdownEl.classList.add('hidden');
@@ -331,7 +324,7 @@ class SachApp {
                     if (this.searchClearBtn) this.searchClearBtn.classList.add('hidden');
                     document.getElementById('search-overlay').classList.remove('active');
                     
-                    this.urlInput.value = query;
+                    this.urlInput.value = this.normalizeUrl(query);
                     this.handleAddLink();
                 } else {
                     inputEl.blur();
@@ -350,43 +343,7 @@ class SachApp {
             if (e.key === 'Escape') this.closeAllModals();
         });
 
-        // Thumbnail selector modal
-        this.closeModalBtn.addEventListener('click', () => this.hideModal(this.thumbModal));
-        this.confirmThumbBtn.addEventListener('click', () => this.confirmThumbnail());
-        this.retryFetchBtn.addEventListener('click', () => this.handleRetryFetch());
-        if (this.addThumbTagBtn) {
-            this.addThumbTagBtn.addEventListener('click', () => this.handleAddFormTag('thumb'));
-        }
-        if (this.addThumbTagsInput) {
-            this.addThumbTagsInput.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') {
-                    e.preventDefault();
-                    this.handleAddFormTag('thumb');
-                }
-            });
-        }
 
-        // Edit link modal
-        this.closeEditModalBtn.addEventListener('click', () => this.hideModal(this.editModal));
-        this.saveEditBtn.addEventListener('click', () => this.saveEdit());
-        this.genScreenshotBtn.addEventListener('click', () => this.generateScreenshot());
-        
-        this.editTagBtn.addEventListener('click', () => this.handleAddFormTag('edit'));
-        this.editTagsInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                this.handleAddFormTag('edit');
-            }
-        });
-
-        // Crop options
-        document.querySelectorAll('.crop-presets button').forEach(btn => {
-            btn.addEventListener('click', () => {
-                document.querySelectorAll('.crop-presets button').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                this.currentCrop = parseInt(btn.dataset.crop);
-            });
-        });
 
         // Main Details Modal
         this.closeModalBtnDetails.onclick = () => this.hideModal(this.mainModal);
@@ -455,9 +412,10 @@ class SachApp {
     }
 
     closeAllModals() {
-        [this.thumbModal, this.editModal, this.mainModal].forEach(m => {
-            if (m) this.hideModal(m);
-        });
+        if (this.mainModal) this.hideModal(this.mainModal);
+        if (this.searchDropdown) this.searchDropdown.classList.add('hidden');
+        const overlay = document.getElementById('search-overlay');
+        if (overlay) overlay.classList.remove('active');
     }
 
     showModal(m) {
@@ -490,6 +448,10 @@ class SachApp {
         } else if (tab === 'sync') {
             this.libraryHistoryContainer.classList.add('hidden');
             this.syncSection.classList.remove('hidden');
+            // Automate pairing code generation on visiting sync tab
+            if (this.syncCodeDisplay && this.syncCodeDisplay.textContent === '——') {
+                this.generateSyncCode();
+            }
         }
 
         window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -506,9 +468,60 @@ class SachApp {
             return;
         }
 
-        this.searchTimeout = setTimeout(() => {
-            this.fetchSuggestions(query, dropdownEl);
-        }, 300);
+        const isUrl = this.isLikelyUrl(query);
+        if (isUrl) {
+            dropdownEl.innerHTML = `
+                <div class="search-item" id="btnImportUrlSuggest" style="background: var(--accent-dim);">
+                    <div style="width:32px; height:32px; border-radius:4px; background:var(--accent-gradient); color:#fff; display:flex; align-items:center; justify-content:center; font-size:0.8rem;">
+                        <i class="fas fa-link"></i>
+                    </div>
+                    <div style="flex:1; min-width:0;">
+                        <h4 style="font-size:0.85rem; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Import Web Link</h4>
+                        <p style="font-size:0.72rem; color:var(--text-secondary); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${query}</p>
+                    </div>
+                </div>
+            `;
+            dropdownEl.classList.remove('hidden');
+
+            const btn = document.getElementById('btnImportUrlSuggest');
+            if (btn) {
+                btn.onclick = () => {
+                    dropdownEl.classList.add('hidden');
+                    if (this.searchInput) {
+                        this.searchInput.value = '';
+                        if (this.searchClearBtn) this.searchClearBtn.classList.add('hidden');
+                    }
+                    if (this.mobileSearchInput) this.mobileSearchInput.value = '';
+                    this.searchQuery = '';
+                    const overlay = document.getElementById('search-overlay');
+                    if (overlay) overlay.classList.remove('active');
+
+                    this.urlInput.value = this.normalizeUrl(query);
+                    this.handleAddLink();
+                };
+            }
+            return;
+        }
+
+        // Render local matches instantly (0ms)
+        const q = query.toLowerCase().trim();
+        const localMatches = this.items.filter(item => {
+            return (item.title || '').toLowerCase().includes(q) ||
+                   (item.desc || '').toLowerCase().includes(q) ||
+                   (item.tags || []).some(tag => tag.toLowerCase().includes(q));
+        }).slice(0, 3);
+
+        if (this.searchCache.has(q)) {
+            const cachedResults = this.searchCache.get(q);
+            this.renderSuggestions(query, localMatches, cachedResults, false, dropdownEl);
+        } else {
+            this.renderSuggestions(query, localMatches, [], true, dropdownEl);
+            
+            // Debounce online search
+            this.searchTimeout = setTimeout(() => {
+                this.fetchSuggestions(query, localMatches, dropdownEl);
+            }, 200);
+        }
     }
 
     renderSuggestions(query, localMatches, imdbResults, isLoadingOnline, dropdownEl) {
@@ -553,7 +566,7 @@ class SachApp {
         if (isLoadingOnline) {
             const heading = document.createElement('div');
             heading.style.cssText = 'padding: 6px 12px; font-size: 0.65rem; font-weight: 800; text-transform: uppercase; color: var(--text-secondary); border-bottom: 1px solid var(--border-color); margin-top: 4px;';
-            heading.textContent = 'Online Movie Matches';
+            heading.textContent = 'Online Movies & TV Shows';
             dropdownEl.appendChild(heading);
 
             const loaderRow = document.createElement('div');
@@ -566,13 +579,13 @@ class SachApp {
         } else if (imdbResults.length > 0) {
             const heading = document.createElement('div');
             heading.style.cssText = 'padding: 6px 12px; font-size: 0.65rem; font-weight: 800; text-transform: uppercase; color: var(--text-secondary); border-bottom: 1px solid var(--border-color); margin-top: 4px;';
-            heading.textContent = 'Online Movie Matches';
+            heading.textContent = 'Online Movies & TV Shows';
             dropdownEl.appendChild(heading);
 
             imdbResults.forEach(movie => {
                 const row = document.createElement('div');
                 row.className = 'search-item';
-                const isAlreadySaved = this.items.some(i => i.imdbId === movie.imdbId);
+                const isAlreadySaved = this.items.some(i => movie.imdbId && i.imdbId && i.imdbId.toLowerCase() === movie.imdbId.toLowerCase());
                 row.innerHTML = `
                     <img src="${movie.poster || 'https://via.placeholder.com/30x45?text=🎞️'}" width="30" height="45" style="border-radius:4px; object-fit:cover;">
                     <div style="flex:1; min-width:0;">
@@ -602,78 +615,128 @@ class SachApp {
             });
         }
 
-        // 3. No Results State
+        // 3. No Results State or Empty Online Matches
         if (localMatches.length === 0 && imdbResults.length === 0 && !isLoadingOnline) {
-            dropdownEl.innerHTML = '<div style="padding: 1rem; text-align: center; color: var(--text-secondary); font-size: 0.8rem;">No results found</div>';
+            dropdownEl.innerHTML = `
+                <div style="padding: 1.25rem 1rem; text-align: center;">
+                    <div style="color: var(--text-muted); font-size: 0.8rem; margin-bottom: 0.75rem;">No results found for "${query}"</div>
+                    <div style="display: flex; flex-direction: column; gap: 8px;">
+                        <button class="btn secondary tiny" id="btnSearchAddMovie" style="width: 100%; border: 1px solid var(--border-color); background: rgba(255,255,255,0.03);"><i class="fas fa-plus"></i> Add Custom Movie / Show</button>
+                        <button class="btn secondary tiny" id="btnSearchAddLink" style="width: 100%; border: 1px solid var(--border-color); background: rgba(255,255,255,0.03);"><i class="fas fa-link"></i> Add Custom Link</button>
+                    </div>
+                </div>
+            `;
+            
+            const btnMovie = dropdownEl.querySelector('#btnSearchAddMovie');
+            const btnLink = dropdownEl.querySelector('#btnSearchAddLink');
+            
+            if (btnMovie) {
+                btnMovie.onclick = (e) => {
+                    e.stopPropagation();
+                    dropdownEl.classList.add('hidden');
+                    const overlay = document.getElementById('search-overlay');
+                    if (overlay) overlay.classList.remove('active');
+                    if (this.searchInput) this.searchInput.value = '';
+                    if (this.mobileSearchInput) this.mobileSearchInput.value = '';
+                    this.searchQuery = '';
+                    this.render();
+                    
+                    const movieItem = {
+                        id: 'movie_custom_' + Date.now(),
+                        type: 'movie',
+                        title: query,
+                        desc: 'Custom Movie or Show Details',
+                        thumb: 'https://via.placeholder.com/300x450?text=Custom+Movie+or+Show',
+                        url: '',
+                        tags: [],
+                        completed: false,
+                        year: new Date().getFullYear().toString(),
+                        imdbId: 'custom_' + Date.now()
+                    };
+                    this.openDetails(movieItem);
+                };
+            }
+            
+            if (btnLink) {
+                btnLink.onclick = (e) => {
+                    e.stopPropagation();
+                    dropdownEl.classList.add('hidden');
+                    const overlay = document.getElementById('search-overlay');
+                    if (overlay) overlay.classList.remove('active');
+                    if (this.searchInput) this.searchInput.value = '';
+                    if (this.mobileSearchInput) this.mobileSearchInput.value = '';
+                    this.searchQuery = '';
+                    this.render();
+                    
+                    const linkItem = {
+                        id: 'sv_' + Date.now(),
+                        type: 'link',
+                        title: query,
+                        desc: 'Custom Web Link',
+                        thumb: 'https://via.placeholder.com/400x225?text=Custom+Link',
+                        url: this.isLikelyUrl(query) ? this.normalizeUrl(query) : 'https://google.com',
+                        tags: [],
+                        date: Date.now(),
+                        completed: false,
+                        year: this.getHostname(this.isLikelyUrl(query) ? this.normalizeUrl(query) : 'https://google.com')
+                    };
+                    this.openDetails(linkItem);
+                };
+            }
+        } else if (localMatches.length > 0 && imdbResults.length === 0 && !isLoadingOnline) {
+            const heading = document.createElement('div');
+            heading.style.cssText = 'padding: 6px 12px; font-size: 0.65rem; font-weight: 800; text-transform: uppercase; color: var(--text-secondary); border-bottom: 1px solid var(--border-color); margin-top: 4px;';
+            heading.textContent = 'Online Movies & TV Shows';
+            dropdownEl.appendChild(heading);
+
+            const emptyRow = document.createElement('div');
+            emptyRow.style.cssText = 'padding: 0.8rem 1rem; text-align: center; color: var(--text-muted); font-size: 0.75rem;';
+            emptyRow.textContent = 'No online matches found';
+            dropdownEl.appendChild(emptyRow);
         }
 
         dropdownEl.classList.remove('hidden');
     }
 
-    async fetchSuggestions(query, dropdownEl) {
-        const isUrl = /^https?:\/\//i.test(query);
+    async fetchSuggestions(query, localMatches, dropdownEl) {
+        const q = query.toLowerCase().trim();
 
-        // 1. If it's a URL, show rapid URL import helper
-        if (isUrl) {
-            dropdownEl.innerHTML = `
-                <div class="search-item" id="btnImportUrlSuggest" style="background: var(--accent-dim);">
-                    <div style="width:32px; height:32px; border-radius:4px; background:var(--accent-gradient); color:#fff; display:flex; align-items:center; justify-content:center; font-size:0.8rem;">
-                        <i class="fas fa-link"></i>
-                    </div>
-                    <div style="flex:1; min-width:0;">
-                        <h4 style="font-size:0.85rem; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Import Web Link</h4>
-                        <p style="font-size:0.72rem; color:var(--text-secondary); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${query}</p>
-                    </div>
-                </div>
-            `;
-            dropdownEl.classList.remove('hidden');
-
-            const btn = document.getElementById('btnImportUrlSuggest');
-            if (btn) {
-                btn.onclick = () => {
-                    dropdownEl.classList.add('hidden');
-                    if (this.searchInput) {
-                        this.searchInput.value = '';
-                        if (this.searchClearBtn) this.searchClearBtn.classList.add('hidden');
-                    }
-                    if (this.mobileSearchInput) this.mobileSearchInput.value = '';
-                    this.searchQuery = '';
-                    document.getElementById('search-overlay').classList.remove('active');
-
-                    // Trigger ingestion directly
-                    this.urlInput.value = query;
-                    this.handleAddLink();
-                };
-            }
-            return;
+        // Abort previous suggestions request if any is pending
+        if (this.suggestionAbortController) {
+            this.suggestionAbortController.abort();
         }
-
-        // 2. Local matching items
-        const q = query.toLowerCase();
-        const localMatches = this.items.filter(item => {
-            return (item.title || '').toLowerCase().includes(q) ||
-                   (item.desc || '').toLowerCase().includes(q) ||
-                   (item.tags || []).some(tag => tag.toLowerCase().includes(q));
-        }).slice(0, 3);
-
-        // Render local matches instantly
-        this.renderSuggestions(query, localMatches, [], true, dropdownEl);
+        this.suggestionAbortController = new AbortController();
 
         // 3. Online IMDb query
         try {
-            const data = await fetchWithTimeout(`https://imdb.iamidiotareyoutoo.com/search?q=${encodeURIComponent(query)}`, { timeout: 4000 });
+            const data = await fetchWithTimeout(`https://imdb.iamidiotareyoutoo.com/search?q=${encodeURIComponent(query)}`, {
+                timeout: 4000,
+                signal: this.suggestionAbortController.signal
+            });
             let imdbResults = [];
-            if (data.ok && data.description) {
-                imdbResults = data.description.map(m => ({
+            const desc = data ? (data.description || data) : null;
+            if (Array.isArray(desc)) {
+                imdbResults = desc.map(m => ({
                     title: m.title || m['#TITLE'] || 'Untitled',
                     year: m.year || m['#YEAR'] || '—',
                     poster: m.poster || m['#IMG_POSTER'] || '',
                     imdbId: m.imdbId || m['#IMDB_ID'] || '',
                     actors: m.actors || m['#ACTORS'] || ''
-                })).filter(Boolean).slice(0, 6);
+                })).filter(m => m.imdbId).slice(0, 6);
             }
+            
+            // Limit cache size to 50 items
+            if (this.searchCache.size >= 50) {
+                const firstKey = this.searchCache.keys().next().value;
+                this.searchCache.delete(firstKey);
+            }
+            this.searchCache.set(q, imdbResults);
+
             this.renderSuggestions(query, localMatches, imdbResults, false, dropdownEl);
         } catch (e) {
+            if (e.name === 'AbortError') {
+                return; // Suppress errors for aborted requests
+            }
             console.warn("IMDb fetch failed or timed out:", e);
             this.renderSuggestions(query, localMatches, [], false, dropdownEl);
         }
@@ -684,7 +747,6 @@ class SachApp {
         const url = this.urlInput.value.trim();
         if (!url) return;
 
-        this.currentLinkTags = [];
         this.currentUrl = url;
         
         const skeletonHtml = `
@@ -703,10 +765,15 @@ class SachApp {
         this.linkGrid.insertAdjacentHTML('afterbegin', skeletonHtml);
         this.showLoader(true, "Fetching metadata...");
 
+        let meta;
         try {
             // Check for duplication
             const dup = this.items.find(i => i.url === url);
             if (dup) {
+                this.showLoader(false);
+                const skeleton = document.getElementById('tempSkeleton');
+                if (skeleton) skeleton.remove();
+                
                 this.showToast("Link already saved!", "error");
                 this.resetAddForm();
                 
@@ -719,33 +786,48 @@ class SachApp {
                 return;
             }
 
-            const meta = await this.fetchLinkMetadata(url);
-            this.currentMetadata = meta;
-            this.showLoader(false);
-            this.showThumbPicker(meta.images || []);
+            meta = await this.fetchLinkMetadata(url);
         } catch (error) {
             console.error("Metadata retrieval failed:", error);
             const screenshotFallback = `https://s.wordpress.com/mshots/v1/${encodeURIComponent(url)}?w=1200`;
-            this.showLoader(false);
-            this.showThumbPicker([], screenshotFallback);
-        } finally {
-            this.resetAddForm();
+            meta = {
+                title: this.getHostname(url),
+                description: 'Metadata retrieval failed',
+                images: [screenshotFallback],
+                url: url,
+                isScreenshot: true
+            };
         }
+
+        this.showLoader(false);
+        const images = meta.images || [];
+        const selected = (images.length > 0) ? images[0] : `https://s.wordpress.com/mshots/v1/${encodeURIComponent(url)}?w=1200`;
+        
+        const item = {
+            id: 'sv_' + Date.now(),
+            type: 'link',
+            title: meta.title || 'Untitled Link',
+            desc: meta.description || '',
+            thumb: selected,
+            url: url,
+            tags: [],
+            date: Date.now(),
+            completed: false,
+            year: this.getHostname(url)
+        };
+
+        this.items.unshift(item);
+        this.saveItems();
+        this.showToast("Link saved successfully!", "success");
+        this.resetAddForm();
     }
 
     resetAddForm() {
         this.urlInput.value = '';
-        this.tempTags = [];
         const skel = document.getElementById('tempSkeleton');
         if (skel) skel.remove();
         this.showLoader(false);
         this.render();
-    }
-
-    async handleRetryFetch() {
-        this.hideModal(this.thumbModal);
-        this.urlInput.value = this.currentUrl;
-        this.handleAddLink();
     }
 
     async fetchLinkMetadata(url) {
@@ -841,77 +923,28 @@ class SachApp {
         return results;
     }
 
-    showThumbPicker(images, overrideFB) {
-        this.thumbPicker.innerHTML = '';
-        const allImages = overrideFB ? [overrideFB] : images;
-        const isScreenshotOnly = this.currentMetadata?.isScreenshot || (allImages.length === 1 && allImages[0].includes('mshots'));
 
-        if (isScreenshotOnly) {
-            this.thumbStatus.innerText = "Metadata cover not found. Select screenshot or try again:";
-            this.thumbStatus.style.color = "var(--danger)";
-        } else {
-            this.thumbStatus.innerText = "Select preferred thumbnail:";
-            this.thumbStatus.style.color = "var(--text-secondary)";
-        }
-
-        allImages.forEach((img, index) => {
-            const div = document.createElement('div');
-            div.className = 'thumb-option' + (index === 0 ? ' selected' : '');
-            div.innerHTML = `<img src="${img}" onerror="this.remove()">`;
-            div.onclick = () => {
-                this.thumbPicker.querySelectorAll('.thumb-option').forEach(o => o.classList.remove('selected'));
-                div.classList.add('selected');
-                this.selectedThumb = img;
-            };
-            this.thumbPicker.appendChild(div);
-        });
-
-        this.selectedThumb = allImages[0];
-        
-        // Reset thumbnail modal tags input & view
-        this.tempTags = [];
-        if (this.addThumbTagsInput) this.addThumbTagsInput.value = '';
-        this.renderFormTags('thumb');
-
-        this.showModal(this.thumbModal);
-    }
-
-    confirmThumbnail() {
-        const item = {
-            id: 'sv_' + Date.now(),
-            type: 'link',
-            title: this.currentMetadata.title || 'Untitled Link',
-            desc: this.currentMetadata.description || '',
-            thumb: this.selectedThumb,
-            url: this.currentUrl,
-            tags: [...this.tempTags],
-            date: Date.now(),
-            completed: false,
-            year: this.getHostname(this.currentUrl)
-        };
-
-        this.items.unshift(item);
-        this.saveItems();
-        this.hideModal(this.thumbModal);
-        this.showToast("Link saved successfully!", "success");
-        this.render();
-    }
 
     // Modal Details quick opening
     openDetails(item) {
-        const isSaved = this.items.some(i => i.id === item.id || (item.imdbId && i.imdbId === item.imdbId));
-        const savedItem = this.items.find(i => i.id === item.id || (item.imdbId && i.imdbId === item.imdbId)) || item;
+        const isSaved = this.items.some(i => i.id === item.id || (item.imdbId && i.imdbId && i.imdbId.toLowerCase() === item.imdbId.toLowerCase()));
+        const savedItem = this.items.find(i => i.id === item.id || (item.imdbId && i.imdbId && i.imdbId.toLowerCase() === item.imdbId.toLowerCase())) || item;
         
         this.modalImg.src = savedItem.thumb || 'https://via.placeholder.com/300x450?text=Unavailable';
         this.modalTitle.textContent = savedItem.title;
         
         // Modal layout settings depending on Link or Movie
         const isLink = savedItem.type === 'link';
-        this.modalLinkActions.classList.toggle('hidden', !isLink);
+        this.modalLinkActions.classList.toggle('hidden', !isLink && !isSaved);
+        this.modalOpenUrl.classList.toggle('hidden', !isLink);
+        this.modalCopyUrl.classList.toggle('hidden', !isLink);
+        this.modalEditToggle.classList.toggle('hidden', !isSaved);
         this.modalEditSection.classList.add('hidden'); // hidden initially
         
+        // Actors / tags section always visible
+        this.modalActorsSection.classList.remove('hidden');
+        
         if (isLink) {
-            this.modalActorsSection.classList.remove('hidden');
             this.modalImg.style.aspectRatio = '16/9';
             this.modalImg.parentElement.style.flex = '0 0 100%'; // Stretch top on mobile
             this.modalTagsLabel.textContent = 'Tags';
@@ -926,38 +959,51 @@ class SachApp {
                 navigator.clipboard.writeText(savedItem.url);
                 this.showToast("URL Copied to clipboard!", "success");
             };
-
-            // Inline editor triggers
-            this.modalEditToggle.onclick = () => {
-                this.modalEditSection.classList.toggle('hidden');
-                if (!this.modalEditSection.classList.contains('hidden')) {
-                    this.modalEditTitle.value = savedItem.title;
-                    this.modalEditDesc.value = savedItem.desc;
-                }
-            };
-
-            this.modalEditSave.onclick = () => {
-                savedItem.title = this.modalEditTitle.value || savedItem.title;
-                savedItem.desc = this.modalEditDesc.value || savedItem.desc;
-                this.saveItems();
-                this.modalTitle.textContent = savedItem.title;
-                this.modalDesc.innerHTML = `
-                    <span class="year-badge"><i class="fas fa-globe"></i> ${savedItem.year}</span>
-                    <span>${savedItem.desc}</span>
-                `;
-                this.modalEditSection.classList.add('hidden');
-                this.showToast("Changes Saved!");
-                this.render();
-            };
         } else {
-            this.modalActorsSection.classList.add('hidden');
             this.modalImg.style.aspectRatio = '2/3';
             this.modalImg.parentElement.style.flex = '0 0 280px';
+            this.modalTagsLabel.textContent = 'Actors & Tags';
             this.modalDesc.innerHTML = `
                 <span class="year-badge"><i class="fas fa-calendar"></i> ${savedItem.year}</span>
                 <span>${savedItem.desc || 'Film Details'}</span>
             `;
         }
+
+        // Hide/show the tag adding input based on isSaved
+        const inputWrap = this.modalActorsSection.querySelector('.modal-actor-input-wrap');
+        if (inputWrap) {
+            inputWrap.classList.toggle('hidden', !isSaved);
+        }
+
+        // Inline editor triggers
+        this.modalEditToggle.onclick = () => {
+            this.modalEditSection.classList.toggle('hidden');
+            if (!this.modalEditSection.classList.contains('hidden')) {
+                this.modalEditTitle.value = savedItem.title;
+                this.modalEditDesc.value = savedItem.desc;
+            }
+        };
+
+        this.modalEditSave.onclick = () => {
+            savedItem.title = this.modalEditTitle.value || savedItem.title;
+            savedItem.desc = this.modalEditDesc.value || savedItem.desc;
+            this.saveItems();
+            this.modalTitle.textContent = savedItem.title;
+            if (isLink) {
+                this.modalDesc.innerHTML = `
+                    <span class="year-badge"><i class="fas fa-globe"></i> ${savedItem.year}</span>
+                    <span>${savedItem.desc}</span>
+                `;
+            } else {
+                this.modalDesc.innerHTML = `
+                    <span class="year-badge"><i class="fas fa-calendar"></i> ${savedItem.year}</span>
+                    <span>${savedItem.desc}</span>
+                `;
+            }
+            this.modalEditSection.classList.add('hidden');
+            this.showToast("Changes Saved!");
+            this.render();
+        };
 
         // Setup Tags
         this.renderModalTags(savedItem);
@@ -1027,98 +1073,32 @@ class SachApp {
         this.modalActorTags.innerHTML = '';
         if (!item.tags) item.tags = [];
         
+        const isSaved = this.items.some(i => i.id === item.id || (item.imdbId && i.imdbId && i.imdbId.toLowerCase() === item.imdbId.toLowerCase()));
+        
         item.tags.forEach((tag, idx) => {
             const tagEl = document.createElement('div');
             tagEl.className = 'actor-tag';
-            tagEl.innerHTML = `
-                ${tag}
-                <button type="button"><i class="fas fa-times"></i></button>
-            `;
-            tagEl.querySelector('button').onclick = (e) => {
-                e.stopPropagation();
-                item.tags.splice(idx, 1);
-                this.saveItems();
-                this.renderModalTags(item);
-                this.render();
-                this.showToast("Tag removed!");
-            };
+            if (isSaved) {
+                tagEl.innerHTML = `
+                    ${tag}
+                    <button type="button"><i class="fas fa-times"></i></button>
+                `;
+                tagEl.querySelector('button').onclick = (e) => {
+                    e.stopPropagation();
+                    item.tags.splice(idx, 1);
+                    this.saveItems();
+                    this.renderModalTags(item);
+                    this.render();
+                    this.showToast("Tag removed!");
+                };
+            } else {
+                tagEl.innerHTML = `${tag}`;
+            }
             this.modalActorTags.appendChild(tagEl);
         });
     }
 
-    // General Link full editor
-    editLink(id) {
-        const item = this.items.find(i => i.id === id);
-        if (!item) return;
 
-        this.editingId = id;
-        this.editTitle.value = item.title;
-        this.editDesc.value = item.desc;
-        this.tempTags = Array.isArray(item.tags) ? [...item.tags] : [];
-        this.renderFormTags('edit');
-        this.editTagsInput.value = '';
-        this.selectedThumb = item.thumb;
-        this.currentUrl = item.url;
-        
-        this.renderEditThumbPicker([item.thumb]);
-        this.fetchLinkMetadata(item.url).then(m => this.renderEditThumbPicker(m.images || []));
-        this.showModal(this.editModal);
-    }
-
-    renderEditThumbPicker(images) {
-        const unique = [...new Set([...(images || []), this.selectedThumb])];
-        this.editThumbPicker.innerHTML = unique.map(img => {
-            const escapedImg = img.replace(/'/g, "\\'");
-            return `
-                <div class="thumb-option ${img === this.selectedThumb ? 'selected' : ''}">
-                    <img src="${img}" onerror="this.remove()">
-                </div>
-            `;
-        }).join('');
-
-        this.editThumbPicker.querySelectorAll('.thumb-option').forEach((opt, idx) => {
-            opt.onclick = () => {
-                this.editThumbPicker.querySelectorAll('.thumb-option').forEach(o => o.classList.remove('selected'));
-                opt.classList.add('selected');
-                this.selectedThumb = unique[idx];
-            };
-        });
-    }
-
-    generateScreenshot() {
-        const ss = `https://s.wordpress.com/mshots/v1/${encodeURIComponent(this.currentUrl)}?w=${this.currentCrop}`;
-        this.selectedThumb = ss;
-        
-        const div = document.createElement('div');
-        div.className = 'thumb-option selected';
-        div.innerHTML = `<img src="${ss}">`;
-        
-        this.editThumbPicker.querySelectorAll('.thumb-option').forEach(o => o.classList.remove('selected'));
-        div.onclick = () => {
-            this.editThumbPicker.querySelectorAll('.thumb-option').forEach(o => o.classList.remove('selected'));
-            div.classList.add('selected');
-            this.selectedThumb = ss;
-        };
-
-        this.editThumbPicker.prepend(div);
-        this.showToast("Screenshot generated!");
-    }
-
-    saveEdit() {
-        const item = this.items.find(i => i.id === this.editingId);
-        if (item) {
-            this.handleAddFormTag('edit');
-            item.title = this.editTitle.value;
-            item.desc = this.editDesc.value;
-            item.tags = [...this.tempTags];
-            item.thumb = this.selectedThumb;
-            this.saveItems();
-            this.render();
-            this.showToast("Bookmark saved successfully!", "success");
-        }
-        this.hideModal(this.editModal);
-        this.tempTags = [];
-    }
 
     removeLink(id) {
         this.items = this.items.filter(i => i.id !== id);
@@ -1180,7 +1160,7 @@ class SachApp {
                         <div class="welcome-header">
                             <i class="fas fa-folder-open welcome-icon"></i>
                             <h2>Start Your Premium Collection</h2>
-                            <p>Paste a website URL or search movie titles in the search bar above. Try importing these popular quick-links instantly:</p>
+                            <p>Paste a website URL or search movies & TV shows in the search bar above. Try importing these popular quick-links instantly:</p>
                         </div>
                         <div class="quick-add-grid">
                             <div class="quick-add-card" onclick="window.sachApp.quickImport('https://www.youtube.com')">
@@ -1275,48 +1255,7 @@ class SachApp {
         }
     }
 
-    // Add forms tag helpers
-    handleAddFormTag(formType) {
-        let input;
-        if (formType === 'add') input = this.addTagsInput;
-        else if (formType === 'edit') input = this.editTagsInput;
-        else if (formType === 'thumb') input = this.addThumbTagsInput;
 
-        if (!input) return;
-
-        const name = input.value.trim();
-        if (name) {
-            const names = name.split(',').map(n => n.trim()).filter(Boolean);
-            names.forEach(n => {
-                if (!this.tempTags.includes(n)) {
-                    this.tempTags.push(n);
-                }
-            });
-            input.value = '';
-            this.renderFormTags(formType);
-        }
-    }
-
-    removeFormTag(formType, index) {
-        this.tempTags.splice(index, 1);
-        this.renderFormTags(formType);
-    }
-
-    renderFormTags(formType) {
-        let list;
-        if (formType === 'add') list = this.addTagsList;
-        else if (formType === 'edit') list = this.editTagsList;
-        else if (formType === 'thumb') list = this.addThumbTagsList;
-
-        if (!list) return;
-
-        list.innerHTML = this.tempTags.map((t, i) => `
-            <div class="form-actor-tag">
-                ${t}
-                <button type="button" onclick="window.sachApp.removeFormTag('${formType}', ${i})">×</button>
-            </div>
-        `).join('');
-    }
 
     // P2P Synchronization Logic
     generateSyncCode() {
@@ -1446,7 +1385,7 @@ class SachApp {
                     this.syncInput.value = '';
                     tempPeer.destroy();
                     // Switch back to library tab so the user sees the synced results
-                    setTimeout(() => this.switchTab('library'), 1000);
+                    setTimeout(() => this.switchTab('library'), 100);
                 }
             });
 
@@ -1472,7 +1411,7 @@ class SachApp {
             if (this.syncInput) {
                 this.syncInput.value = syncParam;
                 this.showToast(`Connecting to sync code ${syncParam}...`);
-                setTimeout(() => this.loadFromSync(), 800);
+                setTimeout(() => this.loadFromSync(), 100);
             }
             // Clear the query parameter from the URL to prevent repeating connection attempts on reload
             const newUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
@@ -1501,7 +1440,7 @@ class SachApp {
                     <div class="hero-content">
                         <span class="hero-badge-featured"><i class="fas fa-star"></i> Welcome to Sach</span>
                         <h1 class="hero-title">Your Cinematic Watchlist & Link Library</h1>
-                        <p class="hero-meta">Save bookmarks, organize movie lists, and synchronize peer-to-peer instantly.</p>
+                        <p class="hero-meta">Save bookmarks, organize movie & TV watchlists, and synchronize peer-to-peer instantly.</p>
                         <div class="hero-buttons">
                             <button class="btn primary hero-btn-watch" onclick="document.getElementById('searchInput').focus();"><i class="fas fa-plus"></i> Add First Item</button>
                         </div>
@@ -1552,6 +1491,20 @@ class SachApp {
     quickImport(url) {
         this.urlInput.value = url;
         this.handleAddLink();
+    }
+
+    isLikelyUrl(str) {
+        if (!str) return false;
+        if (/^https?:\/\//i.test(str)) return true;
+        return /^[a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,5}(:[0-9]{1,5})?(\/.*)?$/i.test(str.trim());
+    }
+
+    normalizeUrl(url) {
+        let trimmed = url.trim();
+        if (!/^https?:\/\//i.test(trimmed)) {
+            trimmed = 'https://' + trimmed;
+        }
+        return trimmed;
     }
 
 

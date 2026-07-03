@@ -15,7 +15,7 @@
     <link rel="stylesheet" href="style.css">
     <!-- P2P and QR Code Libraries -->
     <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
-    <script src="https://cdn.rawgit.com/davidshimjs/qrcodejs/gh-pages/qrcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head>
 
 <body class="dark-theme">
@@ -111,7 +111,7 @@
                 <div class="empty-state">
                     <i class="fas fa-folder-open empty-state-icon"></i>
                     <div class="empty-title">Nothing here yet</div>
-                    <div class="empty-sub">Paste a link above or search movies to begin.</div>
+                    <div class="empty-sub">Paste a link above or search movies & TV shows to begin.</div>
                 </div>
             </div>
         </div>
@@ -155,7 +155,7 @@
     <div class="search-overlay" id="search-overlay">
         <div class="search-header">
             <button id="close-search"><i class="fas fa-arrow-left"></i></button>
-            <input type="text" id="mobile-search-input" placeholder="Search movies, TV or paste link..."
+            <input type="text" id="mobile-search-input" placeholder="Search movies, TV shows, or paste link..."
                 autocomplete="off">
         </div>
         <div id="mobile-results" style="flex:1; overflow-y:auto; padding-bottom: 2rem;"></div>
@@ -165,94 +165,6 @@
     <input type="url" id="urlInput" style="display: none;">
     <input type="text" id="addTagsInput" style="display: none;">
     <button id="addBtn" style="display: none;"></button>
-
-    <!-- Link Thumbnail Picker Modal -->
-    <div id="thumbModal" class="modal-overlay hidden">
-        <div class="modal-content border-panel" style="max-width: 480px; flex-direction: column;">
-            <div style="padding: 1.5rem; display: flex; flex-direction: column; height: 100%;">
-                <h2
-                    style="font-family: var(--font-heading); font-size: 1.15rem; font-weight: 800; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 1rem;">
-                    Select Thumbnail</h2>
-                <p id="thumbStatus" class="modal-subtitle"
-                    style="margin: 0.25rem 0 0.75rem; font-size: 0.82rem; color: var(--text-secondary);"></p>
-                <div id="thumbPicker" class="thumb-picker"></div>
-
-                <!-- Tag Input Option inside Thumbnail Picker -->
-                <div class="field" style="margin-top: 0.75rem;">
-                    <label
-                        style="font-family: var(--font-heading); font-weight: 800; font-size: 0.72rem; text-transform: uppercase; color: var(--text-secondary); margin-bottom: 0.25rem;">Tags</label>
-                    <div class="tag-input-wrapper" style="display: flex; gap: 8px;">
-                        <input type="text" id="addThumbTags" placeholder="Add Tag" style="flex: 1;">
-                        <button id="addThumbTagBtn" class="btn icon-btn" type="button"
-                            style="width: 38px; height: 38px; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; font-weight: bold; padding: 0;">+</button>
-                    </div>
-                    <div id="addThumbTagsList" class="form-tag-list"
-                        style="margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px;"></div>
-                </div>
-
-                <div class="modal-actions" style="margin-top: 1.25rem;">
-                    <button id="confirmThumb" class="btn primary" style="width: 100%">Confirm</button>
-                    <div style="display: flex; gap: 8px; margin-top: 4px;">
-                        <button id="retryFetchBtn" class="btn secondary" style="flex: 1;">Try Again</button>
-                        <button id="closeModal" class="btn secondary" style="flex: 1;">Cancel</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Edit Link Modal (General Links) -->
-    <div id="editModal" class="modal-overlay hidden">
-        <div class="modal-content border-panel" style="max-width: 520px; flex-direction: column;">
-            <div style="padding: 1.5rem; display: flex; flex-direction: column; overflow-y: auto;">
-                <h2
-                    style="font-family: var(--font-heading); font-size: 1.15rem; font-weight: 800; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 1rem;">
-                    Edit Bookmark</h2>
-
-                <div class="edit-fields">
-                    <div class="field">
-                        <label
-                            style="font-family: var(--font-heading); font-weight: 800; font-size: 0.72rem; text-transform: uppercase; color: var(--text-secondary); margin-bottom: 0.25rem;">Title</label>
-                        <input type="text" id="editTitle" placeholder="Title">
-                    </div>
-                    <div class="field" style="margin-top: 0.75rem;">
-                        <label
-                            style="font-family: var(--font-heading); font-weight: 800; font-size: 0.72rem; text-transform: uppercase; color: var(--text-secondary); margin-bottom: 0.25rem;">Description</label>
-                        <textarea id="editDesc" placeholder="Description" style="min-height: 80px;"></textarea>
-                    </div>
-                    <div class="field" style="margin-top: 0.75rem;">
-                        <label
-                            style="font-family: var(--font-heading); font-weight: 800; font-size: 0.72rem; text-transform: uppercase; color: var(--text-secondary); margin-bottom: 0.25rem;">Tags</label>
-                        <div class="tag-input-wrapper">
-                            <input type="text" id="editTags" placeholder="Add Tag">
-                            <button id="editTagBtn" class="btn icon-btn" type="button">+</button>
-                        </div>
-                        <div id="editTagsList" class="form-tag-list"></div>
-                    </div>
-                    <div class="thumbnail-section" style="margin-top: 1rem;">
-                        <label
-                            style="font-family: var(--font-heading); font-weight: 800; font-size: 0.72rem; text-transform: uppercase; color: var(--text-secondary); margin-bottom: 0.25rem;">Thumbnail</label>
-                        <div id="editThumbPicker" class="thumb-picker"></div>
-                        <div class="screenshot-tools">
-                            <h3>Refresh Screenshot</h3>
-                            <div class="crop-presets">
-                                <button class="btn tiny active" data-crop="1200">Full (1200w)</button>
-                                <button class="btn tiny" data-crop="800">Wide (800w)</button>
-                                <button class="btn tiny" data-crop="400">Square (400w)</button>
-                            </div>
-                            <button id="genScreenshotBtn" class="btn secondary" style="width: 100%; margin-top: 6px;"><i
-                                    class="fas fa-camera"></i> Fetch screenshot</button>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="modal-actions" style="margin-top: 1.5rem; display: flex; flex-direction: row; gap: 8px;">
-                    <button id="closeEditModal" class="btn secondary" style="flex: 1;">Cancel</button>
-                    <button id="saveEditBtn" class="btn primary" style="flex: 1;">Save Changes</button>
-                </div>
-            </div>
-        </div>
-    </div>
 
     <!-- Details Modal (Unified Movie watchlist + Link quick view) -->
     <div class="modal-overlay hidden" id="main-modal">
