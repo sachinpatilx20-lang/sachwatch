@@ -38,6 +38,7 @@ class SachApp {
         this.activeType = 'all';
         this.activeTag = 'all';
         this.searchQuery = '';
+        this.activeSort = 'newest';   // 'newest', 'oldest', 'title'
         
         this.currentUrl = '';
         this.theme = localStorage.getItem('sach_theme') || 'dark';
@@ -190,6 +191,7 @@ class SachApp {
         // Grid & Lists
         this.linkGrid = document.getElementById('linkGrid');
         this.tagFilter = document.getElementById('tagFilter');
+        this.sortSelect = document.getElementById('sortSelect');
         this.loader = document.getElementById('loader');
         this.loaderText = document.getElementById('loader-text');
 
@@ -215,6 +217,7 @@ class SachApp {
         this.modalEditSection = document.getElementById('modal-edit-section');
         this.modalEditTitle = document.getElementById('modal-edit-title');
         this.modalEditDesc = document.getElementById('modal-edit-desc');
+        this.modalEditTags = document.getElementById('modal-edit-tags');
         this.modalEditSave = document.getElementById('modal-edit-save');
         this.modalActorsSection = document.getElementById('modal-actors-section');
         this.modalTagsLabel = document.getElementById('modal-tags-label');
@@ -241,6 +244,14 @@ class SachApp {
     initEvents() {
         // Add link input triggers (via hidden fields in response to URL click)
         this.addBtn.addEventListener('click', () => this.handleAddLink());
+
+        if (this.sortSelect) {
+            this.sortSelect.addEventListener('change', (e) => {
+                this.activeSort = e.target.value;
+                this.dirtyLibrary = true;
+                this.render();
+            });
+        }
 
         // Search trigger suggest
         this.searchInput.addEventListener('input', (e) => {
@@ -921,7 +932,7 @@ class SachApp {
 
 
     // Modal Details quick opening
-    openDetails(item) {
+    openDetails(item, startEdit = false) {
         const isSaved = this.items.some(i => i.id === item.id || (item.imdbId && i.imdbId && i.imdbId.toLowerCase() === item.imdbId.toLowerCase()));
         const savedItem = this.items.find(i => i.id === item.id || (item.imdbId && i.imdbId && i.imdbId.toLowerCase() === item.imdbId.toLowerCase())) || item;
         
@@ -976,12 +987,18 @@ class SachApp {
             if (!this.modalEditSection.classList.contains('hidden')) {
                 this.modalEditTitle.value = savedItem.title;
                 this.modalEditDesc.value = savedItem.desc;
+                if (this.modalEditTags) {
+                    this.modalEditTags.value = (savedItem.tags || []).join(', ');
+                }
             }
         };
 
         this.modalEditSave.onclick = () => {
             savedItem.title = this.modalEditTitle.value || savedItem.title;
             savedItem.desc = this.modalEditDesc.value || savedItem.desc;
+            if (this.modalEditTags) {
+                savedItem.tags = this.modalEditTags.value.split(',').map(t => t.trim()).filter(Boolean);
+            }
             this.saveItems();
             this.modalTitle.textContent = savedItem.title;
             if (isLink) {
@@ -995,6 +1012,7 @@ class SachApp {
                     <span>${savedItem.desc}</span>
                 `;
             }
+            this.renderModalTags(savedItem);
             this.modalEditSection.classList.add('hidden');
             this.showToast("Changes Saved!");
             this.render();
@@ -1059,6 +1077,14 @@ class SachApp {
                 this.render();
             };
             this.mainModal.querySelector('.modal-actions').appendChild(rBtn);
+        }
+        if (startEdit && isSaved) {
+            this.modalEditSection.classList.remove('hidden');
+            this.modalEditTitle.value = savedItem.title;
+            this.modalEditDesc.value = savedItem.desc || '';
+            if (this.modalEditTags) {
+                this.modalEditTags.value = (savedItem.tags || []).join(', ');
+            }
         }
 
         this.showModal(this.mainModal);
@@ -1147,7 +1173,14 @@ class SachApp {
                     </div>
                 `;
             } else {
-                const sorted = [...this.items].sort((a, b) => (b.date || 0) - (a.date || 0));
+                let sorted = [...this.items];
+                if (this.activeSort === 'newest') {
+                    sorted.sort((a, b) => (b.date || 0) - (a.date || 0));
+                } else if (this.activeSort === 'oldest') {
+                    sorted.sort((a, b) => (a.date || 0) - (b.date || 0));
+                } else if (this.activeSort === 'title') {
+                    sorted.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+                }
                 
                 // Add an empty state container to toggle inline
                 const gridHTML = sorted.map(item => this.createCardHtml(item)).join('') + `
@@ -1209,30 +1242,51 @@ class SachApp {
         const badgeText = isLink ? 'Web Link' : 'Movie & TV';
         const iconClass = isLink ? 'fa-bookmark' : 'fa-film';
 
-        // Link cards open URL directly; movie cards open detail modal
-        const clickHandler = isLink
-            ? `window.open('${item.url.replace(/'/g, "\\'")}',' _blank')` 
-            : `window.sachApp.openDetailsById('${item.id}')`;
+        // Clicking the card body opens details modal for BOTH links and movies!
+        const clickHandler = `window.sachApp.openDetailsById('${item.id}')`;
 
-        const hostOrYear = isLink ? item.year : `<i class="fas fa-calendar-alt"></i> ${item.year}`;
+        const hostOrYear = isLink 
+            ? `<img src="${favicon}" class="card-favicon" onerror="this.style.display='none'"> ${item.year}` 
+            : `<i class="fas fa-calendar-alt"></i> ${item.year}`;
         const tagsHTML = (item.tags || []).slice(0, 2).map(t => `<span class="card-tag-pill">${t}</span>`).join('');
         const iconBadge = isLink ? `<i class="fas fa-link"></i>` : `<i class="fas fa-film"></i>`;
 
+        // Description / Actor placeholder logic
+        let descHTML = '';
+        if (item.desc) {
+            descHTML = `<p class="card-desc">${item.desc}</p>`;
+        } else {
+            const addText = isLink ? '+ Add Details' : '+ Add Actor';
+            descHTML = `<p class="card-desc add-placeholder" onclick="event.stopPropagation(); window.sachApp.openDetailsById('${item.id}', true)">${addText}</p>`;
+        }
+
+        const overlayIcon = isLink ? 'fa-arrow-up-right-from-square' : 'fa-play';
+        const overlayClickHandler = isLink
+            ? `event.stopPropagation(); window.open('${item.url.replace(/'/g, "\\'")}',' _blank')`
+            : `event.stopPropagation(); window.sachApp.openDetailsById('${item.id}')`;
+
         return `
             <div class="card type-${item.type}" data-id="${item.id}" onclick="${clickHandler}">
+                <button class="quick-action edit-action" title="Edit details" onclick="event.stopPropagation(); window.sachApp.openDetailsById('${item.id}', true)">
+                    <i class="fas fa-pen"></i>
+                </button>
                 <button class="quick-action" title="Delete" onclick="event.stopPropagation(); window.sachApp.removeLink('${item.id}')">
                     <i class="fas fa-times"></i>
                 </button>
-                <div class="card-img-wrapper">
+                <div class="card-img-wrapper" onclick="${overlayClickHandler}">
                     <img src="${item.thumb || 'https://via.placeholder.com/400x225?text=Poster+Unavailable'}" class="card-img" loading="lazy" decoding="async" onerror="this.onerror=null; this.src='https://via.placeholder.com/400x225?text=Image+Unavailable'">
-                    <div class="card-info-overlay">
-                        <div class="card-info-header">
-                            <span class="card-type-icon">${iconBadge}</span>
-                            <span class="card-host-text">${hostOrYear}</span>
-                        </div>
-                        <h3 class="card-overlay-title">${item.title}</h3>
-                        ${tagsHTML ? `<div class="card-overlay-tags">${tagsHTML}</div>` : ''}
+                    <div class="card-hover-overlay">
+                        <span class="hover-play-btn"><i class="fas ${overlayIcon}"></i></span>
                     </div>
+                </div>
+                <div class="card-body">
+                    <div class="card-info-header">
+                        <span class="card-type-icon">${iconBadge}</span>
+                        <span class="card-host-text">${hostOrYear}</span>
+                    </div>
+                    <h3 class="card-title">${item.title}</h3>
+                    ${descHTML}
+                    ${tagsHTML ? `<div class="card-tags">${tagsHTML}</div>` : ''}
                 </div>
             </div>
         `;
@@ -1240,9 +1294,9 @@ class SachApp {
 
 
 
-    openDetailsById(id) {
+    openDetailsById(id, startEdit = false) {
         const item = this.items.find(i => i.id === id);
-        if (item) this.openDetails(item);
+        if (item) this.openDetails(item, startEdit);
     }
 
 

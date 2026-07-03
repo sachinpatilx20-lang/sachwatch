@@ -85,6 +85,13 @@
         <div class="lib-wrap">
             <div class="lib-hd">
                 <h2 class="lib-title">My Library</h2>
+                <div class="lib-actions">
+                    <select id="sortSelect" class="sort-dropdown" aria-label="Sort items">
+                        <option value="newest">Newest First</option>
+                        <option value="oldest">Oldest First</option>
+                        <option value="title">Alphabetical (A-Z)</option>
+                    </select>
+                </div>
             </div>
             <div id="tagFilter" class="pill-bar category-bar"></div>
             <div id="linkGrid" class="card-grid link-grid"></div>
@@ -208,6 +215,10 @@
                 <div class="edit-row">
                     <label class="edit-label">Details / Actors</label>
                     <input type="text" id="modal-edit-desc" class="edit-input" placeholder="Details">
+                </div>
+                <div class="edit-row">
+                    <label class="edit-label">Tags (comma-separated)</label>
+                    <input type="text" id="modal-edit-tags" class="edit-input" placeholder="e.g. movies, drama, personal">
                 </div>
                 <button id="modal-edit-save" class="btn primary wide">
                     <i class="fas fa-floppy-disk"></i> Save Changes
