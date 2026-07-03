@@ -34,8 +34,9 @@ async function fetchWithTimeout(resource, options = {}) {
 class SachApp {
     constructor() {
         this.items = [];
-        this.activeTab = 'home'; // 'home', 'library', 'analytics', 'sync'
-        this.activeType = 'all';  // always 'all' to show links and movies combined
+        this.sections = [];           // Custom user-created shelf sections
+        this.activeTab = 'home';      // 'home', 'library', 'sync'
+        this.activeType = 'all';
         this.activeTag = 'all';
         this.searchQuery = '';
         
@@ -47,6 +48,7 @@ class SachApp {
         this.suggestionAbortController = null;
 
         this.initData();
+        this.sections = this.loadSections();  // Load sections after data
         this.initElements();
         this.initEvents();
         this.setTheme(this.theme);
@@ -353,11 +355,8 @@ class SachApp {
         this.generateSyncBtn.onclick = () => this.generateSyncCode();
         this.loadSyncBtn.onclick = () => this.loadFromSync();
 
-        // Header Navigation tab events
-        document.querySelectorAll('.nav-btn').forEach(btn => {
-            btn.onclick = () => this.switchTab(btn.dataset.tab);
-        });
-        document.querySelectorAll('.tab-item').forEach(btn => {
+        // Navigation tab events (bottom nav + any nav-btn)
+        document.querySelectorAll('.nav-btn, .tab-item, .nav-tab').forEach(btn => {
             btn.onclick = () => this.switchTab(btn.dataset.tab);
         });
 
@@ -371,19 +370,11 @@ class SachApp {
             }
         });
 
-        // Brand Home button click resets filter
-        const resetHome = () => {
-            this.switchTab('home');
-            this.activeTag = 'all';
-            this.searchQuery = '';
-            this.searchInput.value = '';
-            if (this.searchClearBtn) this.searchClearBtn.classList.add('hidden');
-            this.render();
-        };
+        // Logo click — reload the page
         const logoHome = document.getElementById('logoHome');
-        if (logoHome) logoHome.onclick = resetHome;
+        if (logoHome) logoHome.onclick = () => window.location.reload();
         const logoHomeMobile = document.getElementById('logoHomeMobile');
-        if (logoHomeMobile) logoHomeMobile.onclick = resetHome;
+        if (logoHomeMobile) logoHomeMobile.onclick = () => window.location.reload();
     }
 
     showLoader(show, text = "Fetching metadata...") {
@@ -435,7 +426,7 @@ class SachApp {
         this.activeTab = tab;
         
         // Update tabs active state
-        document.querySelectorAll('.nav-btn, .tab-item').forEach(b => {
+        document.querySelectorAll('.nav-btn, .tab-item, .nav-tab').forEach(b => {
             b.classList.remove('active');
             if (b.dataset.tab === tab) b.classList.add('active');
         });
@@ -1267,19 +1258,115 @@ class SachApp {
         if (!shelfMovies || !shelfLinks) return;
 
         const movies = this.items.filter(i => i.type === 'movie').sort((a,b) => b.date - a.date);
-        const links = this.items.filter(i => i.type === 'link').sort((a,b) => b.date - a.date);
+        const links  = this.items.filter(i => i.type === 'link').sort((a,b) => b.date - a.date);
 
-        if (movies.length === 0) {
-            shelfMovies.innerHTML = `<div style="padding:1.5rem; color:var(--text-muted); font-size:0.85rem;">No movies or series added yet. Search above to add them!</div>`;
-        } else {
-            shelfMovies.innerHTML = movies.map(item => this.createCardHtml(item)).join('');
-        }
+        shelfMovies.innerHTML = movies.length
+            ? movies.map(item => this.createCardHtml(item)).join('')
+            : `<div class="shelf-empty">No movies or series yet. Search to add!</div>`;
 
-        if (links.length === 0) {
-            shelfLinks.innerHTML = `<div style="padding:1.5rem; color:var(--text-muted); font-size:0.85rem;">No bookmarks saved yet. Paste a URL above to add!</div>`;
-        } else {
-            shelfLinks.innerHTML = links.map(item => this.createCardHtml(item)).join('');
+        shelfLinks.innerHTML = links.length
+            ? links.map(item => this.createCardHtml(item)).join('')
+            : `<div class="shelf-empty">No bookmarks yet. Paste a URL to add!</div>`;
+
+        // Render user-created custom sections
+        this.renderCustomSections();
+    }
+
+    /* ─────────────────────────────────────────
+       CUSTOM SECTIONS
+    ───────────────────────────────────────── */
+    loadSections() {
+        try {
+            return JSON.parse(localStorage.getItem('sach_sections') || '[]');
+        } catch(e) { return []; }
+    }
+
+    saveSections() {
+        localStorage.setItem('sach_sections', JSON.stringify(this.sections));
+    }
+
+    createSection(name) {
+        const trimmed = (name || '').trim();
+        if (!trimmed) return;
+        if (this.sections.find(s => s.name.toLowerCase() === trimmed.toLowerCase())) {
+            this.showToast('Section already exists!', 'error');
+            return;
         }
+        this.sections.push({ id: 'sec_' + Date.now(), name: trimmed });
+        this.saveSections();
+        this.renderCustomSections();
+        this.showToast(`"${trimmed}" section created!`, 'success');
+    }
+
+    deleteSection(id) {
+        this.sections = this.sections.filter(s => s.id !== id);
+        this.saveSections();
+        this.renderCustomSections();
+        this.showToast('Section removed', 'success');
+    }
+
+    renderCustomSections() {
+        const home = document.getElementById('home-section');
+        if (!home) return;
+
+        // Remove previous custom section blocks and create-section UI
+        home.querySelectorAll('.custom-shelf-block, .create-section-wrap').forEach(el => el.remove());
+
+        // Render each custom section
+        this.sections.forEach(section => {
+            const sectionItems = this.items
+                .filter(i => (i.tags || []).map(t => t.toLowerCase()).includes(section.name.toLowerCase()))
+                .sort((a,b) => b.date - a.date);
+
+            const railHTML = sectionItems.length
+                ? sectionItems.map(item => this.createCardHtml(item)).join('')
+                : `<div class="shelf-empty">No items yet — tag any item with "<strong style="color:var(--accent-3)">${section.name}</strong>"</div>`;
+
+            const block = document.createElement('div');
+            block.className = 'shelf-block custom-shelf-block';
+            block.dataset.sectionId = section.id;
+            block.innerHTML = `
+                <div class="shelf-hd">
+                    <h3 class="shelf-title"><i class="fas fa-layer-group"></i> ${section.name}</h3>
+                    <button class="section-del-btn" onclick="event.stopPropagation(); window.sachApp.deleteSection('${section.id}')" title="Remove section">
+                        <i class="fas fa-xmark"></i>
+                    </button>
+                </div>
+                <div class="shelf-rail carousel-shelf">${railHTML}</div>
+            `;
+            home.appendChild(block);
+        });
+
+        // Create-section UI
+        const wrap = document.createElement('div');
+        wrap.className = 'create-section-wrap';
+        wrap.innerHTML = `
+            <div class="create-section-form" id="create-section-form">
+                <input type="text" id="new-section-name" class="new-section-input" placeholder="Section name…" maxlength="40">
+                <button class="btn primary tiny" id="new-section-ok"><i class="fas fa-check"></i> Create</button>
+                <button class="btn ghost tiny" id="new-section-cancel"><i class="fas fa-xmark"></i></button>
+            </div>
+            <button class="create-section-btn" id="create-section-trigger">
+                <i class="fas fa-plus"></i> New Section
+            </button>
+        `;
+        home.appendChild(wrap);
+
+        // Wire events
+        const trigger   = document.getElementById('create-section-trigger');
+        const form      = document.getElementById('create-section-form');
+        const input     = document.getElementById('new-section-name');
+        const okBtn     = document.getElementById('new-section-ok');
+        const cancelBtn = document.getElementById('new-section-cancel');
+
+        const showForm = () => { trigger.classList.add('hidden'); form.classList.add('open'); input.focus(); };
+        const hideForm = () => { trigger.classList.remove('hidden'); form.classList.remove('open'); input.value = ''; };
+        const doCreate = () => { this.createSection(input.value); hideForm(); };
+
+        if (trigger)   trigger.onclick   = showForm;
+        if (cancelBtn) cancelBtn.onclick  = hideForm;
+        if (okBtn)     okBtn.onclick      = doCreate;
+        if (input)     input.onkeydown    = (e) => { if (e.key === 'Enter') doCreate(); if (e.key === 'Escape') hideForm(); };
     }
 
 
@@ -1480,8 +1567,8 @@ class SachApp {
         const container = document.getElementById('heroBannerContainer');
         if (!container) return;
 
-        // Only show hero banner on Library tab, and when search query is empty
-        if (this.activeTab !== 'library' || this.searchQuery.trim() !== '') {
+        // Hero banner is on home tab always; library tab uses its own section
+        if (this.activeTab !== 'home') {
             container.innerHTML = '';
             container.style.display = 'none';
             return;
@@ -1490,19 +1577,19 @@ class SachApp {
         container.style.display = 'block';
 
         if (this.items.length === 0) {
-            // Default premium fallback billboard
             container.innerHTML = `
-                <div style="position: relative; margin-bottom: 2.5rem;">
-                    <div class="hero-banner-glow" style="background-image: url('https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?q=80&w=1200');"></div>
-                    <div class="hero-banner" style="margin-bottom: 0;">
-                        <div class="hero-backdrop" style="background-image: linear-gradient(to right, rgba(20,20,20,0.9) 30%, rgba(20,20,20,0.3) 100%), url('https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?q=80&w=1200')"></div>
-                        <div class="hero-content">
-                            <span class="hero-badge-featured"><i class="fas fa-star"></i> Welcome to Sach</span>
-                            <h1 class="hero-title">Your Cinematic Watchlist & Link Library</h1>
-                            <p class="hero-meta">Save bookmarks, organize movie & TV watchlists, and synchronize peer-to-peer instantly.</p>
-                            <div class="hero-buttons">
-                                <button class="btn primary hero-btn-watch" onclick="document.getElementById('searchInput').focus();"><i class="fas fa-plus"></i> Add First Item</button>
-                            </div>
+                <div class="hero-banner hero-empty">
+                    <div class="hero-scrim"></div>
+                    <div class="hero-content">
+                        <div class="hero-badge-row">
+                            <span class="hero-type-badge"><i class="fas fa-star"></i> Welcome to Sach</span>
+                        </div>
+                        <h2 class="hero-title">Your Cinematic Library</h2>
+                        <p class="hero-desc">Search for movies, shows, or paste any URL to start building your collection.</p>
+                        <div class="hero-btn-row">
+                            <button class="btn primary" onclick="document.getElementById('mobile-search-btn').click(); setTimeout(() => document.getElementById('mobile-search-input').focus(), 100);">
+                                <i class="fas fa-plus"></i> Add First Item
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -1510,41 +1597,37 @@ class SachApp {
             return;
         }
 
-        // Find the latest item (prefer movies for cinematic feel)
-        let featured = this.items.find(i => i.type === 'movie');
-        if (!featured) featured = this.items[0]; // Fallback to latest link
-
+        // Prefer movies for cinematic feel, fallback to any item
+        let featured = this.items.find(i => i.type === 'movie') || this.items[0];
         const isMovie = featured.type === 'movie';
         const backdropUrl = featured.thumb || 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?q=80&w=1200';
-        const badgeText = isMovie ? 'Featured Movie' : 'Featured Bookmark';
-        const badgeIcon = isMovie ? 'fa-film' : 'fa-link';
+        const badgeIcon = isMovie ? 'fa-clapperboard' : 'fa-bookmark';
+        const badgeText = isMovie ? 'Movie &amp; TV' : 'Bookmark';
         const buttonText = isMovie ? 'View Details' : 'Open Link';
-        const buttonIcon = isMovie ? 'fa-info-circle' : 'fa-external-link-alt';
+        const buttonIcon = isMovie ? 'fa-circle-info' : 'fa-arrow-up-right-from-square';
 
         const actionHandler = isMovie
             ? `window.sachApp.openDetailsById('${featured.id}')`
-            : `window.open('${featured.url.replace(/'/g, "\\'")}', '_blank')`;
-
-        const tagsHTML = (featured.tags || []).slice(0, 3).map(t => `<span class="hero-tag">${t}</span>`).join('');
+            : `window.open('${featured.url.replace(/'/g, "\\'") }', '_blank')`;
 
         container.innerHTML = `
-            <div style="position: relative; margin-bottom: 2.5rem;">
-                <div class="hero-banner-glow" style="background-image: url('${backdropUrl}');"></div>
-                <div class="hero-banner" style="margin-bottom: 0;">
-                    <div class="hero-backdrop" style="background-image: linear-gradient(to right, rgba(20,20,20,0.9) 40%, rgba(20,20,20,0.4) 100%), url('${backdropUrl}')"></div>
-                    <div class="hero-content">
-                        <span class="hero-badge-featured"><i class="fas ${badgeIcon}"></i> ${badgeText}</span>
-                        <h1 class="hero-title">${featured.title}</h1>
-                        <p class="hero-meta">
-                            <span class="hero-year">${featured.year}</span>
-                            <span class="hero-actors">${featured.desc || 'No description available.'}</span>
-                        </p>
-                        ${tagsHTML ? `<div class="hero-tags">${tagsHTML}</div>` : ''}
-                        <div class="hero-buttons">
-                            <button class="btn primary hero-btn-watch" onclick="${actionHandler}">
-                                <i class="fas ${buttonIcon}"></i> ${buttonText}
-                            </button>
-                        </div>
+            <div class="hero-banner" onclick="${actionHandler}" style="cursor:pointer;">
+                <img src="${backdropUrl}" class="hero-bg-img" alt="" loading="lazy" onerror="this.style.display='none'">
+                <div class="hero-scrim"></div>
+                <div class="hero-content">
+                    <div class="hero-badge-row">
+                        <span class="hero-type-badge"><i class="fas ${badgeIcon}"></i> ${badgeText}</span>
+                        <span class="hero-year-pill">${featured.year || ''}</span>
+                    </div>
+                    <h2 class="hero-title">${featured.title}</h2>
+                    ${featured.desc ? `<p class="hero-desc">${featured.desc}</p>` : ''}
+                    <div class="hero-btn-row">
+                        <button class="btn primary" onclick="event.stopPropagation(); ${actionHandler}">
+                            <i class="fas ${buttonIcon}"></i> ${buttonText}
+                        </button>
+                        <button class="btn secondary" onclick="event.stopPropagation(); window.sachApp.switchTab('library');">
+                            <i class="fas fa-folder-open"></i> Library
+                        </button>
                     </div>
                 </div>
             </div>
