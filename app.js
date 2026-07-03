@@ -34,7 +34,7 @@ async function fetchWithTimeout(resource, options = {}) {
 class SachApp {
     constructor() {
         this.items = [];
-        this.activeTab = 'library'; // 'library' (My List), 'sync'
+        this.activeTab = 'home'; // 'home', 'library', 'analytics', 'sync'
         this.activeType = 'all';  // always 'all' to show links and movies combined
         this.activeTag = 'all';
         this.searchQuery = '';
@@ -198,7 +198,6 @@ class SachApp {
         this.closeSearchBtn = document.getElementById('close-search');
 
         // Nav and Section wrappers
-        this.libraryHistoryContainer = document.getElementById('library-history-container');
         this.syncSection = document.getElementById('sync-section');
 
 
@@ -256,9 +255,7 @@ class SachApp {
 
         this.searchInput.addEventListener('focus', (e) => {
             const query = e.target.value.trim();
-            if (query) {
-                this.triggerSearch(query, this.searchDropdown);
-            }
+            this.triggerSearch(query, this.searchDropdown);
         });
 
         this.searchClearBtn.addEventListener('click', () => {
@@ -303,9 +300,7 @@ class SachApp {
             };
             this.mobileSearchInput.addEventListener('focus', (e) => {
                 const query = e.target.value.trim();
-                if (query) {
-                    this.triggerSearch(query, this.mobileResults);
-                }
+                this.triggerSearch(query, this.mobileResults);
             });
         }
 
@@ -377,14 +372,18 @@ class SachApp {
         });
 
         // Brand Home button click resets filter
-        document.getElementById('logoHome').onclick = () => {
-            this.switchTab('library');
+        const resetHome = () => {
+            this.switchTab('home');
             this.activeTag = 'all';
             this.searchQuery = '';
             this.searchInput.value = '';
-            this.searchClearBtn.classList.add('hidden');
+            if (this.searchClearBtn) this.searchClearBtn.classList.add('hidden');
             this.render();
         };
+        const logoHome = document.getElementById('logoHome');
+        if (logoHome) logoHome.onclick = resetHome;
+        const logoHomeMobile = document.getElementById('logoHomeMobile');
+        if (logoHomeMobile) logoHomeMobile.onclick = resetHome;
     }
 
     showLoader(show, text = "Fetching metadata...") {
@@ -442,12 +441,15 @@ class SachApp {
         });
 
         // Hide show sections
-        if (tab === 'library') {
-            this.libraryHistoryContainer.classList.remove('hidden');
-            this.syncSection.classList.add('hidden');
-        } else if (tab === 'sync') {
-            this.libraryHistoryContainer.classList.add('hidden');
-            this.syncSection.classList.remove('hidden');
+        const homeSection = document.getElementById('home-section');
+        const librarySection = document.getElementById('library-section');
+        const syncSection = document.getElementById('sync-section');
+
+        if (homeSection) homeSection.classList.toggle('hidden', tab !== 'home');
+        if (librarySection) librarySection.classList.toggle('hidden', tab !== 'library');
+        if (syncSection) syncSection.classList.toggle('hidden', tab !== 'sync');
+
+        if (tab === 'sync') {
             // Automate pairing code generation on visiting sync tab
             if (this.syncCodeDisplay && this.syncCodeDisplay.textContent === '——') {
                 this.generateSyncCode();
@@ -461,10 +463,37 @@ class SachApp {
     // Smart suggestion triggers
     triggerSearch(query, dropdownEl) {
         clearTimeout(this.searchTimeout);
-        if (query.length < 2) {
-            dropdownEl.classList.add('hidden');
-            dropdownEl.innerHTML = '';
-            this.render();
+        if (!query || query.trim().length < 2) {
+            // Show recent items & quick ideas instead of closing!
+            const recentSaved = this.items.slice(0, 3);
+            let recentHtml = '';
+            if (recentSaved.length > 0) {
+                recentHtml = `
+                    <div style="padding: 6px 12px; font-size: 0.65rem; font-weight: 800; text-transform: uppercase; color: var(--text-secondary); border-bottom: 1px solid var(--border-color);">Recently Added</div>
+                `;
+                recentSaved.forEach(item => {
+                    const icon = item.type === 'link' ? '<i class="fas fa-bookmark" style="color:var(--accent-color)"></i>' : '<i class="fas fa-film" style="color:var(--accent-color)"></i>';
+                    recentHtml += `
+                        <div class="search-item" onclick="event.stopPropagation(); window.sachApp.openRecentItem('${item.id}', '${dropdownEl.id}')">
+                            <div style="width:24px; text-align:center;">${icon}</div>
+                            <div style="flex:1; min-width:0;">
+                                <h4 style="font-size:0.85rem; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${item.title}</h4>
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+
+            const ideas = ['Inception', 'Breaking Bad', 'Interstellar', 'Friends', 'Stranger Things'];
+            const ideasHtml = `
+                <div style="padding: 10px 12px 6px; font-size: 0.65rem; font-weight: 800; text-transform: uppercase; color: var(--text-secondary); border-bottom: 1px solid var(--border-color); margin-top: 4px;">Quick Search Ideas</div>
+                <div style="padding: 10px 12px; display: flex; flex-wrap: wrap; gap: 6px;">
+                    ${ideas.map(idea => `<span class="card-tag-pill" style="cursor:pointer; padding: 4px 10px; font-size: 0.72rem; background: rgba(255,255,255,0.06); border: 1px solid var(--border-color); border-radius: 12px;" onclick="event.stopPropagation(); window.sachApp.quickSearchFill('${idea}', '${dropdownEl.id}')">${idea}</span>`).join('')}
+                </div>
+            `;
+
+            dropdownEl.innerHTML = recentHtml + ideasHtml;
+            dropdownEl.classList.remove('hidden');
             return;
         }
 
@@ -1116,19 +1145,26 @@ class SachApp {
     // Grid rendering logic
     render() {
         if (!this.linkGrid) return;
+
+        // Render views based on activeTab
+        if (this.activeTab === 'home') {
+            this.renderHeroBanner();
+            this.renderCarousels();
+            return;
+        }
+
+        // Active tab is library grid
         this.updateTagPillBar();
         this.renderHeroBanner();
 
         let filtered = [...this.items];
 
-        // 1. Tab filters (No Completed filter since completed section is removed)
-
-        // 2. Tag filters
+        // 1. Tag filters
         if (this.activeTag !== 'all') {
             filtered = filtered.filter(i => (i.tags || []).includes(this.activeTag));
         }
 
-        // 3. Text search local filter
+        // 2. Text search local filter
         if (this.searchQuery.trim()) {
             const q = this.searchQuery.toLowerCase();
             filtered = filtered.filter(i => {
@@ -1138,8 +1174,6 @@ class SachApp {
                        (i.year || '').toLowerCase().includes(q);
             });
         }
-
-
 
         // Sorting: Newest first
         filtered.sort((a, b) => (b.date || 0) - (a.date || 0));
@@ -1187,45 +1221,68 @@ class SachApp {
         }
 
         // Render card lists
-        const gridHTML = filtered.map(item => {
-            
-            const isLink = item.type === 'link';
-            const favicon = isLink ? this.getFaviconUrl(item.url) : 'https://imdb.iamidiotareyoutoo.com/favicon.ico';
-            const timeAgo = this.getRelativeTime(item.date);
-            const badgeText = isLink ? 'Web Link' : 'Movie & TV';
-            const iconClass = isLink ? 'fa-bookmark' : 'fa-film';
-
-            // Link cards open URL directly; movie cards open detail modal
-            const clickHandler = isLink
-                ? `window.open('${item.url.replace(/'/g, "\\'")}',' _blank')` 
-                : `window.sachApp.openDetailsById('${item.id}')`;
-
-            const hostOrYear = isLink ? item.year : `<i class="fas fa-calendar-alt"></i> ${item.year}`;
-            const tagsHTML = (item.tags || []).slice(0, 2).map(t => `<span class="card-tag-pill">${t}</span>`).join('');
-            const iconBadge = isLink ? `<i class="fas fa-link"></i>` : `<i class="fas fa-film"></i>`;
-
-            return `
-                <div class="card type-${item.type}" data-id="${item.id}" onclick="${clickHandler}">
-                    <button class="quick-action" title="Delete" onclick="event.stopPropagation(); window.sachApp.removeLink('${item.id}')">
-                        <i class="fas fa-times"></i>
-                    </button>
-                    <div class="card-img-wrapper">
-                        <img src="${item.thumb || 'https://via.placeholder.com/400x225?text=Poster+Unavailable'}" class="card-img" loading="lazy" onerror="this.onerror=null; this.src='https://via.placeholder.com/400x225?text=Image+Unavailable'">
-                        <div class="card-info-overlay">
-                            <div class="card-info-header">
-                                <span class="card-type-icon">${iconBadge}</span>
-                                <span class="card-host-text">${hostOrYear}</span>
-                            </div>
-                            <h3 class="card-overlay-title">${item.title}</h3>
-                            ${tagsHTML ? `<div class="card-overlay-tags">${tagsHTML}</div>` : ''}
-                        </div>
-                    </div>
-                </div>
-            `;
-        }).join('');
-
+        const gridHTML = filtered.map(item => this.createCardHtml(item)).join('');
         this.linkGrid.innerHTML = gridHTML;
     }
+
+    createCardHtml(item) {
+        const isLink = item.type === 'link';
+        const favicon = isLink ? this.getFaviconUrl(item.url) : 'https://imdb.iamidiotareyoutoo.com/favicon.ico';
+        const timeAgo = this.getRelativeTime(item.date);
+        const badgeText = isLink ? 'Web Link' : 'Movie & TV';
+        const iconClass = isLink ? 'fa-bookmark' : 'fa-film';
+
+        // Link cards open URL directly; movie cards open detail modal
+        const clickHandler = isLink
+            ? `window.open('${item.url.replace(/'/g, "\\'")}',' _blank')` 
+            : `window.sachApp.openDetailsById('${item.id}')`;
+
+        const hostOrYear = isLink ? item.year : `<i class="fas fa-calendar-alt"></i> ${item.year}`;
+        const tagsHTML = (item.tags || []).slice(0, 2).map(t => `<span class="card-tag-pill">${t}</span>`).join('');
+        const iconBadge = isLink ? `<i class="fas fa-link"></i>` : `<i class="fas fa-film"></i>`;
+
+        return `
+            <div class="card type-${item.type}" data-id="${item.id}" onclick="${clickHandler}">
+                <button class="quick-action" title="Delete" onclick="event.stopPropagation(); window.sachApp.removeLink('${item.id}')">
+                    <i class="fas fa-times"></i>
+                </button>
+                <div class="card-img-wrapper">
+                    <img src="${item.thumb || 'https://via.placeholder.com/400x225?text=Poster+Unavailable'}" class="card-img" loading="lazy" onerror="this.onerror=null; this.src='https://via.placeholder.com/400x225?text=Image+Unavailable'">
+                    <div class="card-info-overlay">
+                        <div class="card-info-header">
+                            <span class="card-type-icon">${iconBadge}</span>
+                            <span class="card-host-text">${hostOrYear}</span>
+                        </div>
+                        <h3 class="card-overlay-title">${item.title}</h3>
+                        ${tagsHTML ? `<div class="card-overlay-tags">${tagsHTML}</div>` : ''}
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    renderCarousels() {
+        const shelfMovies = document.getElementById('shelf-movies');
+        const shelfLinks = document.getElementById('shelf-links');
+        if (!shelfMovies || !shelfLinks) return;
+
+        const movies = this.items.filter(i => i.type === 'movie').sort((a,b) => b.date - a.date);
+        const links = this.items.filter(i => i.type === 'link').sort((a,b) => b.date - a.date);
+
+        if (movies.length === 0) {
+            shelfMovies.innerHTML = `<div style="padding:1.5rem; color:var(--text-muted); font-size:0.85rem;">No movies or series added yet. Search above to add them!</div>`;
+        } else {
+            shelfMovies.innerHTML = movies.map(item => this.createCardHtml(item)).join('');
+        }
+
+        if (links.length === 0) {
+            shelfLinks.innerHTML = `<div style="padding:1.5rem; color:var(--text-muted); font-size:0.85rem;">No bookmarks saved yet. Paste a URL above to add!</div>`;
+        } else {
+            shelfLinks.innerHTML = links.map(item => this.createCardHtml(item)).join('');
+        }
+    }
+
+
 
     openDetailsById(id) {
         const item = this.items.find(i => i.id === id);
@@ -1435,14 +1492,17 @@ class SachApp {
         if (this.items.length === 0) {
             // Default premium fallback billboard
             container.innerHTML = `
-                <div class="hero-banner">
-                    <div class="hero-backdrop" style="background-image: linear-gradient(to right, rgba(20,20,20,0.9) 30%, rgba(20,20,20,0.3) 100%), url('https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?q=80&w=1200')"></div>
-                    <div class="hero-content">
-                        <span class="hero-badge-featured"><i class="fas fa-star"></i> Welcome to Sach</span>
-                        <h1 class="hero-title">Your Cinematic Watchlist & Link Library</h1>
-                        <p class="hero-meta">Save bookmarks, organize movie & TV watchlists, and synchronize peer-to-peer instantly.</p>
-                        <div class="hero-buttons">
-                            <button class="btn primary hero-btn-watch" onclick="document.getElementById('searchInput').focus();"><i class="fas fa-plus"></i> Add First Item</button>
+                <div style="position: relative; margin-bottom: 2.5rem;">
+                    <div class="hero-banner-glow" style="background-image: url('https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?q=80&w=1200');"></div>
+                    <div class="hero-banner" style="margin-bottom: 0;">
+                        <div class="hero-backdrop" style="background-image: linear-gradient(to right, rgba(20,20,20,0.9) 30%, rgba(20,20,20,0.3) 100%), url('https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?q=80&w=1200')"></div>
+                        <div class="hero-content">
+                            <span class="hero-badge-featured"><i class="fas fa-star"></i> Welcome to Sach</span>
+                            <h1 class="hero-title">Your Cinematic Watchlist & Link Library</h1>
+                            <p class="hero-meta">Save bookmarks, organize movie & TV watchlists, and synchronize peer-to-peer instantly.</p>
+                            <div class="hero-buttons">
+                                <button class="btn primary hero-btn-watch" onclick="document.getElementById('searchInput').focus();"><i class="fas fa-plus"></i> Add First Item</button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1468,25 +1528,30 @@ class SachApp {
         const tagsHTML = (featured.tags || []).slice(0, 3).map(t => `<span class="hero-tag">${t}</span>`).join('');
 
         container.innerHTML = `
-            <div class="hero-banner">
-                <div class="hero-backdrop" style="background-image: linear-gradient(to right, rgba(20,20,20,0.9) 40%, rgba(20,20,20,0.4) 100%), url('${backdropUrl}')"></div>
-                <div class="hero-content">
-                    <span class="hero-badge-featured"><i class="fas ${badgeIcon}"></i> ${badgeText}</span>
-                    <h1 class="hero-title">${featured.title}</h1>
-                    <p class="hero-meta">
-                        <span class="hero-year">${featured.year}</span>
-                        <span class="hero-actors">${featured.desc || 'No description available.'}</span>
-                    </p>
-                    ${tagsHTML ? `<div class="hero-tags">${tagsHTML}</div>` : ''}
-                    <div class="hero-buttons">
-                        <button class="btn primary hero-btn-watch" onclick="${actionHandler}">
-                            <i class="fas ${buttonIcon}"></i> ${buttonText}
-                        </button>
+            <div style="position: relative; margin-bottom: 2.5rem;">
+                <div class="hero-banner-glow" style="background-image: url('${backdropUrl}');"></div>
+                <div class="hero-banner" style="margin-bottom: 0;">
+                    <div class="hero-backdrop" style="background-image: linear-gradient(to right, rgba(20,20,20,0.9) 40%, rgba(20,20,20,0.4) 100%), url('${backdropUrl}')"></div>
+                    <div class="hero-content">
+                        <span class="hero-badge-featured"><i class="fas ${badgeIcon}"></i> ${badgeText}</span>
+                        <h1 class="hero-title">${featured.title}</h1>
+                        <p class="hero-meta">
+                            <span class="hero-year">${featured.year}</span>
+                            <span class="hero-actors">${featured.desc || 'No description available.'}</span>
+                        </p>
+                        ${tagsHTML ? `<div class="hero-tags">${tagsHTML}</div>` : ''}
+                        <div class="hero-buttons">
+                            <button class="btn primary hero-btn-watch" onclick="${actionHandler}">
+                                <i class="fas ${buttonIcon}"></i> ${buttonText}
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
         `;
     }
+
+
 
     quickImport(url) {
         this.urlInput.value = url;
@@ -1539,6 +1604,29 @@ class SachApp {
         if (days < 30) return `${days}d ago`;
         const months = Math.floor(days / 30);
         return `${months}mo ago`;
+    }
+
+    quickSearchFill(text, dropdownId) {
+        const dropdownEl = document.getElementById(dropdownId);
+        const inputEl = (dropdownId === 'mobile-results') ? this.mobileSearchInput : this.searchInput;
+        if (inputEl) {
+            inputEl.value = text;
+            if (this.searchClearBtn && inputEl === this.searchInput) {
+                this.searchClearBtn.classList.remove('hidden');
+            }
+            this.searchQuery = text;
+            this.render();
+            this.triggerSearch(text, dropdownEl);
+        }
+    }
+
+    openRecentItem(itemId, dropdownId) {
+        const dropdownEl = document.getElementById(dropdownId);
+        if (dropdownEl) dropdownEl.classList.add('hidden');
+        const overlay = document.getElementById('search-overlay');
+        if (overlay) overlay.classList.remove('active');
+        const item = this.items.find(i => i.id === itemId);
+        if (item) this.openDetails(item);
     }
 
     showToast(message, type = 'success') {

@@ -4,14 +4,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Sach — Premium Links & Cinematic watchlist</title>
+    <title>Sach — Premium Links & Cinematic Watchlist</title>
     <meta name="description"
         content="A pristine, minimalist link library and cinematic watchlist. Save links, track movies, and sync peer-to-peer.">
     <!-- Clean Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <!-- Icons and Styles -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="style.css">
     <!-- P2P and QR Code Libraries -->
     <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
@@ -32,164 +32,170 @@
         </div>
     </div>
 
-    <style>
-        @keyframes spin {
-            0% {
-                transform: rotate(0deg);
-            }
-
-            100% {
-                transform: rotate(360deg);
-            }
-        }
-    </style>
-
     <!-- Toast Notifications -->
     <div id="toast-container"></div>
 
-    <!-- Sticky Header -->
-    <header>
-        <div class="nav-container">
-            <!-- Brand Logo -->
-            <div class="logo" id="logoHome">
-                <i class="fa-solid fa-play"></i>
-                <span></span>
+    <!-- Global Top Header Navbar -->
+    <header class="top-bar">
+        <!-- Brand Logo -->
+        <div class="logo" id="logoHome">
+            <i class="fa-solid fa-play logo-icon"></i>
+            <span class="logo-text">SACH</span>
+        </div>
+        
+        <!-- Desktop Navigation Links -->
+        <nav class="nav-links">
+            <button class="nav-btn active" data-tab="home">
+                <i class="fas fa-house"></i> <span>Home</span>
+            </button>
+            <button class="nav-btn" data-tab="library">
+                <i class="fas fa-folder-open"></i> <span>My Library</span>
+            </button>
+            <button class="nav-btn" data-tab="sync">
+                <i class="fas fa-broadcast-tower"></i> <span>Sync Hub</span>
+            </button>
+        </nav>
+
+        <!-- Unified Smart Search -->
+        <div class="header-search">
+            <div class="search-input-wrapper">
+                <i class="fas fa-search search-icon-inside"></i>
+                <input type="text" id="searchInput" placeholder="Search movies, TV shows, or paste URL..." autocomplete="off">
+                <button id="searchClearBtn" class="search-clear-btn hidden" title="Clear">×</button>
             </div>
+            <div id="search-dropdown" class="results-dropdown hidden"></div>
+        </div>
 
-            <!-- Smart Search (Unified local + IMDb suggestions) -->
-            <div class="header-search">
-                <div class="search-input-wrapper">
-                    <i class="fas fa-search search-icon-inside"></i>
-                    <input type="text" id="searchInput" placeholder="Search movies, TV shows, or paste URL..."
-                        autocomplete="off">
-                    <button id="searchClearBtn" class="search-clear-btn hidden" title="Clear">×</button>
-                </div>
-                <!-- Search Suggestions Dropdown -->
-                <div id="search-dropdown" class="results-dropdown hidden"></div>
-            </div>
-
-            <!-- Desktop Navigation Links -->
-            <nav class="nav-links">
-                <button class="nav-btn active" data-tab="library"><i class="fas fa-folder-open"></i>My List</button>
-                <button class="nav-btn" data-tab="sync"><i class="fas fa-tv"></i>Sync Devices</button>
-            </nav>
-
-            <!-- Desktop Theme & Actions -->
-            <div class="header-actions">
-                <button id="themeToggle" class="icon-btn" title="Toggle Theme">
-                    <i class="fas fa-sun" id="themeIcon"></i>
-                </button>
-            </div>
-
-            <!-- Mobile Search Icon -->
-            <div class="mobile-search-toggle" id="mobile-search-btn" style="cursor: pointer; display: none;">
+        <div class="top-bar-right">
+            <button id="themeToggle" class="icon-btn" title="Toggle Theme" style="margin-right: 8px;">
+                <i class="fas fa-sun" id="themeIcon"></i>
+            </button>
+            <!-- Mobile search magnifying button -->
+            <div class="mobile-search-toggle" id="mobile-search-btn" style="cursor: pointer;">
                 <i class="fas fa-search" style="font-size: 1.25rem;"></i>
             </div>
         </div>
     </header>
 
-    <!-- App Container -->
-    <main class="app-container">
+    <!-- App Tab Views Wrapper -->
+    <main class="view-wrapper">
 
-        <!-- Library & History Sections -->
-        <div id="library-history-container">
-
-            <!-- Billboard Hero Banner (Injected dynamically) -->
+        <!-- 1. HOME VIEW SECTION -->
+        <section id="home-section" class="tab-view-section">
+            <!-- Billboard Featured Banner -->
             <div id="heroBannerContainer"></div>
 
-            <!-- Unified Filters & Tag pills bar -->
+            <!-- Horizontal Carousel Shelves -->
+            <div class="carousel-container">
+                <!-- Movie Shelf -->
+                <div class="carousel-shelf-wrapper">
+                    <h3 class="shelf-title"><i class="fas fa-film"></i> Watchlist Movies & TV Shows</h3>
+                    <div id="shelf-movies" class="carousel-shelf">
+                        <!-- Movie cards injected dynamically -->
+                    </div>
+                </div>
+
+                <!-- Bookmarks Shelf -->
+                <div class="carousel-shelf-wrapper" style="margin-top: 2.5rem;">
+                    <h3 class="shelf-title"><i class="fas fa-bookmark"></i> Saved Web Bookmarks</h3>
+                    <div id="shelf-links" class="carousel-shelf">
+                        <!-- Link cards injected dynamically -->
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 2. LIBRARY VIEW SECTION -->
+        <section id="library-section" class="tab-view-section hidden">
+            <!-- Tag filters navigation -->
             <div class="category-container">
-                <!-- Tag Filters -->
                 <div id="tagFilter" class="category-bar">
                     <button class="cat-pill active" data-tag="all">All Tags</button>
                 </div>
             </div>
 
-            <!-- Main Library Grid -->
+            <!-- Main Grid -->
             <div id="linkGrid" class="link-grid">
-                <!-- Cards injected here dynamically -->
                 <div class="empty-state">
                     <i class="fas fa-folder-open empty-state-icon"></i>
                     <div class="empty-title">Nothing here yet</div>
-                    <div class="empty-sub">Paste a link above or search movies & TV shows to begin.</div>
+                    <div class="empty-sub">Paste a link in search or query movies to begin.</div>
                 </div>
             </div>
-        </div>
+        </section>
 
-        <!-- Sync Section -->
-        <section id="sync-section" class="hidden" style="margin-top: 1rem;">
+
+
+        <!-- 4. SYNC VIEW SECTION -->
+        <section id="sync-section" class="tab-view-section hidden">
             <div class="sync-grid">
-                <!-- Sync Host code generator -->
+                <!-- Host generator -->
                 <div class="sync-card">
                     <p class="sync-label">Your Pairing Code</p>
                     <div id="sync-code-display" class="sync-code">——</div>
                     <div id="p2p-qr" class="p2p-qr hidden"></div>
-                    <button id="generate-sync" class="btn primary" style="width:100%"><i
-                            class="fas fa-broadcast-tower"></i> Generate Code</button>
-                    <p class="sync-hint">Generate a code to broadcast your links and watchlist library to a secondary
-                        device.</p>
+                    <button id="generate-sync" class="btn primary" style="width:100%"><i class="fas fa-broadcast-tower"></i> Generate Code</button>
+                    <p class="sync-hint">Generate a pairing code to stream your library to another screen.</p>
                 </div>
 
-                <!-- Sync Guest pairing form -->
+                <!-- Guest pair -->
                 <div class="sync-card">
                     <p class="sync-label">Pair with Code</p>
-                    <input type="text" id="sync-input" class="sync-input" placeholder="Enter 6-digit code"
-                        maxlength="6">
-                    <button id="load-sync" class="btn secondary" style="width:100%"><i class="fas fa-link"></i> Pair
-                        Device</button>
-                    <p class="sync-hint">Enter the 6-digit code from your primary device to merge both collections.</p>
+                    <input type="text" id="sync-input" class="sync-input" placeholder="Enter 6-digit code" maxlength="6">
+                    <button id="load-sync" class="btn secondary" style="width:100%"><i class="fas fa-link"></i> Pair Device</button>
+                    <p class="sync-hint">Enter the 6-digit code from your primary screen to sync collections.</p>
                 </div>
             </div>
-
-
         </section>
     </main>
 
-    <!-- Mobile Navigation Tab Bar -->
+    <!-- Mobile Floating Navigation Bar -->
     <nav class="tab-bar">
-        <button class="tab-item active" data-tab="library"><i class="fas fa-folder-open"></i><span>My List</span></button>
-        <button class="tab-item" data-tab="sync"><i class="fas fa-tv"></i><span>Sync Devices</span></button>
+        <button class="tab-item active" data-tab="home">
+            <i class="fas fa-house"></i><span>Home</span>
+        </button>
+        <button class="tab-item" data-tab="library">
+            <i class="fas fa-folder-open"></i><span>Library</span>
+        </button>
+        <button class="tab-item" data-tab="sync">
+            <i class="fas fa-broadcast-tower"></i><span>Sync</span>
+        </button>
     </nav>
 
     <!-- Mobile Search Overlay -->
     <div class="search-overlay" id="search-overlay">
         <div class="search-header">
             <button id="close-search"><i class="fas fa-arrow-left"></i></button>
-            <input type="text" id="mobile-search-input" placeholder="Search movies, TV shows, or paste link..."
-                autocomplete="off">
+            <input type="text" id="mobile-search-input" placeholder="Search movies, TV shows, or paste link..." autocomplete="off">
         </div>
-        <div id="mobile-results" style="flex:1; overflow-y:auto; padding-bottom: 2rem;"></div>
+        <div id="mobile-results" style="flex: 1; overflow-y: auto; padding-bottom: 2rem;"></div>
     </div>
 
-    <!-- Hidden Inputs for App Ingestion logic -->
+    <!-- Hidden Ingestion Inputs -->
     <input type="url" id="urlInput" style="display: none;">
     <input type="text" id="addTagsInput" style="display: none;">
     <button id="addBtn" style="display: none;"></button>
 
-    <!-- Details Modal (Unified Movie watchlist + Link quick view) -->
+    <!-- Unified Details Modal -->
     <div class="modal-overlay hidden" id="main-modal">
         <div class="modal-content">
             <!-- Poster Side -->
             <div class="modal-poster-side">
-                <img id="modal-img" src="" alt="Poster"
-                    onerror="this.onerror=null; this.src='https://via.placeholder.com/300x450?text=Poster+Unavailable'">
+                <img id="modal-img" src="" alt="Poster" onerror="this.onerror=null; this.src='https://via.placeholder.com/300x450?text=Poster+Unavailable'">
             </div>
             <!-- Info Side -->
             <div class="modal-info-side">
                 <h2 id="modal-title" class="modal-title"></h2>
                 <div id="modal-desc" class="modal-meta"></div>
 
-                <!-- Web Link actions -->
+                <!-- Open & Copy Action panel -->
                 <div id="modal-link-actions" class="modal-link-actions hidden">
-                    <button id="modal-open-url" class="btn secondary" style="flex: 1;"><i
-                            class="fas fa-external-link-alt"></i> Open</button>
-                    <button id="modal-copy-url" class="btn secondary" style="flex: 1;"><i class="fas fa-copy"></i> Copy
-                        Link</button>
-                    <button id="modal-edit-toggle" class="btn secondary" title="Edit Properties"><i
-                            class="fas fa-pen"></i> Edit</button>
+                    <button id="modal-open-url" class="btn secondary" style="flex: 1;"><i class="fas fa-external-link-alt"></i> Open</button>
+                    <button id="modal-copy-url" class="btn secondary" style="flex: 1;"><i class="fas fa-copy"></i> Copy Link</button>
+                    <button id="modal-edit-toggle" class="btn secondary" title="Edit Properties"><i class="fas fa-pen"></i> Edit</button>
                 </div>
 
-                <!-- Web Link inline details editor -->
+                <!-- Inline editor -->
                 <div id="modal-edit-section" class="modal-edit-section hidden">
                     <div class="modal-edit-field">
                         <label>Title</label>
@@ -199,22 +205,20 @@
                         <label>Description / Actors</label>
                         <input type="text" id="modal-edit-desc" placeholder="Details">
                     </div>
-                    <button id="modal-edit-save" class="btn primary" style="width:100%; margin-top: 6px;">Save
-                        Changes</button>
+                    <button id="modal-edit-save" class="btn primary" style="width: 100%; margin-top: 6px;">Save Changes</button>
                 </div>
 
-                <!-- Actors / Tags Editor -->
+                <!-- Tags / Actors list -->
                 <div id="modal-actors-section" class="modal-actors-section">
-                    <label id="modal-tags-label">Actors</label>
+                    <label id="modal-tags-label">Tags & Actors</label>
                     <div id="modal-actor-tags" class="modal-actor-tags"></div>
                     <div class="modal-actor-input-wrap">
-                        <input type="text" id="modal-actor-input" placeholder="Add tags...">
-                        <button id="modal-add-actor" class="btn primary icon-btn-sm"
-                            style="width: 32px; height: 32px; border-radius: 8px;"><i class="fas fa-plus"></i></button>
+                        <input type="text" id="modal-actor-input" placeholder="Add Tag">
+                        <button id="modal-add-actor" class="btn primary icon-btn-sm" style="width: 32px; height: 32px; border-radius: 8px;"><i class="fas fa-plus"></i></button>
                     </div>
                 </div>
 
-                <!-- Dialog actions (Add, watched, delete) -->
+                <!-- Actions row -->
                 <div class="modal-actions">
                     <div class="modal-actions-row" style="grid-template-columns: 1fr;">
                         <button id="add-to-library" class="btn primary">Add to My List</button>
@@ -225,7 +229,7 @@
         </div>
     </div>
 
-    <!-- Application Script -->
+    <!-- Main JavaScript Bundle -->
     <script src="app.js"></script>
 </body>
 
