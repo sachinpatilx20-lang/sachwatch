@@ -2094,64 +2094,10 @@ class SachApp {
     // Dynamic Cinematic Hero Billboard banner rendering
     renderHeroBanner() {
         const container = document.getElementById('hero-banner-container');
-        if (!container) return;
-
-        if (!this.dirtyHero) return;
-
-        // Pick featured item: prefer movies, fallback to links
-        const movies = this.items.filter(i => i.type === 'movie');
-        const links = this.items.filter(i => i.type === 'link');
-        const featured = movies.length > 0 ? movies[0] : (links.length > 0 ? links[0] : null);
-
-        if (!featured) {
+        if (container) {
             container.innerHTML = '';
             container.style.display = 'none';
-            this.dirtyHero = false;
-            return;
         }
-
-        container.style.display = 'block';
-        const isLink = featured.type === 'link';
-        const backdrop = featured.thumb || 'https://via.placeholder.com/1200x460?text=Premium+Collection';
-        const typeIcon = isLink ? '<i class="fas fa-bookmark"></i>' : '<i class="fas fa-film"></i>';
-        const typeLabel = isLink ? 'Featured Web Link' : 'Featured Movie & TV';
-        const actionLabel = isLink ? 'Open Link' : 'View Details';
-        
-        const btnAction = isLink 
-            ? `window.open('${featured.url.replace(/'/g, "\\'")}', '_blank')`
-            : `window.sachApp.openDetailsById('${featured.id}')`;
-
-        const favIconClass = featured.favorite ? 'fas fa-star' : 'far fa-star';
-        const statusIconClass = featured.completed ? 'fas fa-circle-check' : 'far fa-circle-check';
-        const statusText = isLink 
-            ? (featured.completed ? 'Read' : 'Mark Read') 
-            : (featured.completed ? 'Watched' : 'Mark Watched');
-
-        container.innerHTML = `
-            <div class="hero-banner">
-                <img src="${backdrop}" alt="${featured.title}" class="hero-bg-img" onerror="this.src='https://via.placeholder.com/1200x460?text=Sach+Collection'">
-                <div class="hero-scrim"></div>
-                <div class="hero-content">
-                    <div class="hero-badge-row">
-                        <span class="hero-type-badge">${typeIcon} ${typeLabel}</span>
-                        <span class="hero-year-pill">${featured.year || ''}</span>
-                    </div>
-                    <h1 class="hero-title">${featured.title}</h1>
-                    <p class="hero-desc">${featured.desc || 'No description available.'}</p>
-                    <div class="hero-btn-row">
-                        <button class="btn primary" onclick="${btnAction}">
-                            <i class="fas ${isLink ? 'fa-arrow-up-right-from-square' : 'fa-info-circle'}"></i> ${actionLabel}
-                        </button>
-                        <button class="btn secondary" onclick="window.sachApp.toggleFavorite('${featured.id}')">
-                            <i class="${favIconClass}" style="${featured.favorite ? 'color:#f5c518;' : ''}"></i> Favorite
-                        </button>
-                        <button class="btn secondary" onclick="window.sachApp.toggleCompleted('${featured.id}')">
-                            <i class="${statusIconClass}" style="${featured.completed ? 'color:var(--green);' : ''}"></i> ${statusText}
-                        </button>
-                    </div>
-                </div>
-            </div>
-        `;
         this.dirtyHero = false;
     }
 
