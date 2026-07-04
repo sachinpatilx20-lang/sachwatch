@@ -23,6 +23,7 @@
     <div class="glow-sphere glow-sphere-2"></div>
 </div>
 
+
 <!-- ═══════════════════════════════════════════
      LOADER OVERLAY
      ═══════════════════════════════════════════ -->
@@ -82,10 +83,31 @@
 
     <!-- ── HOME (MY LIBRARY) ──────────────────── -->
     <section id="home-section" class="view-section">
+        
+        <!-- Immersive Billboard Banner for Movies/Bookmarks -->
+        <div id="hero-banner-container"></div>
+
+        <!-- Netflix-style Shelves Rail Container -->
+        <div id="shelves-container"></div>
+
         <div class="lib-wrap">
             <div class="lib-hd">
                 <h2 class="lib-title">My Library</h2>
                 <div class="lib-actions">
+                    <!-- Unified Filter segments -->
+                    <div class="filter-segments">
+                        <div class="segment-control" id="typeSegment" role="radiogroup" aria-label="Filter by type">
+                            <button class="segment-btn active" data-type="all" role="radio" aria-checked="true">All</button>
+                            <button class="segment-btn" data-type="movie" role="radio" aria-checked="false"><i class="fas fa-film"></i> Movies</button>
+                            <button class="segment-btn" data-type="link" role="radio" aria-checked="false"><i class="fas fa-bookmark"></i> Links</button>
+                        </div>
+                        <div class="segment-control" id="statusSegment" role="radiogroup" aria-label="Filter by status">
+                            <button class="segment-btn active" data-status="all" role="radio" aria-checked="true">All Status</button>
+                            <button class="segment-btn" data-status="pending" role="radio" aria-checked="false">Pending</button>
+                            <button class="segment-btn" data-status="completed" role="radio" aria-checked="false">Completed</button>
+                        </div>
+                    </div>
+
                     <select id="sortSelect" class="sort-dropdown" aria-label="Sort items">
                         <option value="newest">Newest First</option>
                         <option value="oldest">Oldest First</option>
@@ -95,6 +117,15 @@
             </div>
             <div id="tagFilter" class="pill-bar category-bar"></div>
             <div id="linkGrid" class="card-grid link-grid"></div>
+
+            <!-- Create Custom Shelf Form -->
+            <div class="create-section-wrap">
+                <button class="create-section-btn" id="create-shelf-btn"><i class="fas fa-plus"></i> Create Custom Shelf</button>
+                <form class="create-section-form" id="create-shelf-form">
+                    <input type="text" id="new-shelf-input" class="new-section-input" placeholder="Shelf Name" required autocomplete="off">
+                    <button type="submit" class="btn primary tiny">Create</button>
+                </form>
+            </div>
         </div>
     </section>
 
@@ -117,6 +148,9 @@
                     <p class="sync-hint">Generate a 6-digit pairing code. Share it with another device.</p>
                     <div id="sync-code-display" class="sync-code">——</div>
                     <div id="p2p-qr" class="qr-wrap hidden"></div>
+                    <button id="copy-sync-link" class="btn secondary wide hidden" style="margin-bottom: 8px;">
+                        <i class="fas fa-copy"></i> Copy Pairing Link
+                    </button>
                     <button id="generate-sync" class="btn primary wide">
                         <i class="fas fa-satellite-dish"></i> Generate Code
                     </button>
@@ -138,6 +172,25 @@
                     <button id="load-sync" class="btn secondary wide">
                         <i class="fas fa-plug"></i> Connect Device
                     </button>
+                </div>
+
+                <!-- Backup & Restore card -->
+                <div class="sync-panel">
+                    <div class="sync-panel-icon"><i class="fas fa-database"></i></div>
+                    <h3 class="sync-panel-title">Backup &amp; Restore</h3>
+                    <p class="sync-hint">Export your library as a local JSON file or restore/merge it from a previously saved JSON file.</p>
+                    <div class="backup-btn-group" style="display: flex; flex-direction: column; gap: 8px; width: 100%;">
+                        <button id="export-library" class="btn secondary wide">
+                            <i class="fas fa-download"></i> Export JSON Backup
+                        </button>
+                        <button id="import-library-trigger" class="btn secondary wide">
+                            <i class="fas fa-upload"></i> Import Backup File
+                        </button>
+                        <input type="file" id="import-library-file" accept=".json" style="display: none;">
+                        <button id="clear-library-btn" class="btn danger wide" style="margin-top: 8px;">
+                            <i class="fas fa-trash-can"></i> Reset Library
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -206,6 +259,16 @@
                 </button>
             </div>
 
+            <!-- Saved Item Quick-States Row (Favorite & Watch Status) -->
+            <div id="modal-state-actions" class="modal-btn-row hidden" style="margin-top: 4px;">
+                <button id="modal-fav-btn" class="btn secondary">
+                    <i class="far fa-star"></i> Favorite
+                </button>
+                <button id="modal-status-btn" class="btn secondary">
+                    <i class="far fa-circle-check"></i> Mark Completed
+                </button>
+            </div>
+
             <!-- Inline edit form -->
             <div id="modal-edit-section" class="modal-edit-block hidden">
                 <div class="edit-row">
@@ -219,6 +282,16 @@
                 <div class="edit-row">
                     <label class="edit-label">Tags (comma-separated)</label>
                     <input type="text" id="modal-edit-tags" class="edit-input" placeholder="e.g. movies, drama, personal">
+                </div>
+                <div class="edit-row">
+                    <label class="edit-label">Image / Poster URL</label>
+                    <input type="url" id="modal-edit-thumb" class="edit-input" placeholder="https://example.com/image.jpg">
+                </div>
+                <div class="edit-row">
+                    <label class="edit-label">Assign to Shelf</label>
+                    <select id="modal-edit-shelf" class="edit-input">
+                        <option value="">None (General Library)</option>
+                    </select>
                 </div>
                 <button id="modal-edit-save" class="btn primary wide">
                     <i class="fas fa-floppy-disk"></i> Save Changes

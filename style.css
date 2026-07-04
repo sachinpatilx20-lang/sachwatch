@@ -138,6 +138,7 @@ a { color: inherit; text-decoration: none; }
     filter: blur(140px);
     opacity: 0.16;
     transition: opacity 0.5s var(--ease);
+    will-change: transform;
 }
 .glow-sphere-1 {
     width: 380px; height: 380px;
@@ -434,17 +435,18 @@ body.light-theme .bottom-nav {
 /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    HERO BILLBOARD (CINEMATIC)
    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
-.hero-wrap {}
+.hero-wrap {
+    margin: 1.5rem 1.5rem 0.5rem;
+}
 .hero-banner {
     position: relative;
     height: 280px;
     overflow: hidden;
     background: var(--surface2);
-    margin: 1.5rem 1.5rem 2.25rem;
     border: 1px solid var(--border);
     border-radius: var(--r-md);
     box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-    transition: box-shadow 0.3s var(--ease);
+    transition: box-shadow 0.3s var(--ease), height 0.3s var(--ease);
 }
 body.light-theme .hero-banner {
     box-shadow: 0 10px 30px rgba(0,0,0,0.06);
@@ -455,9 +457,9 @@ body.light-theme .hero-banner {
     object-position: center 20%;
     display: block;
     transition: transform 6s var(--ease);
-    filter: brightness(0.6) contrast(1.05);
+    filter: brightness(0.55) contrast(1.05);
 }
-.hero-banner:hover .hero-bg-img { transform: scale(1.04); }
+.hero-banner:hover .hero-bg-img { transform: scale(1.03); }
 
 .hero-scrim {
     position: absolute;
@@ -465,7 +467,7 @@ body.light-theme .hero-banner {
     background: linear-gradient(
         to top,
         var(--bg) 0%,
-        rgba(8, 7, 11, 0.4) 60%,
+        rgba(20, 20, 20, 0.4) 60%,
         transparent 100%
     );
     pointer-events: none;
@@ -474,7 +476,7 @@ body.light-theme .hero-scrim {
     background: linear-gradient(
         to top,
         var(--bg) 0%,
-        rgba(246, 246, 249, 0.4) 60%,
+        rgba(250, 250, 250, 0.4) 60%,
         transparent 100%
     );
 }
@@ -870,7 +872,7 @@ body.light-theme .card:hover {
     border-radius: var(--r-xs);
 }
 
-/* Quick Delete Action */
+/* Quick Actions on Cards */
 .quick-action {
     position: absolute;
     top: 8px; right: 8px;
@@ -886,7 +888,7 @@ body.light-theme .card:hover {
     align-items: center;
     justify-content: center;
     opacity: 0;
-    transition: opacity var(--t-fast), background var(--t-fast);
+    transition: opacity var(--t-fast), background var(--t-fast), color var(--t-fast);
     z-index: 20;
     cursor: pointer;
 }
@@ -907,15 +909,150 @@ body.light-theme .card:hover {
     border-color: var(--accent);
 }
 
+.quick-action.fav-action {
+    right: 38px;
+}
+.quick-action.fav-action.active {
+    color: #f5c518;
+    background: rgba(8, 7, 11, 0.75);
+    border-color: rgba(245, 197, 24, 0.4);
+    opacity: 1;
+}
+.quick-action.fav-action.active:hover {
+    color: #fff;
+    background: #f5c518;
+    border-color: #f5c518;
+}
+.card.fav-active .quick-action.fav-action {
+    opacity: 1;
+}
+
+.quick-action.complete-action {
+    left: 38px;
+}
+.quick-action.complete-action.active {
+    color: var(--green);
+    background: rgba(8, 7, 11, 0.75);
+    border-color: rgba(16, 185, 129, 0.4);
+    opacity: 1;
+}
+.quick-action.complete-action.active:hover {
+    color: #fff;
+    background: var(--green);
+    border-color: var(--green);
+}
+.card.completed-active .quick-action.complete-action {
+    opacity: 1;
+}
+
+/* Card Completed/Watched badge */
+.card-completed-badge {
+    position: absolute;
+    bottom: 8px;
+    right: 8px;
+    background: rgba(16, 185, 129, 0.9);
+    color: #fff;
+    font-family: var(--font-mono);
+    font-size: 0.58rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    padding: 3px 6px;
+    border-radius: var(--r-xs);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    z-index: 10;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+}
+body.light-theme .card-completed-badge {
+    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+
 /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    LIBRARY CATALOG GRID & CATEGORY FILTERS
    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
 .lib-wrap { padding: 1.5rem 1.5rem 6.5rem; }
 .lib-hd {
     display: flex;
-    justify-content: space-between;
+    flex-direction: column;
+    gap: 12px;
+    align-items: flex-start;
+    margin-bottom: 1.25rem;
+}
+@media (min-width: 1024px) {
+    .lib-hd {
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: center;
+    }
+}
+.lib-title {
+    font-size: 1.2rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+}
+.lib-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
     align-items: center;
-    margin-bottom: 1.1rem;
+    width: 100%;
+    justify-content: space-between;
+}
+@media (min-width: 768px) {
+    .lib-actions {
+        width: auto;
+        justify-content: flex-end;
+    }
+}
+
+/* Unified Filter segments */
+.filter-segments {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.segment-control {
+    display: flex;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    padding: 3px;
+    gap: 2px;
+}
+
+.segment-btn {
+    padding: 5px 10px;
+    border-radius: var(--r-xs);
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--text2);
+    transition: all var(--t-fast);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    cursor: pointer;
+    background: transparent;
+    border: none;
+}
+.segment-btn i {
+    font-size: 0.78rem;
+}
+.segment-btn:hover {
+    color: var(--text);
+    background: var(--surface3);
+}
+.segment-btn.active {
+    background: var(--accent-gradient);
+    color: #fff;
+    box-shadow: 0 2px 8px var(--accent-glow);
+}
+body.light-theme .segment-btn.active {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
 }
 .sort-dropdown {
     background: var(--bg2);
@@ -1250,6 +1387,21 @@ body.light-theme .card:hover {
 /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    DETAILS MODAL (PREMIUM BOTTOM SHEET)
    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+/* Sidebar Nav Link styles and Desktop sidebar */
+/* Removed sidebar navigation rules */
+
+/* Modals state button styles */
+#modal-fav-btn.active {
+    color: #f5c518;
+    border-color: rgba(245, 197, 24, 0.4);
+    background: rgba(245, 197, 24, 0.08);
+}
+#modal-status-btn.active {
+    color: var(--green);
+    border-color: rgba(16, 185, 129, 0.4);
+    background: rgba(16, 185, 129, 0.08);
+}
+
 .modal-overlay {
     position: fixed;
     inset: 0;
