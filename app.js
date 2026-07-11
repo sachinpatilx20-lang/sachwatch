@@ -44,6 +44,9 @@ class SachApp {
         this.currentUrl = '';
         this.theme = localStorage.getItem('sach_theme') || 'dark';
         this.peer = null;
+        this.currentMetadata = null;
+        this.selectedThumb = '';
+        this.currentCrop = 1200;
         this.searchTimeout = null;
         this.searchCache = new Map();
         this.suggestionAbortController = null;
@@ -288,6 +291,17 @@ class SachApp {
         this.importTrigger = document.getElementById('import-library-trigger');
         this.importFile = document.getElementById('import-library-file');
         this.clearLibraryBtn = document.getElementById('clear-library-btn');
+
+        // Thumbnail Picker Modal & Screenshot Tools
+        this.thumbModal = document.getElementById('thumbModal');
+        this.thumbPicker = document.getElementById('thumbPicker');
+        this.thumbStatus = document.getElementById('thumbStatus');
+        this.confirmThumbBtn = document.getElementById('confirmThumb');
+        this.closeModalBtnThumb = document.getElementById('closeModal');
+        this.retryFetchBtn = document.getElementById('retryFetchBtn');
+        this.editThumbPicker = document.getElementById('editThumbPicker');
+        this.genScreenshotBtn = document.getElementById('genScreenshotBtn');
+        this.modalEditLinkThumbSection = document.getElementById('modal-edit-link-thumb-section');
     }
 
     initEvents() {
@@ -515,6 +529,40 @@ class SachApp {
         // Logo click — reload the page
         const logoHome = document.getElementById('logoHome');
         if (logoHome) logoHome.onclick = () => window.location.reload();
+
+        // Thumbnail Picker and Screenshot Event Handlers
+        if (this.confirmThumbBtn) {
+            this.confirmThumbBtn.addEventListener('click', () => this.confirmThumbnail());
+        }
+        if (this.closeModalBtnThumb) {
+            this.closeModalBtnThumb.addEventListener('click', () => {
+                this.hideModal(this.thumbModal);
+                this.resetAddForm();
+            });
+        }
+        if (this.retryFetchBtn) {
+            this.retryFetchBtn.addEventListener('click', () => this.handleRetryFetch());
+        }
+        if (this.genScreenshotBtn) {
+            this.genScreenshotBtn.addEventListener('click', () => this.generateScreenshot());
+        }
+        document.querySelectorAll('.crop-presets button').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.crop-presets button').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                this.currentCrop = parseInt(btn.dataset.crop);
+            });
+        });
+
+        // Backdrop click closer for thumbModal
+        if (this.thumbModal) {
+            this.thumbModal.addEventListener('click', (e) => {
+                if (e.target === this.thumbModal) {
+                    this.hideModal(this.thumbModal);
+                    this.resetAddForm();
+                }
+            });
+        }
     }
 
     showLoader(show, text = "Fetching metadata...") {
@@ -543,6 +591,10 @@ class SachApp {
 
     closeAllModals() {
         if (this.mainModal) this.hideModal(this.mainModal);
+        if (this.thumbModal) {
+            this.hideModal(this.thumbModal);
+            this.resetAddForm();
+        }
         if (this.searchDropdown) this.searchDropdown.classList.add('hidden');
     }
 
@@ -955,11 +1007,48 @@ class SachApp {
         }
 
         this.showLoader(false);
-        const images = meta.images || [];
-        const selected = (images.length > 0) ? images[0] : `https://s.wordpress.com/mshots/v1/${encodeURIComponent(url)}?w=1200`;
-        
+        const skel = document.getElementById('tempSkeleton');
+        if (skel) skel.remove();
+
+        this.currentMetadata = meta;
+        this.showThumbPicker(meta.images || [], `https://s.wordpress.com/mshots/v1/${encodeURIComponent(url)}?w=1200`);
+    }
+
+    showThumbPicker(images, overrideFB) {
+        if (!this.thumbPicker) return;
+        this.thumbPicker.innerHTML = '';
+        const allImages = overrideFB ? [overrideFB] : images;
+        const isScreenshotOnly = this.currentMetadata?.isScreenshot || (allImages.length === 1 && allImages[0].includes('mshots'));
+
+        if (this.thumbStatus) {
+            if (isScreenshotOnly) {
+                this.thumbStatus.innerText = "OG Image not found. Use this screenshot or try again?";
+                this.thumbStatus.style.color = "var(--red)";
+            } else {
+                this.thumbStatus.innerText = "Select your preferred thumbnail:";
+                this.thumbStatus.style.color = "var(--text2)";
+            }
+        }
+
+        allImages.forEach((img, index) => {
+            const div = document.createElement('div');
+            div.className = 'thumb-option' + (index === 0 ? ' selected' : '');
+            div.innerHTML = `<img src="${img}">`;
+            div.onclick = () => {
+                this.thumbPicker.querySelectorAll('.thumb-option').forEach(o => o.classList.remove('selected'));
+                div.classList.add('selected');
+                this.selectedThumb = img;
+            };
+            this.thumbPicker.appendChild(div);
+        });
+        this.selectedThumb = allImages[0];
+        this.showModal(this.thumbModal);
+    }
+
+    confirmThumbnail() {
+        if (!this.currentMetadata) return;
         const autoTags = [];
-        const domain = this.getHostname(url).toLowerCase();
+        const domain = this.getHostname(this.currentUrl).toLowerCase();
         if (domain.includes('youtube.com') || domain.includes('youtu.be')) {
             autoTags.push('YouTube');
         } else if (domain.includes('github.com')) {
@@ -981,20 +1070,27 @@ class SachApp {
         const item = {
             id: 'sv_' + Date.now(),
             type: 'link',
-            title: meta.title || 'Untitled Link',
-            desc: meta.description || '',
-            thumb: selected,
-            url: url,
+            title: this.currentMetadata.title || 'Untitled Link',
+            desc: this.currentMetadata.description || '',
+            thumb: this.selectedThumb,
+            url: this.currentUrl,
             tags: autoTags,
             date: Date.now(),
             completed: false,
-            year: this.getHostname(url)
+            year: this.getHostname(this.currentUrl)
         };
 
         this.items.unshift(item);
         this.saveItems();
         this.showToast("Link saved successfully!", "success");
+        this.hideModal(this.thumbModal);
         this.resetAddForm();
+    }
+
+    handleRetryFetch() {
+        this.hideModal(this.thumbModal);
+        this.urlInput.value = this.currentUrl;
+        this.handleAddLink();
     }
 
     resetAddForm() {
@@ -1177,6 +1273,17 @@ class SachApp {
                 if (this.modalEditShelf) {
                     this.modalEditShelf.value = savedItem.shelf || '';
                 }
+
+                // Toggle edit link thumbnail selection
+                if (this.modalEditLinkThumbSection) {
+                    this.modalEditLinkThumbSection.classList.toggle('hidden', !isLink);
+                }
+                if (isLink) {
+                    this.selectedThumb = savedItem.thumb;
+                    this.currentUrl = savedItem.url;
+                    this.renderEditThumbPicker([savedItem.thumb]);
+                    this.fetchLinkMetadata(savedItem.url).then(m => this.renderEditThumbPicker(m.images || []));
+                }
             }
         };
 
@@ -1186,7 +1293,15 @@ class SachApp {
             if (this.modalEditTags) {
                 savedItem.tags = this.modalEditTags.value.split(',').map(t => t.trim()).filter(Boolean);
             }
-            if (this.modalEditThumb) {
+            if (isLink) {
+                const manualThumb = this.modalEditThumb ? this.modalEditThumb.value.trim() : '';
+                if (manualThumb && manualThumb !== savedItem.thumb && manualThumb !== this.selectedThumb) {
+                    savedItem.thumb = manualThumb;
+                } else if (this.selectedThumb) {
+                    savedItem.thumb = this.selectedThumb;
+                }
+                this.modalImg.src = savedItem.thumb;
+            } else if (this.modalEditThumb) {
                 savedItem.thumb = this.modalEditThumb.value.trim() || savedItem.thumb;
                 this.modalImg.src = savedItem.thumb;
             }
@@ -1198,12 +1313,12 @@ class SachApp {
             if (isLink) {
                 this.modalDesc.innerHTML = `
                     <span class="year-badge"><i class="fas fa-globe"></i> ${savedItem.year}</span>
-                    <span>${savedItem.desc}</span>
+                    <span>${savedItem.desc || 'No description available'}</span>
                 `;
             } else {
                 this.modalDesc.innerHTML = `
                     <span class="year-badge"><i class="fas fa-calendar"></i> ${savedItem.year}</span>
-                    <span>${savedItem.desc}</span>
+                    <span>${savedItem.desc || 'Film Details'}</span>
                 `;
             }
             this.renderModalTags(savedItem);
@@ -1215,6 +1330,7 @@ class SachApp {
 
         // Setup Tags
         this.renderModalTags(savedItem);
+        this.renderTagSuggestions(savedItem);
 
         // Binding add tag event in modal
         this.modalAddActor.onclick = () => {
@@ -1223,6 +1339,7 @@ class SachApp {
                 savedItem.tags.push(val);
                 this.saveItems();
                 this.renderModalTags(savedItem);
+                this.renderTagSuggestions(savedItem);
                 this.render();
                 this.modalActorInput.value = '';
                 this.showToast("Tag added!");
@@ -1315,9 +1432,111 @@ class SachApp {
             if (this.modalEditShelf) {
                 this.modalEditShelf.value = savedItem.shelf || '';
             }
+
+            // Toggle edit link thumbnail selection
+            if (this.modalEditLinkThumbSection) {
+                this.modalEditLinkThumbSection.classList.toggle('hidden', !isLink);
+            }
+            if (isLink) {
+                this.selectedThumb = savedItem.thumb;
+                this.currentUrl = savedItem.url;
+                this.renderEditThumbPicker([savedItem.thumb]);
+                this.fetchLinkMetadata(savedItem.url).then(m => this.renderEditThumbPicker(m.images || []));
+            }
         }
 
         this.showModal(this.mainModal);
+    }
+
+    renderEditThumbPicker(images) {
+        if (!this.editThumbPicker) return;
+        const unique = [...new Set([...(images || []), this.selectedThumb])];
+        this.editThumbPicker.innerHTML = unique.map(img => {
+            const escapedImg = img.replace(/'/g, "\\'");
+            return `
+                <div class="thumb-option ${img === this.selectedThumb ? 'selected' : ''}" onclick="window.sachApp.selectEditThumb('${escapedImg}')">
+                    <img src="${img}">
+                </div>
+            `;
+        }).join('');
+    }
+
+    selectEditThumb(img) {
+        this.selectedThumb = img;
+        if (this.editThumbPicker) {
+            this.editThumbPicker.querySelectorAll('.thumb-option').forEach(o => {
+                o.classList.remove('selected');
+                const imgEl = o.querySelector('img');
+                if (imgEl && (imgEl.src === img || imgEl.getAttribute('src') === img)) o.classList.add('selected');
+            });
+        }
+    }
+
+    generateScreenshot() {
+        const ss = `https://s.wordpress.com/mshots/v1/${encodeURIComponent(this.currentUrl)}?w=${this.currentCrop}`;
+        this.selectEditThumb(ss);
+        const div = document.createElement('div');
+        div.className = 'thumb-option selected';
+        div.innerHTML = `<img src="${ss}">`;
+        div.onclick = () => this.selectEditThumb(ss);
+        if (this.editThumbPicker) {
+            this.editThumbPicker.prepend(div);
+        }
+    }
+
+    renderTagSuggestions(item) {
+        const container = document.getElementById('modal-tag-suggestions');
+        if (!container) return;
+        container.innerHTML = '';
+        
+        // Only show suggestions for saved items
+        const isSaved = this.items.some(i => i.id === item.id || (item.imdbId && i.imdbId && i.imdbId.toLowerCase() === item.imdbId.toLowerCase()));
+        if (!isSaved) return;
+
+        let suggestions = [];
+        if (item.type === 'movie') {
+            suggestions = ['Movie', 'Cinema', 'Watchlist', 'Entertainment'];
+        } else {
+            const domain = this.getHostname(item.url).toLowerCase();
+            if (domain.includes('github') || domain.includes('stackoverflow') || domain.includes('npm')) {
+                suggestions = ['Dev', 'Tech', 'Reference', 'Code'];
+            } else if (domain.includes('youtube') || domain.includes('vimeo') || domain.includes('netflix')) {
+                suggestions = ['Video', 'Media', 'Watch', 'Entertainment'];
+            } else if (domain.includes('wikipedia') || domain.includes('medium') || domain.includes('news') || domain.includes('reddit')) {
+                suggestions = ['Research', 'Article', 'Read', 'News'];
+            } else {
+                suggestions = ['Web', 'Reference', 'Bookmark', 'Personal'];
+            }
+        }
+
+        // Filter out tags already on the item (case-insensitive check)
+        const currentTags = (item.tags || []).map(t => t.toLowerCase());
+        const filtered = suggestions.filter(s => !currentTags.includes(s.toLowerCase()));
+
+        if (filtered.length === 0) return;
+
+        const label = document.createElement('div');
+        label.className = 'edit-label';
+        label.style.cssText = 'font-size: 0.65rem; width: 100%; margin-top: 8px; margin-bottom: 2px; color: var(--text3); font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em;';
+        label.textContent = 'Suggestions:';
+        container.appendChild(label);
+
+        filtered.forEach(tag => {
+            const pill = document.createElement('button');
+            pill.type = 'button';
+            pill.className = 'actor-tag';
+            pill.style.cssText = 'background: var(--accent-dim); border: 1px dashed var(--accent); color: var(--accent); cursor: pointer; opacity: 0.85; transition: opacity var(--t-fast), transform var(--t-fast); display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: var(--r-xs); font-size: 0.65rem;';
+            pill.innerHTML = `<i class="fas fa-plus" style="font-size:0.55rem;"></i>${tag}`;
+            pill.onclick = () => {
+                item.tags.push(tag);
+                this.saveItems();
+                this.renderModalTags(item);
+                this.renderTagSuggestions(item);
+                this.render();
+                this.showToast(`Tag "${tag}" added!`);
+            };
+            container.appendChild(pill);
+        });
     }
 
     renderModalTags(item) {
@@ -1339,6 +1558,7 @@ class SachApp {
                     item.tags.splice(idx, 1);
                     this.saveItems();
                     this.renderModalTags(item);
+                    this.renderTagSuggestions(item);
                     this.render();
                     this.showToast("Tag removed!");
                 };
@@ -1603,48 +1823,84 @@ class SachApp {
         const isLink = item.type === 'link';
         const favicon = isLink ? this.getFaviconUrl(item.url) : 'https://imdb.iamidiotareyoutoo.com/favicon.ico';
         const timeAgo = this.getRelativeTime(item.date);
-        const badgeText = isLink ? 'Web Link' : 'Movie & TV';
-        const iconClass = isLink ? 'fa-bookmark' : 'fa-film';
 
-        // Clicking the card body opens details modal for BOTH links and movies!
-        const clickHandler = `window.sachApp.openDetailsById('${item.id}')`;
+        if (isLink) {
+            const hostname = this.getHostname(item.url);
+            const tags = item.tags || [];
+            const readTime = Math.max(1, Math.round((item.desc || '').length / 150));
+            
+            return `
+                <div class="card type-link ${item.favorite ? 'fav-active' : ''} ${item.completed ? 'completed-active' : ''}" data-id="${item.id}">
+                    <div class="card-img-wrapper" onclick="window.open('${item.url.replace(/'/g, "\\'")}', '_blank')">
+                        <img src="${item.thumb || 'https://via.placeholder.com/400x225?text=Image+Unavailable'}" class="card-img" loading="lazy" decoding="async" onerror="this.onerror=null; this.src='https://via.placeholder.com/400x225?text=Image+Unavailable'">
+                        <div class="card-hover-overlay">
+                            <span class="hover-play-btn"><i class="fas fa-arrow-up-right-from-square"></i></span>
+                        </div>
+                        ${item.completed ? `<div class="card-completed-badge"><i class="fas fa-check"></i> Read</div>` : ''}
+                    </div>
+                    <div class="card-content">
+                        <div class="card-header-row">
+                            <img src="${favicon}" class="channel-avatar" onerror="this.onerror=null; this.src='https://via.placeholder.com/64?text=L'">
+                            <div class="card-text-col">
+                                <h3 class="card-title" onclick="window.open('${item.url.replace(/'/g, "\\'")}', '_blank')" title="${item.title}">${item.title}</h3>
+                                <div class="card-metadata">
+                                    <span class="channel-name" onclick="event.stopPropagation(); window.open('${item.url.replace(/'/g, "\\'")}', '_blank')" title="${hostname}">${hostname}</span>
+                                    <span class="metadata-separator">•</span>
+                                    <span class="upload-date">${timeAgo}</span>
+                                    <span class="metadata-separator">•</span>
+                                    <span class="read-time-pill" title="Estimated read time"><i class="far fa-clock"></i> ${readTime} min read</span>
+                                </div>
+                                <p class="card-desc">${item.desc || 'No description available'}</p>
+                                <div class="card-tag-tags">
+                                    ${tags.map(t => `<span class="card-tag-tag">${t}</span>`).join('')}
+                                </div>
+                                <div class="card-actions">
+                                    <button class="btn open-btn" onclick="event.stopPropagation(); window.open('${item.url.replace(/'/g, "\\'")}', '_blank')" title="Open">
+                                        Open
+                                    </button>
+                                    <button class="btn default-btn icon-only" onclick="event.stopPropagation(); window.sachApp.copyLink('${item.url.replace(/'/g, "\\'")}')" title="Copy URL">
+                                        <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="2" fill="none"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                                    </button>
+                                    <button class="btn default-btn icon-only" onclick="event.stopPropagation(); window.sachApp.openDetailsById('${item.id}', true)" title="Edit">
+                                        <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="2" fill="none"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                                    </button>
+                                    <button class="btn default-btn icon-only delete-btn" onclick="event.stopPropagation(); window.sachApp.removeLink('${item.id}')" title="Delete">
+                                        <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="2" fill="none"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2-2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
 
-        const hostOrYear = isLink 
-            ? `<img src="${favicon}" class="card-favicon" onerror="this.style.display='none'"> ${item.year}` 
-            : `<i class="fas fa-calendar-alt"></i> ${item.year}`;
+        // Movie card (type === 'movie')
+        const completeIconClass = item.completed ? 'fas fa-circle-check' : 'far fa-circle-check';
+        const isCompleteActive = item.completed ? 'active' : '';
+        const completeTitle = item.completed ? `Mark as Pending` : `Mark as Watched`;
+        const favIconClass = item.favorite ? 'fas fa-star' : 'far fa-star';
+        const isFavActive = item.favorite ? 'active' : '';
+        const favTitle = item.favorite ? 'Remove from Favorites' : 'Add to Favorites';
+        const completedBadgeHTML = item.completed 
+            ? `<div class="card-completed-badge"><i class="fas fa-check"></i> Watched</div>`
+            : '';
+        const hostOrYear = `<i class="fas fa-calendar-alt"></i> ${item.year}`;
         const tagsHTML = (item.tags || []).slice(0, 2).map(t => `<span class="card-tag-pill">${t}</span>`).join('');
-        const iconBadge = isLink ? `<i class="fas fa-link"></i>` : `<i class="fas fa-film"></i>`;
+        const clickHandler = `window.sachApp.openDetailsById('${item.id}')`;
+        const overlayClickHandler = `event.stopPropagation(); window.sachApp.openDetailsById('${item.id}')`;
+        const overlayIcon = 'fa-play';
+        const iconBadge = `<i class="fas fa-film"></i>`;
 
-        // Description / Actor placeholder logic
         let descHTML = '';
         if (item.desc) {
             descHTML = `<p class="card-desc">${item.desc}</p>`;
         } else {
-            const addText = isLink ? '+ Add Details' : '+ Add Actor';
-            descHTML = `<p class="card-desc add-placeholder" onclick="event.stopPropagation(); window.sachApp.openDetailsById('${item.id}', true)">${addText}</p>`;
+            descHTML = `<p class="card-desc add-placeholder" onclick="event.stopPropagation(); window.sachApp.openDetailsById('${item.id}', true)">+ Add Actor</p>`;
         }
 
-        const overlayIcon = isLink ? 'fa-arrow-up-right-from-square' : 'fa-play';
-        const overlayClickHandler = isLink
-            ? `event.stopPropagation(); window.open('${item.url.replace(/'/g, "\\'")}',' _blank')`
-            : `event.stopPropagation(); window.sachApp.openDetailsById('${item.id}')`;
-
-        // Quick action variables
-        const favIconClass = item.favorite ? 'fas fa-star' : 'far fa-star';
-        const isFavActive = item.favorite ? 'active' : '';
-        const favTitle = item.favorite ? 'Remove from Favorites' : 'Add to Favorites';
-
-        const completeIconClass = item.completed ? 'fas fa-circle-check' : 'far fa-circle-check';
-        const isCompleteActive = item.completed ? 'active' : '';
-        const completeLabel = item.type === 'link' ? 'Read' : 'Watched';
-        const completeTitle = item.completed ? `Mark as Pending` : `Mark as ${completeLabel}`;
-
-        const completedBadgeHTML = item.completed 
-            ? `<div class="card-completed-badge"><i class="fas fa-check"></i> ${completeLabel}</div>`
-            : '';
-
         return `
-            <div class="card type-${item.type} ${item.favorite ? 'fav-active' : ''} ${item.completed ? 'completed-active' : ''}" data-id="${item.id}" onclick="${clickHandler}">
+            <div class="card type-movie ${item.favorite ? 'fav-active' : ''} ${item.completed ? 'completed-active' : ''}" data-id="${item.id}" onclick="${clickHandler}">
                 <button class="quick-action edit-action" title="Edit details" onclick="event.stopPropagation(); window.sachApp.openDetailsById('${item.id}', true)">
                     <i class="fas fa-pen"></i>
                 </button>
@@ -1684,89 +1940,137 @@ class SachApp {
         cardEl.classList.toggle('fav-active', !!item.favorite);
         cardEl.classList.toggle('completed-active', !!item.completed);
         
-        // Update favorite action button
-        const favBtn = cardEl.querySelector('.fav-action');
-        if (favBtn) {
-            favBtn.className = `quick-action fav-action ${item.favorite ? 'active' : ''}`;
-            favBtn.title = item.favorite ? 'Remove from Favorites' : 'Add to Favorites';
-            const favIcon = favBtn.querySelector('i');
-            if (favIcon) {
-                favIcon.className = item.favorite ? 'fas fa-star' : 'far fa-star';
-            }
-        }
-        
-        // Update complete action button
-        const completeBtn = cardEl.querySelector('.complete-action');
-        if (completeBtn) {
-            const completeLabel = item.type === 'link' ? 'Read' : 'Watched';
-            completeBtn.className = `quick-action complete-action ${item.completed ? 'active' : ''}`;
-            completeBtn.title = item.completed ? `Mark as Pending` : `Mark as ${completeLabel}`;
-            const completeIcon = completeBtn.querySelector('i');
-            if (completeIcon) {
-                completeIcon.className = item.completed ? 'fas fa-circle-check' : 'far fa-circle-check';
-            }
-        }
-        
-        // Update completed badge
-        const imgWrapper = cardEl.querySelector('.card-img-wrapper');
-        if (imgWrapper) {
-            let badge = imgWrapper.querySelector('.card-completed-badge');
-            if (item.completed) {
-                const completeLabel = item.type === 'link' ? 'Read' : 'Watched';
-                if (!badge) {
-                    badge = document.createElement('div');
-                    badge.className = 'card-completed-badge';
-                    imgWrapper.appendChild(badge);
+        if (item.type === 'link') {
+            // Update completed badge
+            const imgWrapper = cardEl.querySelector('.card-img-wrapper');
+            if (imgWrapper) {
+                let badge = imgWrapper.querySelector('.card-completed-badge');
+                if (item.completed) {
+                    if (!badge) {
+                        badge = document.createElement('div');
+                        badge.className = 'card-completed-badge';
+                        imgWrapper.appendChild(badge);
+                    }
+                    badge.innerHTML = `<i class="fas fa-check"></i> Read`;
+                } else if (badge) {
+                    badge.remove();
                 }
-                badge.innerHTML = `<i class="fas fa-check"></i> ${completeLabel}`;
-            } else if (badge) {
-                badge.remove();
             }
-        }
 
-        // Update title
-        const titleEl = cardEl.querySelector('.card-title');
-        if (titleEl && titleEl.textContent !== item.title) {
-            titleEl.textContent = item.title;
-        }
-
-        // Update description / placeholder
-        const descEl = cardEl.querySelector('.card-desc');
-        if (descEl) {
-            if (item.desc) {
-                descEl.textContent = item.desc;
-                descEl.classList.remove('add-placeholder');
-            } else {
-                const isLink = item.type === 'link';
-                const addText = isLink ? '+ Add Details' : '+ Add Actor';
-                descEl.textContent = addText;
-                descEl.classList.add('add-placeholder');
+            // Update title
+            const titleEl = cardEl.querySelector('.card-title');
+            if (titleEl && titleEl.textContent !== item.title) {
+                titleEl.textContent = item.title;
             }
-        }
 
-        // Update tags
-        const tagsEl = cardEl.querySelector('.card-tags');
-        const tagsHTML = (item.tags || []).slice(0, 2).map(t => `<span class="card-tag-pill">${t}</span>`).join('');
-        if (tagsHTML) {
+            // Update description
+            const descEl = cardEl.querySelector('.card-desc');
+            if (descEl && descEl.textContent !== item.desc) {
+                descEl.textContent = item.desc || 'No description available';
+            }
+
+            // Update tags
+            const tagsEl = cardEl.querySelector('.card-tag-tags');
             if (tagsEl) {
-                tagsEl.innerHTML = tagsHTML;
-            } else {
-                const cardBody = cardEl.querySelector('.card-body');
-                if (cardBody) {
-                    const newTagsEl = document.createElement('div');
-                    newTagsEl.className = 'card-tags';
-                    newTagsEl.innerHTML = tagsHTML;
-                    cardBody.appendChild(newTagsEl);
+                tagsEl.innerHTML = (item.tags || []).map(t => `<span class="card-tag-tag">${t}</span>`).join('');
+            }
+
+            // Update read-time estimate pill
+            const readTimeEl = cardEl.querySelector('.read-time-pill');
+            if (readTimeEl) {
+                const readTime = Math.max(1, Math.round((item.desc || '').length / 150));
+                readTimeEl.innerHTML = `<i class="far fa-clock"></i> ${readTime} min read`;
+            }
+
+            // Update thumbnail
+            const imgEl = cardEl.querySelector('.card-img');
+            if (imgEl && imgEl.src !== item.thumb) {
+                imgEl.src = item.thumb || 'https://via.placeholder.com/400x225?text=Image+Unavailable';
+            }
+        } else {
+            // Update favorite action button
+            const favBtn = cardEl.querySelector('.fav-action');
+            if (favBtn) {
+                favBtn.className = `quick-action fav-action ${item.favorite ? 'active' : ''}`;
+                favBtn.title = item.favorite ? 'Remove from Favorites' : 'Add to Favorites';
+                const favIcon = favBtn.querySelector('i');
+                if (favIcon) {
+                    favIcon.className = item.favorite ? 'fas fa-star' : 'far fa-star';
                 }
             }
-        } else if (tagsEl) {
-            tagsEl.remove();
-        }
+            
+            // Update complete action button
+            const completeBtn = cardEl.querySelector('.complete-action');
+            if (completeBtn) {
+                const completeLabel = 'Watched';
+                completeBtn.className = `quick-action complete-action ${item.completed ? 'active' : ''}`;
+                completeBtn.title = item.completed ? `Mark as Pending` : `Mark as ${completeLabel}`;
+                const completeIcon = completeBtn.querySelector('i');
+                if (completeIcon) {
+                    completeIcon.className = item.completed ? 'fas fa-circle-check' : 'far fa-circle-check';
+                }
+            }
+            
+            // Update completed badge
+            const imgWrapper = cardEl.querySelector('.card-img-wrapper');
+            if (imgWrapper) {
+                let badge = imgWrapper.querySelector('.card-completed-badge');
+                if (item.completed) {
+                    const completeLabel = 'Watched';
+                    if (!badge) {
+                        badge = document.createElement('div');
+                        badge.className = 'card-completed-badge';
+                        imgWrapper.appendChild(badge);
+                    }
+                    badge.innerHTML = `<i class="fas fa-check"></i> ${completeLabel}`;
+                } else if (badge) {
+                    badge.remove();
+                }
+            }
 
-        // Update thumbnail
-        const imgEl = cardEl.querySelector('.card-img');
-        if (imgEl && imgEl.src !== item.thumb) {
-            imgEl.src = item.thumb || 'https://via.placeholder.com/400x225?text=Poster+Unavailable';
+            // Update title
+            const titleEl = cardEl.querySelector('.card-title');
+            if (titleEl && titleEl.textContent !== item.title) {
+                titleEl.textContent = item.title;
+            }
+
+            // Update description / placeholder
+            const descEl = cardEl.querySelector('.card-desc');
+            if (descEl) {
+                if (item.desc) {
+                    descEl.textContent = item.desc;
+                    descEl.classList.remove('add-placeholder');
+                } else {
+                    const addText = '+ Add Actor';
+                    descEl.textContent = addText;
+                    descEl.classList.add('add-placeholder');
+                }
+            }
+
+            // Update tags
+            const tagsEl = cardEl.querySelector('.card-tags');
+            const tagsHTML = (item.tags || []).slice(0, 2).map(t => `<span class="card-tag-pill">${t}</span>`).join('');
+            if (tagsHTML) {
+                if (tagsEl) {
+                    tagsEl.innerHTML = tagsHTML;
+                } else {
+                    const cardBody = cardEl.querySelector('.card-body');
+                    if (cardBody) {
+                        const newTagsEl = document.createElement('div');
+                        newTagsEl.className = 'card-tags';
+                        newTagsEl.innerHTML = tagsHTML;
+                        cardBody.appendChild(newTagsEl);
+                    }
+                }
+            } else if (tagsEl) {
+                tagsEl.remove();
+            }
+
+            // Update thumbnail
+            const imgEl = cardEl.querySelector('.card-img');
+            if (imgEl && imgEl.src !== item.thumb) {
+                imgEl.src = item.thumb || 'https://via.placeholder.com/400x225?text=Poster+Unavailable';
+            }
         }
     }
 

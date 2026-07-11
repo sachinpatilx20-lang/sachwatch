@@ -292,6 +292,22 @@
                         <option value="">None (General Library)</option>
                     </select>
                 </div>
+                <!-- Thumbnail selection section for links only -->
+                <div id="modal-edit-link-thumb-section" class="hidden" style="margin-top: 10px;">
+                    <label class="edit-label">Select Thumbnail</label>
+                    <div id="editThumbPicker" class="thumb-picker"></div>
+                    <div class="screenshot-tools" style="display: flex; flex-direction: column; gap: 8px; margin-top: 8px;">
+                        <label class="edit-label">Refresh Screenshot</label>
+                        <div class="crop-presets" style="display: flex; gap: 6px;">
+                            <button type="button" class="btn tiny active" data-crop="1200">Full</button>
+                            <button type="button" class="btn tiny" data-crop="800">Wide</button>
+                            <button type="button" class="btn tiny" data-crop="400">Square</button>
+                        </div>
+                        <button type="button" id="genScreenshotBtn" class="btn secondary tiny" style="width: fit-content;">
+                            <i class="fas fa-camera"></i> Fetch Screenshot
+                        </button>
+                    </div>
+                </div>
                 <button id="modal-edit-save" class="btn primary wide">
                     <i class="fas fa-floppy-disk"></i> Save Changes
                 </button>
@@ -301,6 +317,7 @@
             <div id="modal-actors-section" class="modal-tags-block">
                 <div class="section-label" id="modal-tags-label">Tags &amp; Actors</div>
                 <div id="modal-actor-tags" class="actor-tags-wrap"></div>
+                <div id="modal-tag-suggestions" class="actor-tags-wrap" style="margin-top: 4px; margin-bottom: 6px; gap: 4px;"></div>
                 <div class="modal-actor-input-wrap">
                     <input
                         type="text"
@@ -332,6 +349,32 @@
 
 </div>
 <!-- end #main-modal -->
+
+<!-- Thumbnail Picker Modal -->
+<div class="modal-overlay hidden" id="thumbModal" role="dialog" aria-modal="true" aria-label="Select thumbnail">
+    <div class="modal-content">
+        <!-- Drag handle -->
+        <div class="modal-drag-handle"></div>
+        <div class="modal-body" style="padding-top: 0.5rem;">
+            <h2 style="font-size: 1.15rem; font-weight: 800; line-height: 1.25; margin-bottom: 6px; border: none; padding: 0;">Select Thumbnail</h2>
+            <p id="thumbStatus" class="modal-item-meta" style="font-size: 0.8rem; color: var(--text2); margin-bottom: 12px;"></p>
+            <div id="thumbPicker" class="thumb-picker"></div>
+            <div class="modal-cta-group" style="margin-top: 1rem;">
+                <button id="confirmThumb" class="btn primary wide">
+                    <i class="fas fa-circle-check"></i> Confirm Thumbnail
+                </button>
+                <div style="display: flex; gap: 8px; width: 100%;">
+                    <button id="retryFetchBtn" class="btn secondary" style="flex: 1;">
+                        <i class="fas fa-rotate"></i> Try Again
+                    </button>
+                    <button id="closeModal" class="btn ghost" style="flex: 1;">
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 
 <script src="app.js"></script>
 </body>
