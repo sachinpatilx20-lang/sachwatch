@@ -302,6 +302,8 @@ class SachApp {
         this.editThumbPicker = document.getElementById('editThumbPicker');
         this.genScreenshotBtn = document.getElementById('genScreenshotBtn');
         this.modalEditLinkThumbSection = document.getElementById('modal-edit-link-thumb-section');
+        this.modalTrailerContainer = document.getElementById('modal-trailer-container');
+        this.modalTrailerIframe = document.getElementById('modal-trailer-iframe');
     }
 
     initEvents() {
@@ -596,6 +598,8 @@ class SachApp {
             this.resetAddForm();
         }
         if (this.searchDropdown) this.searchDropdown.classList.add('hidden');
+        if (this.modalTrailerIframe) this.modalTrailerIframe.src = '';
+        if (this.modalTrailerContainer) this.modalTrailerContainer.classList.add('hidden');
     }
 
     showModal(m) {
@@ -648,10 +652,10 @@ class SachApp {
             let recentHtml = '';
             if (recentSaved.length > 0) {
                 recentHtml = `
-                    <div style="padding: 6px 12px; font-size: 0.65rem; font-weight: 800; text-transform: uppercase; color: var(--text-secondary); border-bottom: 1px solid var(--border-color);">Recently Added</div>
+                    <div style="padding: 6px 12px; font-size: 0.65rem; font-weight: 800; text-transform: uppercase; color: var(--text2); border-bottom: 1px solid var(--border2);">Recently Added</div>
                 `;
                 recentSaved.forEach(item => {
-                    const icon = item.type === 'link' ? '<i class="fas fa-bookmark" style="color:var(--accent-color)"></i>' : '<i class="fas fa-film" style="color:var(--accent-color)"></i>';
+                    const icon = item.type === 'link' ? '<i class="fas fa-bookmark" style="color:var(--accent)"></i>' : '<i class="fas fa-film" style="color:var(--accent)"></i>';
                     recentHtml += `
                         <div class="search-item" onclick="event.stopPropagation(); window.sachApp.openRecentItem('${item.id}', '${dropdownEl.id}')">
                             <div style="width:24px; text-align:center;">${icon}</div>
@@ -665,9 +669,9 @@ class SachApp {
 
             const ideas = ['Inception', 'Breaking Bad', 'Interstellar', 'Friends', 'Stranger Things'];
             const ideasHtml = `
-                <div style="padding: 10px 12px 6px; font-size: 0.65rem; font-weight: 800; text-transform: uppercase; color: var(--text-secondary); border-bottom: 1px solid var(--border-color); margin-top: 4px;">Quick Search Ideas</div>
+                <div style="padding: 10px 12px 6px; font-size: 0.65rem; font-weight: 800; text-transform: uppercase; color: var(--text2); border-bottom: 1px solid var(--border2); margin-top: 4px;">Quick Search Ideas</div>
                 <div style="padding: 10px 12px; display: flex; flex-wrap: wrap; gap: 6px;">
-                    ${ideas.map(idea => `<span class="card-tag-pill" style="cursor:pointer; padding: 4px 10px; font-size: 0.72rem; background: var(--surface2); border: 1px solid var(--border-color); border-radius: var(--r-xs);" onclick="event.stopPropagation(); window.sachApp.quickSearchFill('${idea}', '${dropdownEl.id}')">${idea}</span>`).join('')}
+                    ${ideas.map(idea => `<span class="card-tag-pill" style="cursor:pointer; padding: 4px 10px; font-size: 0.72rem; background: var(--surface2); border: 1px solid var(--border2); border-radius: var(--r-xs);" onclick="event.stopPropagation(); window.sachApp.quickSearchFill('${idea}', '${dropdownEl.id}')">${idea}</span>`).join('')}
                 </div>
             `;
 
@@ -685,7 +689,7 @@ class SachApp {
                     </div>
                     <div style="flex:1; min-width:0;">
                         <h4 style="font-size:0.85rem; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Import Web Link</h4>
-                        <p style="font-size:0.72rem; color:var(--text-secondary); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${query}</p>
+                        <p style="font-size:0.72rem; color:var(--text2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${query}</p>
                     </div>
                 </div>
             `;
@@ -742,14 +746,14 @@ class SachApp {
         // 1. Render Local Matches
         if (localMatches.length > 0) {
             const heading = document.createElement('div');
-            heading.style.cssText = 'padding: 6px 12px; font-size: 0.65rem; font-weight: 800; text-transform: uppercase; color: var(--text-secondary); border-bottom: 1px solid var(--border-color);';
+            heading.style.cssText = 'padding: 6px 12px; font-size: 0.65rem; font-weight: 800; text-transform: uppercase; color: var(--text2); border-bottom: 1px solid var(--border2);';
             heading.textContent = 'Saved in Library';
             dropdownEl.appendChild(heading);
 
             localMatches.forEach(item => {
                 const row = document.createElement('div');
                 row.className = 'search-item';
-                const icon = item.type === 'link' ? '<i class="fas fa-bookmark" style="color:var(--accent-color)"></i>' : '<i class="fas fa-film" style="color:var(--accent-color)"></i>';
+                const icon = item.type === 'link' ? '<i class="fas fa-bookmark" style="color:var(--accent)"></i>' : '<i class="fas fa-film" style="color:var(--accent)"></i>';
                 row.innerHTML = `
                     <div style="width:24px; text-align:center;">${icon}</div>
                     <div style="flex:1; min-width:0;">
@@ -767,20 +771,20 @@ class SachApp {
         // 2. Render Online Matches or Loading State
         if (isLoadingOnline) {
             const heading = document.createElement('div');
-            heading.style.cssText = 'padding: 6px 12px; font-size: 0.65rem; font-weight: 800; text-transform: uppercase; color: var(--text-secondary); border-bottom: 1px solid var(--border-color); margin-top: 4px;';
+            heading.style.cssText = 'padding: 6px 12px; font-size: 0.65rem; font-weight: 800; text-transform: uppercase; color: var(--text2); border-bottom: 1px solid var(--border2); margin-top: 4px;';
             heading.textContent = 'Online Movies & TV Shows';
             dropdownEl.appendChild(heading);
 
             const loaderRow = document.createElement('div');
-            loaderRow.style.cssText = 'padding: 1rem; text-align: center; color: var(--text-secondary); font-size: 0.8rem; display: flex; align-items: center; justify-content: center; gap: 8px;';
+            loaderRow.style.cssText = 'padding: 1rem; text-align: center; color: var(--text2); font-size: 0.8rem; display: flex; align-items: center; justify-content: center; gap: 8px;';
             loaderRow.innerHTML = `
-                <div class="loader-spinner" style="border: 2px solid var(--border-color); border-top: 2px solid var(--accent-color); border-radius: 50%; width: 16px; height: 16px; animation: spin 0.8s linear infinite;"></div>
+                <div class="loader-spinner" style="border: 2px solid var(--border2); border-top: 2px solid var(--accent); border-radius: 50%; width: 16px; height: 16px; animation: spin 0.8s linear infinite;"></div>
                 <span>Searching IMDb...</span>
             `;
             dropdownEl.appendChild(loaderRow);
         } else if (imdbResults.length > 0) {
             const heading = document.createElement('div');
-            heading.style.cssText = 'padding: 6px 12px; font-size: 0.65rem; font-weight: 800; text-transform: uppercase; color: var(--text-secondary); border-bottom: 1px solid var(--border-color); margin-top: 4px;';
+            heading.style.cssText = 'padding: 6px 12px; font-size: 0.65rem; font-weight: 800; text-transform: uppercase; color: var(--text2); border-bottom: 1px solid var(--border2); margin-top: 4px;';
             heading.textContent = 'Online Movies & TV Shows';
             dropdownEl.appendChild(heading);
 
@@ -792,7 +796,7 @@ class SachApp {
                     <img src="${movie.poster || 'https://via.placeholder.com/30x45?text=🎞️'}" width="30" height="45" loading="lazy" decoding="async" style="border-radius:4px; object-fit:cover;">
                     <div style="flex:1; min-width:0;">
                         <h4 style="font-size:0.85rem; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${movie.title}</h4>
-                        <p style="font-size:0.72rem; color:var(--text-secondary);">${movie.year} ${isAlreadySaved ? '· <span style="color:var(--accent-color); font-weight:bold;">On list</span>' : ''}</p>
+                        <p style="font-size:0.72rem; color:var(--text2);">${movie.year} ${isAlreadySaved ? '· <span style="color:var(--accent); font-weight:bold;">On list</span>' : ''}</p>
                     </div>
                 `;
                 row.onclick = () => {
@@ -820,10 +824,10 @@ class SachApp {
         if (localMatches.length === 0 && imdbResults.length === 0 && !isLoadingOnline) {
             dropdownEl.innerHTML = `
                 <div style="padding: 1.25rem 1rem; text-align: center;">
-                    <div style="color: var(--text-muted); font-size: 0.8rem; margin-bottom: 0.75rem;">No results found for "${query}"</div>
+                    <div style="color: var(--text3); font-size: 0.8rem; margin-bottom: 0.75rem;">No results found for "${query}"</div>
                     <div style="display: flex; flex-direction: column; gap: 8px;">
-                        <button class="btn secondary tiny" id="btnSearchAddMovie" style="width: 100%; border: 1px solid var(--border-color); background: rgba(255,255,255,0.03);"><i class="fas fa-plus"></i> Add Custom Movie / Show</button>
-                        <button class="btn secondary tiny" id="btnSearchAddLink" style="width: 100%; border: 1px solid var(--border-color); background: rgba(255,255,255,0.03);"><i class="fas fa-link"></i> Add Custom Link</button>
+                        <button class="btn secondary tiny" id="btnSearchAddMovie" style="width: 100%; border: 1px solid var(--border2); background: rgba(255,255,255,0.03);"><i class="fas fa-plus"></i> Add Custom Movie / Show</button>
+                        <button class="btn secondary tiny" id="btnSearchAddLink" style="width: 100%; border: 1px solid var(--border2); background: rgba(255,255,255,0.03);"><i class="fas fa-link"></i> Add Custom Link</button>
                     </div>
                 </div>
             `;
@@ -892,12 +896,12 @@ class SachApp {
             }
         } else if (localMatches.length > 0 && imdbResults.length === 0 && !isLoadingOnline) {
             const heading = document.createElement('div');
-            heading.style.cssText = 'padding: 6px 12px; font-size: 0.65rem; font-weight: 800; text-transform: uppercase; color: var(--text-secondary); border-bottom: 1px solid var(--border-color); margin-top: 4px;';
+            heading.style.cssText = 'padding: 6px 12px; font-size: 0.65rem; font-weight: 800; text-transform: uppercase; color: var(--text2); border-bottom: 1px solid var(--border2); margin-top: 4px;';
             heading.textContent = 'Online Movies & TV Shows';
             dropdownEl.appendChild(heading);
 
             const emptyRow = document.createElement('div');
-            emptyRow.style.cssText = 'padding: 0.8rem 1rem; text-align: center; color: var(--text-muted); font-size: 0.75rem;';
+            emptyRow.style.cssText = 'padding: 0.8rem 1rem; text-align: center; color: var(--text3); font-size: 0.75rem;';
             emptyRow.textContent = 'No online matches found';
             dropdownEl.appendChild(emptyRow);
         }
@@ -1108,7 +1112,13 @@ class SachApp {
             images: [],
             fallback: `https://s.wordpress.com/mshots/v1/${encodeURIComponent(url)}?w=1200`,
             url: url,
-            isScreenshot: false
+            isScreenshot: false,
+            ogImage: null,
+            twitterImage: null,
+            itempropImage: null,
+            microlinkImage: null,
+            noembedImage: null,
+            otherImages: []
         };
 
         const resolveUrl = (relative) => {
@@ -1139,7 +1149,7 @@ class SachApp {
                 .then(data => {
                     if (data.title && results.title === url) results.title = data.title;
                     if (data.author_name && results.description.startsWith('Fetching')) results.description = `Shared by ${data.author_name}`;
-                    if (data.thumbnail_url) results.images.push(data.thumbnail_url);
+                    if (data.thumbnail_url) results.noembedImage = data.thumbnail_url;
                 }),
             fetchWithTimeout(`https://api.microlink.io/?url=${encodeURIComponent(url)}`, { timeout: 2000 })
                 .then(data => {
@@ -1147,8 +1157,8 @@ class SachApp {
                         const m = data.data;
                         if (m.title && results.title === url) results.title = m.title;
                         if (m.description) results.description = m.description;
-                        if (m.image?.url) results.images.push(m.image.url);
-                        if (m.logo?.url) results.images.push(m.logo.url);
+                        if (m.image?.url) results.microlinkImage = m.image.url;
+                        if (m.logo?.url) results.otherImages.push(m.logo.url);
                     }
                 }),
             fetchWithTimeout(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`, { timeout: 1800 })
@@ -1162,13 +1172,19 @@ class SachApp {
                     const desc = getM('og:description') || getM('twitter:description') || doc.querySelector('[itemprop="description"]')?.getAttribute('content') || getM('description');
                     if (desc) results.description = desc;
                     
-                    const og = getM('og:image') || getM('twitter:image') || doc.querySelector('[itemprop="image"]')?.getAttribute('content');
-                    if (og) results.images.push(resolveUrl(og));
+                    const og = getM('og:image');
+                    if (og) results.ogImage = resolveUrl(og);
+
+                    const twitter = getM('twitter:image');
+                    if (twitter) results.twitterImage = resolveUrl(twitter);
+
+                    const itemprop = doc.querySelector('[itemprop="image"]')?.getAttribute('content');
+                    if (itemprop) results.itempropImage = resolveUrl(itemprop);
 
                     // Grab rel icons
                     ['apple-touch-icon', 'icon', 'shortcut icon'].forEach(rel => {
                         const href = doc.querySelector(`link[rel="${rel}"]`)?.getAttribute('href');
-                        if (href) results.images.push(resolveUrl(href));
+                        if (href) results.otherImages.push(resolveUrl(href));
                     });
 
                     // Grab document images
@@ -1177,7 +1193,7 @@ class SachApp {
                         .filter(Boolean)
                         .filter(src => src.startsWith('http') || src.startsWith('/'))
                         .slice(0, 10)
-                        .forEach(src => results.images.push(resolveUrl(src)));
+                        .forEach(src => results.otherImages.push(resolveUrl(src)));
                 })
         ]).catch(err => console.warn("Proxy fetches finished with errors:", err));
 
@@ -1185,7 +1201,16 @@ class SachApp {
             try { results.title = new URL(url).hostname; } catch (e) {}
         }
 
-        results.images = [...new Set(results.images.filter(Boolean))];
+        const priorityList = [
+            results.ogImage,
+            results.twitterImage,
+            results.itempropImage,
+            results.microlinkImage,
+            results.noembedImage,
+            ...results.otherImages
+        ];
+
+        results.images = [...new Set(priorityList.filter(Boolean))];
         if (results.images.length === 0) {
             results.images = [results.fallback];
             results.isScreenshot = true;
@@ -1203,6 +1228,22 @@ class SachApp {
         
         this.modalImg.src = savedItem.thumb || 'https://via.placeholder.com/300x450?text=Unavailable';
         this.modalTitle.textContent = savedItem.title;
+
+        // Setup Trailer Preview if Movie
+        if (savedItem.type === 'movie') {
+            if (this.modalTrailerContainer) this.modalTrailerContainer.classList.add('hidden');
+            if (this.modalTrailerIframe) this.modalTrailerIframe.src = '';
+            
+            this.fetchTrailerId(savedItem.title, savedItem.year).then(videoId => {
+                if (videoId && !this.mainModal.classList.contains('hidden') && this.modalTitle.textContent === savedItem.title) {
+                    if (this.modalTrailerIframe) this.modalTrailerIframe.src = `https://www.youtube.com/embed/${videoId}`;
+                    if (this.modalTrailerContainer) this.modalTrailerContainer.classList.remove('hidden');
+                }
+            });
+        } else {
+            if (this.modalTrailerContainer) this.modalTrailerContainer.classList.add('hidden');
+            if (this.modalTrailerIframe) this.modalTrailerIframe.src = '';
+        }
         
         // Modal layout settings depending on Link or Movie
         const isLink = savedItem.type === 'link';
@@ -1446,6 +1487,28 @@ class SachApp {
         }
 
         this.showModal(this.mainModal);
+    }
+
+    async fetchTrailerId(title, year) {
+        try {
+            const query = `${title} ${year || ''} official trailer`;
+            const url = `https://api.allorigins.win/get?url=${encodeURIComponent('https://www.youtube.com/results?search_query=' + encodeURIComponent(query))}`;
+            const response = await fetch(url);
+            if (!response.ok) return null;
+            const data = await response.json();
+            const html = data.contents;
+            const regex = /\/watch\?v=([a-zA-Z0-9_-]{11})/g;
+            let match;
+            const ids = [];
+            while ((match = regex.exec(html)) !== null) {
+                ids.push(match[1]);
+            }
+            const uniqueIds = [...new Set(ids)];
+            return uniqueIds.length > 0 ? uniqueIds[0] : null;
+        } catch (e) {
+            console.error("Error fetching trailer ID:", e);
+            return null;
+        }
     }
 
     renderEditThumbPicker(images) {
@@ -2398,10 +2461,69 @@ class SachApp {
     // Dynamic Cinematic Hero Billboard banner rendering
     renderHeroBanner() {
         const container = document.getElementById('hero-banner-container');
-        if (container) {
+        if (!container) return;
+
+        if (this.items.length === 0) {
             container.innerHTML = '';
             container.style.display = 'none';
+            this.dirtyHero = false;
+            return;
         }
+
+        // Hide hero if searching or filtering active
+        const isFiltering = this.searchQuery || this.activeType !== 'all' || this.activeStatus !== 'all' || this.activeTag !== 'all';
+        if (isFiltering) {
+            container.style.display = 'none';
+            return;
+        }
+
+        if (!this.dirtyHero && container.innerHTML !== '') return;
+
+        // Choose featured item: Favorite Movie > Pending Movie > Favorite Link > Any Link
+        let featured = this.items.find(i => i.type === 'movie' && i.favorite);
+        if (!featured) featured = this.items.find(i => i.type === 'movie' && !i.completed);
+        if (!featured) featured = this.items.find(i => i.favorite);
+        if (!featured) featured = this.items[0];
+
+        if (!featured) {
+            container.innerHTML = '';
+            container.style.display = 'none';
+            this.dirtyHero = false;
+            return;
+        }
+
+        const isMovie = featured.type === 'movie';
+        const badgeText = featured.favorite ? 'FAVORITE' : 'FEATURED';
+        const badgeIcon = featured.favorite ? 'fa-star' : 'fa-play';
+        const yearOrHost = isMovie ? featured.year : this.getHostname(featured.url);
+        
+        container.innerHTML = `
+            <div class="hero-wrap">
+                <div class="hero-banner" onclick="window.sachApp.openDetailsById('${featured.id}')" style="cursor: pointer;">
+                    <img class="hero-bg-img" src="${featured.thumb || 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?q=80&w=1200&auto=format&fit=crop'}" alt="${featured.title}">
+                    <div class="hero-scrim"></div>
+                    <div class="hero-content">
+                        <div class="hero-badge-row">
+                            <span class="hero-type-badge"><i class="fas ${badgeIcon}"></i> ${badgeText}</span>
+                            <span class="hero-year-pill">${yearOrHost}</span>
+                        </div>
+                        <h2 class="hero-title">${featured.title}</h2>
+                        <p class="hero-desc">${featured.desc || 'No description available.'}</p>
+                        <div class="hero-btn-row">
+                            <button class="btn primary" onclick="event.stopPropagation(); window.sachApp.openDetailsById('${featured.id}')">
+                                <i class="fas fa-circle-info"></i> More Info
+                            </button>
+                            ${featured.url ? `
+                                <button class="btn secondary" onclick="event.stopPropagation(); window.open('${featured.url.replace(/'/g, "\\'")}', '_blank')">
+                                    <i class="fas fa-arrow-up-right-from-square"></i> Open Link
+                                </button>
+                            ` : ''}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        container.style.display = 'block';
         this.dirtyHero = false;
     }
 

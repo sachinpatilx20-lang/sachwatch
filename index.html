@@ -84,7 +84,8 @@
     <!-- ── HOME (MY LIBRARY) ──────────────────── -->
     <section id="home-section" class="view-section">
         
-
+        <!-- Cinematic Hero Billboard Container -->
+        <div id="hero-banner-container"></div>
 
         <!-- Netflix-style Shelves Rail Container -->
         <div id="shelves-container"></div>
@@ -239,6 +240,14 @@
             <div class="modal-info-side">
                 <h2 id="modal-title" class="modal-item-title"></h2>
                 <div id="modal-desc" class="modal-item-meta"></div>
+            </div>
+        </div>
+
+        <!-- Trailer Preview Section -->
+        <div id="modal-trailer-container" class="modal-trailer-wrap hidden">
+            <div class="section-label" style="margin-top: 12px; margin-bottom: 6px; font-size: 0.65rem; font-weight: 800; text-transform: uppercase; color: var(--text2); letter-spacing: 0.03em;">Official Trailer</div>
+            <div class="trailer-video-wrapper" style="position: relative; width: 100%; aspect-ratio: 16/9; border-radius: var(--r-sm); overflow: hidden; border: 1px solid var(--border); margin-bottom: 12px; background: #000;">
+                <iframe id="modal-trailer-iframe" src="" style="position: absolute; top:0; left:0; width:100%; height:100%; border:none;" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
             </div>
         </div>
 
