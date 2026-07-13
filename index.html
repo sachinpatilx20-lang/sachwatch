@@ -21,6 +21,7 @@
 <div class="ambient-glow" aria-hidden="true">
     <div class="glow-sphere glow-sphere-1"></div>
     <div class="glow-sphere glow-sphere-2"></div>
+    <div class="glow-sphere glow-sphere-3"></div>
 </div>
 
 
@@ -45,9 +46,23 @@
 <header class="topbar" id="top-bar">
     <!-- Logo -->
     <button class="logo-btn" id="logoHome" aria-label="Go home">
-        <span class="logo-icon"><i class="fas fa-play"></i></span>
-        <span class="logo-text">SACH</span>
+        <span class="logo-icon">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <!-- Bookmark ribbon (light blue) -->
+                <path d="M5 3C5 1.89543 5.89543 1 7 1H17C18.1046 1 19 1.89543 19 3V23L12 18L5 23V3Z" fill="var(--accent)" opacity="0.85"/>
+                <!-- Play triangle (light red) -->
+                <path d="M9 7L17 12L9 17V7Z" fill="var(--accent-red)"/>
+            </svg>
+        </span>
     </button>
+
+    <!-- Desktop Navigation Menu -->
+    <nav class="desktop-nav" aria-label="Primary header navigation">
+        <button class="header-nav-link active" data-nav="home">Home</button>
+        <button class="header-nav-link" data-nav="movie">Movies &amp; TV</button>
+        <button class="header-nav-link" data-nav="link">Bookmarks</button>
+        <button class="header-nav-link" data-nav="sync">Sync Hub</button>
+    </nav>
 
     <!-- Unified search bar -->
     <div class="topbar-search header-search" id="topbar-search-wrap">
@@ -96,11 +111,6 @@
                 <div class="lib-actions">
                     <!-- Unified Filter segments -->
                     <div class="filter-segments">
-                        <div class="segment-control" id="typeSegment" role="radiogroup" aria-label="Filter by type">
-                            <button class="segment-btn active" data-type="all" role="radio" aria-checked="true">All</button>
-                            <button class="segment-btn" data-type="movie" role="radio" aria-checked="false"><i class="fas fa-film"></i> Movies</button>
-                            <button class="segment-btn" data-type="link" role="radio" aria-checked="false"><i class="fas fa-bookmark"></i> Links</button>
-                        </div>
                         <div class="segment-control" id="statusSegment" role="radiogroup" aria-label="Filter by status">
                             <button class="segment-btn active" data-status="all" role="radio" aria-checked="true">All Status</button>
                             <button class="segment-btn" data-status="pending" role="radio" aria-checked="false">Pending</button>
@@ -108,11 +118,14 @@
                         </div>
                     </div>
 
-                    <select id="sortSelect" class="sort-dropdown" aria-label="Sort items">
-                        <option value="newest">Newest First</option>
-                        <option value="oldest">Oldest First</option>
-                        <option value="title">Alphabetical (A-Z)</option>
-                    </select>
+                    <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                        <select id="sortSelect" class="sort-dropdown" aria-label="Sort items">
+                            <option value="newest">Newest First</option>
+                            <option value="oldest">Oldest First</option>
+                            <option value="title">Alphabetical (A-Z)</option>
+                        </select>
+                        <button id="lib-clear-all-btn" class="btn danger tiny" title="Clear entire library"><i class="fas fa-trash-can"></i> Clear All</button>
+                    </div>
                 </div>
             </div>
             <div id="tagFilter" class="pill-bar category-bar"></div>
@@ -187,9 +200,6 @@
                             <i class="fas fa-upload"></i> Import Backup File
                         </button>
                         <input type="file" id="import-library-file" accept=".json" style="display: none;">
-                        <button id="clear-library-btn" class="btn danger wide" style="margin-top: 8px;">
-                            <i class="fas fa-trash-can"></i> Reset Library
-                        </button>
                     </div>
                 </div>
             </div>
@@ -236,6 +246,11 @@
         <div class="modal-top-row">
             <div class="modal-poster-side">
                 <img id="modal-img" src="" alt="Poster" class="modal-poster-img" loading="lazy">
+                <!-- Trailer Overlay Inside Banner -->
+                <div id="modal-trailer-container" class="modal-trailer-wrap hidden">
+                    <iframe id="modal-trailer-iframe" src="" style="position: absolute; top:0; left:0; width:100%; height:100%; border:none;" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+                </div>
+                <div class="modal-banner-scrim"></div>
             </div>
             <div class="modal-info-side">
                 <h2 id="modal-title" class="modal-item-title"></h2>
@@ -243,13 +258,7 @@
             </div>
         </div>
 
-        <!-- Trailer Preview Section -->
-        <div id="modal-trailer-container" class="modal-trailer-wrap hidden">
-            <div class="section-label" style="margin-top: 12px; margin-bottom: 6px; font-size: 0.65rem; font-weight: 800; text-transform: uppercase; color: var(--text2); letter-spacing: 0.03em;">Official Trailer</div>
-            <div class="trailer-video-wrapper" style="position: relative; width: 100%; aspect-ratio: 16/9; border-radius: var(--r-sm); overflow: hidden; border: 1px solid var(--border); margin-bottom: 12px; background: #000;">
-                <iframe id="modal-trailer-iframe" src="" style="position: absolute; top:0; left:0; width:100%; height:100%; border:none;" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
-            </div>
-        </div>
+
 
         <!-- Action body -->
         <div class="modal-body modal-actions">

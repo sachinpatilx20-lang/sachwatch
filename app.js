@@ -355,6 +355,8 @@ class SachApp {
         this.suggestionAbortController = null;
         this.renderFrameId = null;
         this.shelves = JSON.parse(localStorage.getItem('sach_shelves')) || [];
+        this.heroIndex = 0;
+        this.heroInterval = null;
 
         // Cache elements maps and optimization flags
         this.cardElements = new Map();
@@ -383,6 +385,18 @@ class SachApp {
                         tick = false;
                     });
                     tick = true;
+                }
+            });
+        }
+
+        // Scroll listener for transparent-to-black header
+        const topBar = document.getElementById('top-bar');
+        if (topBar) {
+            window.addEventListener('scroll', () => {
+                if (window.scrollY > 20) {
+                    topBar.classList.add('scrolled');
+                } else {
+                    topBar.classList.remove('scrolled');
                 }
             });
         }
@@ -515,6 +529,11 @@ class SachApp {
             this.dirtyLibrary = true;
             this.dirtyShelves = true;
             this.dirtyHero = true;
+            this.heroIndex = 0;
+            if (this.heroInterval) {
+                clearInterval(this.heroInterval);
+                this.heroInterval = null;
+            }
         }
     }
 
@@ -593,7 +612,6 @@ class SachApp {
         this.exportBtn = document.getElementById('export-library');
         this.importTrigger = document.getElementById('import-library-trigger');
         this.importFile = document.getElementById('import-library-file');
-        this.clearLibraryBtn = document.getElementById('clear-library-btn');
 
         // Thumbnail Picker Modal & Screenshot Tools
         this.thumbModal = document.getElementById('thumbModal');
@@ -655,9 +673,11 @@ class SachApp {
             });
         }
 
-        // Reset Library event
-        if (this.clearLibraryBtn) {
-            this.clearLibraryBtn.addEventListener('click', () => {
+
+
+        const libClearAllBtn = document.getElementById('lib-clear-all-btn');
+        if (libClearAllBtn) {
+            libClearAllBtn.addEventListener('click', () => {
                 if (confirm("Are you sure you want to clear your entire library and all custom shelves? This action cannot be undone.")) {
                     this.items = [];
                     this.shelves = [];
@@ -738,6 +758,7 @@ class SachApp {
                     this.urlInput.value = this.normalizeUrl(query);
                     this.handleAddLink();
                 } else {
+                    this.addToSearchHistory(query);
                     inputEl.blur();
                     dropdownEl.classList.add('hidden');
                 }
@@ -771,23 +792,41 @@ class SachApp {
             btn.onclick = () => this.switchTab(btn.dataset.tab);
         });
 
-        // Segmented filter controller clicks
-        const typeSegment = document.getElementById('typeSegment');
-        if (typeSegment) {
-            typeSegment.addEventListener('click', (e) => {
-                const btn = e.target.closest('.segment-btn');
-                if (btn) {
-                    typeSegment.querySelectorAll('.segment-btn').forEach(b => {
-                        b.classList.remove('active');
-                        b.setAttribute('aria-checked', 'false');
-                    });
-                    btn.classList.add('active');
-                    btn.setAttribute('aria-checked', 'true');
-                    this.activeType = btn.dataset.type;
+        // Desktop Header Nav Link events
+        document.querySelectorAll('.header-nav-link').forEach(link => {
+            link.onclick = () => {
+                const targetNav = link.dataset.nav;
+                
+                // Set active class
+                document.querySelectorAll('.header-nav-link').forEach(l => l.classList.remove('active'));
+                link.classList.add('active');
+
+                if (targetNav === 'home') {
+                    // Switch to home, show all
+                    this.activeType = 'all';
+                    this.activeTag = 'all';
+                    this.activeStatus = 'all';
+                    this.switchTab('home');
+                    this.clearAllFilters(); // Reset filters
+                } else if (targetNav === 'movie') {
+                    // Switch to home, filter to movies
+                    this.activeType = 'movie';
+                    this.activeTag = 'all';
+                    this.activeStatus = 'all';
+                    this.switchTab('home');
                     this.render();
+                } else if (targetNav === 'link') {
+                    // Switch to home, filter to bookmarks
+                    this.activeType = 'link';
+                    this.activeTag = 'all';
+                    this.activeStatus = 'all';
+                    this.switchTab('home');
+                    this.render();
+                } else if (targetNav === 'sync') {
+                    this.switchTab('sync');
                 }
-            });
-        }
+            };
+        });
 
         const statusSegment = document.getElementById('statusSegment');
         if (statusSegment) {
@@ -877,13 +916,21 @@ class SachApp {
     }
 
     setTheme(theme) {
-        // Enforce dark mode at all times
-        this.theme = 'dark';
-        document.body.className = 'dark-theme';
-        localStorage.setItem('sach_theme', 'dark');
-        
-        if (this.themeIcon) {
-            this.themeIcon.className = 'fas fa-sun';
+        this.theme = theme;
+        if (theme === 'light') {
+            document.body.className = 'light-theme';
+            document.body.classList.remove('dark-theme');
+            localStorage.setItem('sach_theme', 'light');
+            if (this.themeIcon) {
+                this.themeIcon.className = 'fas fa-moon';
+            }
+        } else {
+            document.body.className = 'dark-theme';
+            document.body.classList.remove('light-theme');
+            localStorage.setItem('sach_theme', 'dark');
+            if (this.themeIcon) {
+                this.themeIcon.className = 'fas fa-sun';
+            }
         }
     }
 
@@ -919,6 +966,19 @@ class SachApp {
     switchTab(tab) {
         this.activeTab = tab;
         
+        // Update header links state
+        document.querySelectorAll('.header-nav-link').forEach(l => {
+            let isMatch = false;
+            if (tab === 'sync' && l.dataset.nav === 'sync') {
+                isMatch = true;
+            } else if (tab === 'home') {
+                if (this.activeType === 'all' && l.dataset.nav === 'home') isMatch = true;
+                if (this.activeType === 'movie' && l.dataset.nav === 'movie') isMatch = true;
+                if (this.activeType === 'link' && l.dataset.nav === 'link') isMatch = true;
+            }
+            l.classList.toggle('active', isMatch);
+        });
+
         // Update tabs active state
         document.querySelectorAll('.nav-btn, .tab-item, .nav-tab').forEach(b => {
             b.classList.remove('active');
@@ -947,12 +1007,35 @@ class SachApp {
     triggerSearch(query, dropdownEl) {
         clearTimeout(this.searchTimeout);
         if (!query || query.trim().length < 2) {
-            // Show recent items & quick ideas instead of closing!
+            const history = JSON.parse(localStorage.getItem('sach_search_history')) || [];
+            let historyHtml = '';
+            if (history.length > 0) {
+                historyHtml = `
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 12px 6px; border-bottom: 1px solid var(--border);">
+                        <span style="font-size: 0.65rem; font-weight: 800; text-transform: uppercase; color: var(--text2);">Recent Searches</span>
+                        <button id="clear-search-history-btn" style="font-size: 0.65rem; font-weight: 700; color: var(--accent); cursor: pointer; text-transform: uppercase; border: none; background: none;" onclick="event.stopPropagation(); window.sachApp.clearSearchHistory()">Clear All</button>
+                    </div>
+                    <div style="display: flex; flex-direction: column;">
+                        ${history.map((h, index) => `
+                            <div class="search-item" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px;" onclick="event.stopPropagation(); window.sachApp.quickSearchFill('${h.replace(/'/g, "\\'")}', '${dropdownEl.id}')">
+                                <div style="display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0;">
+                                    <i class="fas fa-clock-rotate-left" style="font-size: 0.75rem; color: var(--text3); flex-shrink: 0;"></i>
+                                    <span style="font-size: 0.85rem; color: var(--text2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${h}</span>
+                                </div>
+                                <button style="color: var(--text3); font-size: 0.85rem; padding: 4px; display: flex; align-items: center; justify-content: center; cursor: pointer; border: none; background: none;" onclick="event.stopPropagation(); window.sachApp.removeSearchHistoryItem(${index})">
+                                    <i class="fas fa-xmark"></i>
+                                </button>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            }
+
             const recentSaved = this.items.slice(0, 3);
             let recentHtml = '';
             if (recentSaved.length > 0) {
                 recentHtml = `
-                    <div style="padding: 6px 12px; font-size: 0.65rem; font-weight: 800; text-transform: uppercase; color: var(--text2); border-bottom: 1px solid var(--border2);">Recently Added</div>
+                    <div style="padding: 10px 12px 6px; font-size: 0.65rem; font-weight: 800; text-transform: uppercase; color: var(--text2); border-bottom: 1px solid var(--border);">Recently Added</div>
                 `;
                 recentSaved.forEach(item => {
                     const icon = item.type === 'link' ? '<i class="fas fa-bookmark" style="color:var(--accent)"></i>' : '<i class="fas fa-film" style="color:var(--accent)"></i>';
@@ -969,13 +1052,13 @@ class SachApp {
 
             const ideas = ['Inception', 'Breaking Bad', 'Interstellar', 'Friends', 'Stranger Things'];
             const ideasHtml = `
-                <div style="padding: 10px 12px 6px; font-size: 0.65rem; font-weight: 800; text-transform: uppercase; color: var(--text2); border-bottom: 1px solid var(--border2); margin-top: 4px;">Quick Search Ideas</div>
+                <div style="padding: 10px 12px 6px; font-size: 0.65rem; font-weight: 800; text-transform: uppercase; color: var(--text2); border-bottom: 1px solid var(--border); margin-top: 4px;">Quick Search Ideas</div>
                 <div style="padding: 10px 12px; display: flex; flex-wrap: wrap; gap: 6px;">
-                    ${ideas.map(idea => `<span class="card-tag-pill" style="cursor:pointer; padding: 4px 10px; font-size: 0.72rem; background: var(--surface2); border: 1px solid var(--border2); border-radius: var(--r-xs);" onclick="event.stopPropagation(); window.sachApp.quickSearchFill('${idea}', '${dropdownEl.id}')">${idea}</span>`).join('')}
+                    ${ideas.map(idea => `<span class="card-tag-pill" style="cursor:pointer; padding: 4px 10px; font-size: 0.72rem; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--r-xs);" onclick="event.stopPropagation(); window.sachApp.quickSearchFill('${idea}', '${dropdownEl.id}')">${idea}</span>`).join('')}
                 </div>
             `;
 
-            dropdownEl.innerHTML = recentHtml + ideasHtml;
+            dropdownEl.innerHTML = historyHtml + recentHtml + ideasHtml;
             dropdownEl.classList.remove('hidden');
             return;
         }
@@ -1061,6 +1144,7 @@ class SachApp {
                     </div>
                 `;
                 row.onclick = () => {
+                    this.addToSearchHistory(query);
                     dropdownEl.classList.add('hidden');
                     this.openDetails(item);
                 };
@@ -1100,6 +1184,7 @@ class SachApp {
                     </div>
                 `;
                 row.onclick = () => {
+                    this.addToSearchHistory(query);
                     dropdownEl.classList.add('hidden');
                     
                     const movieItem = {
@@ -1250,6 +1335,35 @@ class SachApp {
             }
             console.warn("IMDb fetch failed or timed out:", e);
             this.renderSuggestions(query, localMatches, [], false, dropdownEl);
+        }
+    }
+
+    addToSearchHistory(query) {
+        if (!query) return;
+        const q = query.trim();
+        if (q.length < 2) return;
+        let history = JSON.parse(localStorage.getItem('sach_search_history')) || [];
+        history = history.filter(item => item.toLowerCase() !== q.toLowerCase());
+        history.unshift(q);
+        if (history.length > 5) {
+            history = history.slice(0, 5);
+        }
+        localStorage.setItem('sach_search_history', JSON.stringify(history));
+    }
+
+    clearSearchHistory() {
+        localStorage.removeItem('sach_search_history');
+        if (this.searchInput) {
+            this.triggerSearch(this.searchInput.value, this.searchDropdown);
+        }
+    }
+
+    removeSearchHistoryItem(index) {
+        let history = JSON.parse(localStorage.getItem('sach_search_history')) || [];
+        history.splice(index, 1);
+        localStorage.setItem('sach_search_history', JSON.stringify(history));
+        if (this.searchInput) {
+            this.triggerSearch(this.searchInput.value, this.searchDropdown);
         }
     }
 
@@ -2175,6 +2289,11 @@ class SachApp {
 
         if (!this.linkGrid) return;
 
+        const libClearAllBtn = document.getElementById('lib-clear-all-btn');
+        if (libClearAllBtn) {
+            libClearAllBtn.classList.toggle('hidden', this.items.length === 0);
+        }
+
         // Render dynamic immersive billboard banner
         this.renderHeroBanner();
 
@@ -2291,6 +2410,16 @@ class SachApp {
         }
     }
 
+    getMatchScore(title) {
+        if (!title) return '95%';
+        let hash = 0;
+        for (let i = 0; i < title.length; i++) {
+            hash = title.charCodeAt(i) + ((hash << 5) - hash);
+        }
+        const score = 85 + Math.abs(hash % 15);
+        return `${score}% Match`;
+    }
+
     createCardHtml(item) {
         const isLink = item.type === 'link';
         const favicon = isLink ? this.getFaviconUrl(item.url) : 'https://imdb.iamidiotareyoutoo.com/favicon.ico';
@@ -2393,9 +2522,9 @@ class SachApp {
                     ${completedBadgeHTML}
                 </div>
                 <div class="card-body">
-                    <div class="card-info-header">
-                        <span class="card-type-icon">${iconBadge}</span>
-                        <span class="card-host-text">${hostOrYear}</span>
+                    <div class="card-info-header" style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+                        <span class="card-match-score" style="color: var(--green); font-weight: 800; font-size: 0.72rem;">${this.getMatchScore(item.title)}</span>
+                        <span class="card-host-text" style="font-size: 0.68rem; color: var(--text3); font-weight: 600;">${hostOrYear}</span>
                     </div>
                     <h3 class="card-title">${item.title}</h3>
                     ${descHTML}
@@ -2565,8 +2694,10 @@ class SachApp {
         const uniqueTags = [...new Set(allTags)].filter(Boolean).sort();
 
         const hasFavorites = this.items.some(i => i.favorite);
+        const isFiltering = this.searchQuery || this.activeType !== 'all' || this.activeStatus !== 'all' || this.activeTag !== 'all';
 
         const tagPillsHTML = [
+            ...(isFiltering ? [`<button class="cat-pill clear-filters-pill" style="border: 1px dashed var(--accent); color: var(--accent); background: var(--accent-dim); display: inline-flex; align-items: center; gap: 4px;" onclick="window.sachApp.clearAllFilters()"><i class="fas fa-xmark" style="font-size:0.65rem;"></i> Clear Filters</button>`] : []),
             `<button class="cat-pill ${this.activeTag === 'all' ? 'active' : ''}" data-tag="all">All Tags</button>`,
             ...(hasFavorites ? [`<button class="cat-pill ${this.activeTag === 'favorites' ? 'active' : ''}" data-tag="favorites"><i class="fas fa-star" style="color:#f5c518"></i> Favorites</button>`] : []),
             ...uniqueTags.map(tag => `
@@ -2577,6 +2708,31 @@ class SachApp {
         if (this.tagFilter.innerHTML !== tagPillsHTML) {
             this.tagFilter.innerHTML = tagPillsHTML;
         }
+    }
+
+    clearAllFilters() {
+        this.searchQuery = '';
+        if (this.searchInput) this.searchInput.value = '';
+        if (this.searchClearBtn) this.searchClearBtn.classList.add('hidden');
+        this.activeType = 'all';
+        this.activeStatus = 'all';
+        this.activeTag = 'all';
+
+        // Reset UI segment classes
+
+        const statusSegment = document.getElementById('statusSegment');
+        if (statusSegment) {
+            statusSegment.querySelectorAll('.segment-btn').forEach(b => {
+                const isAll = b.dataset.status === 'all';
+                b.classList.toggle('active', isAll);
+                b.setAttribute('aria-checked', isAll ? 'true' : 'false');
+            });
+        }
+
+        this.dirtyLibrary = true;
+        this.dirtyShelves = true;
+        this.dirtyHero = true;
+        this.render();
     }
 
 
@@ -2876,6 +3032,10 @@ class SachApp {
             container.innerHTML = '';
             container.style.display = 'none';
             this.dirtyHero = false;
+            if (this.heroInterval) {
+                clearInterval(this.heroInterval);
+                this.heroInterval = null;
+            }
             return;
         }
 
@@ -2886,20 +3046,40 @@ class SachApp {
             return;
         }
 
-        if (!this.dirtyHero && container.innerHTML !== '') return;
+        // Candidates for hero: Favorites + movie watchlist + newest items
+        let candidates = this.items.filter(i => i.favorite || (i.type === 'movie' && !i.completed));
+        if (candidates.length === 0) {
+            candidates = this.items.slice(0, 5); // Fallback to newest 5 items
+        }
 
-        // Choose featured item: Favorite Movie > Pending Movie > Favorite Link > Any Link
-        let featured = this.items.find(i => i.type === 'movie' && i.favorite);
-        if (!featured) featured = this.items.find(i => i.type === 'movie' && !i.completed);
-        if (!featured) featured = this.items.find(i => i.favorite);
-        if (!featured) featured = this.items[0];
-
-        if (!featured) {
+        if (candidates.length === 0) {
             container.innerHTML = '';
             container.style.display = 'none';
             this.dirtyHero = false;
+            if (this.heroInterval) {
+                clearInterval(this.heroInterval);
+                this.heroInterval = null;
+            }
             return;
         }
+
+        // Adjust index if out of bounds
+        if (this.heroIndex >= candidates.length) {
+            this.heroIndex = 0;
+        }
+
+        const featured = candidates[this.heroIndex];
+
+        // Set rotation interval if not set already
+        if (!this.heroInterval && candidates.length > 1) {
+            this.heroInterval = setInterval(() => {
+                this.heroIndex = (this.heroIndex + 1) % candidates.length;
+                this.dirtyHero = true;
+                this.renderHeroBanner();
+            }, 8000); // rotate every 8 seconds
+        }
+
+        if (!this.dirtyHero && container.innerHTML !== '') return;
 
         const isMovie = featured.type === 'movie';
         const badgeText = featured.favorite ? 'FAVORITE' : 'FEATURED';
