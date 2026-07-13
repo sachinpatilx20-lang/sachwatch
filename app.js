@@ -31,6 +31,309 @@ async function fetchWithTimeout(resource, options = {}) {
     }
 }
 
+// Standalone utility for fetch with timeout that returns raw text (HTML)
+async function fetchTextWithTimeout(resource, options = {}) {
+    const { timeout = 2500, signal } = options;
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), timeout);
+    
+    if (signal) {
+        signal.addEventListener('abort', () => controller.abort());
+    }
+    
+    try {
+        const response = await fetch(resource, {
+            ...options,
+            signal: controller.signal
+        });
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.text();
+        clearTimeout(id);
+        return data;
+    } catch (e) {
+        clearTimeout(id);
+        throw e;
+    }
+}
+
+// Promise helper that returns the first successful resolution, or rejects if all fail
+function firstSuccess(promises) {
+    return new Promise((resolve, reject) => {
+        let errors = [];
+        let remaining = promises.length;
+        if (remaining === 0) reject(new Error("No promises provided"));
+        promises.forEach(p => {
+            p.then(resolve).catch(err => {
+                errors.push(err);
+                remaining--;
+                if (remaining === 0) {
+                    reject(new Error("All promises rejected: " + errors.map(e => e.message || e).join("; ")));
+                }
+            });
+        });
+    });
+}
+
+// Cascading and CONCURRENT raced proxy HTML fetcher
+async function fetchHtmlFromProxies(url) {
+    const proxies = [
+        // 1. Direct fetch (fast fail if CORS blocks)
+        {
+            url: url,
+            type: 'direct',
+            timeout: 1500
+        },
+        // 2. Corsproxy.io (returns raw HTML)
+        {
+            url: `https://corsproxy.io/?${encodeURIComponent(url)}`,
+            type: 'text',
+            timeout: 4000
+        },
+        // 3. Allorigins raw text (no JSON container, extremely fast)
+        {
+            url: `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+            type: 'text',
+            timeout: 4000
+        },
+        // 4. Codetabs (returns raw HTML)
+        {
+            url: `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
+            type: 'text',
+            timeout: 4000
+        },
+        // 5. Thingproxy.freeboard.io (backup text proxy)
+        {
+            url: `https://thingproxy.freeboard.io/fetch/${url}`,
+            type: 'text',
+            timeout: 4500
+        }
+    ];
+
+    const fetchPromise = (proxy) => {
+        return fetchTextWithTimeout(proxy.url, { timeout: proxy.timeout }).then(html => {
+            if (html && html.trim().length > 100 && (html.toLowerCase().includes('<title') || html.toLowerCase().includes('<meta'))) {
+                return html;
+            }
+            throw new Error(`Invalid HTML content from proxy ${proxy.type}`);
+        });
+    };
+
+    try {
+        // Race all proxies concurrently! This ensures the absolute highest reliability and speed.
+        return await firstSuccess(proxies.map(p => fetchPromise(p)));
+    } catch (e) {
+        console.warn("Raced proxies failed, attempting fallback sequential fetch...", e);
+        
+        // Fallback: If raced failing, try Allorigins JSON proxy sequentially
+        try {
+            const alloriginsJsonUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
+            const json = await fetchWithTimeout(alloriginsJsonUrl, { timeout: 3500 });
+            if (json && json.contents) {
+                return json.contents;
+            }
+        } catch (err) {
+            console.error("Allorigins JSON sequential fallback also failed:", err);
+        }
+        throw new Error("All metadata proxies failed to fetch HTML.");
+    }
+}
+
+// Parses HTML string to extract title, description, and candidate image/thumbnail URLs
+function parseHtmlMetadata(htmlStr, baseUrl) {
+    const results = {
+        title: '',
+        description: '',
+        images: []
+    };
+
+    try {
+        const doc = new DOMParser().parseFromString(htmlStr, 'text/html');
+        if (!doc) return results;
+
+        const resolveUrl = (relative) => {
+            if (!relative) return '';
+            try { return new URL(relative, baseUrl).href; } catch (e) { return relative; }
+        };
+
+        const getMeta = (nameOrProperty) => {
+            return doc.querySelector(`meta[property="${nameOrProperty}"], meta[name="${nameOrProperty}"], meta[itemprop="${nameOrProperty}"]`)?.getAttribute('content') || '';
+        };
+
+        // Extract Title
+        results.title = getMeta('og:title') || 
+                        getMeta('twitter:title') || 
+                        getMeta('title') || 
+                        doc.querySelector('[itemprop="name"]')?.getAttribute('content') || 
+                        doc.title || 
+                        doc.querySelector('h1')?.textContent?.trim() || 
+                        '';
+
+        // Extract Description
+        results.description = getMeta('og:description') || 
+                              getMeta('twitter:description') || 
+                              getMeta('description') || 
+                              doc.querySelector('[itemprop="description"]')?.getAttribute('content') || 
+                              doc.querySelector('p')?.textContent?.trim() || 
+                              '';
+
+        // Collect Images
+        const addImage = (src) => {
+            if (!src || src.startsWith('data:image')) return;
+            const resolved = resolveUrl(src);
+            if (resolved && !results.images.includes(resolved)) {
+                results.images.push(resolved);
+            }
+        };
+
+        // Standard OG & Twitter tags
+        addImage(getMeta('og:image'));
+        addImage(getMeta('og:image:url'));
+        addImage(getMeta('og:image:secure_url'));
+        addImage(getMeta('twitter:image'));
+        addImage(getMeta('twitter:image:src'));
+        addImage(getMeta('thumbnail'));
+
+        // Link relations
+        const imageSrcLink = doc.querySelector('link[rel="image_src"]')?.getAttribute('href');
+        if (imageSrcLink) addImage(imageSrcLink);
+
+        const preloadImgLink = doc.querySelector('link[rel="preload"][as="image"]')?.getAttribute('href');
+        if (preloadImgLink) addImage(preloadImgLink);
+
+        // Helper to parse srcset attributes (extracting all candidate URLs)
+        const parseSrcset = (srcsetStr) => {
+            if (!srcsetStr) return [];
+            const urls = [];
+            srcsetStr.split(',').forEach(part => {
+                const trimmed = part.trim();
+                if (!trimmed) return;
+                const match = trimmed.match(/^(\S+)(?:\s+([\d\.]+)w)?(?:\s+([\d\.]+)x)?/);
+                if (match && match[1]) {
+                    urls.push(match[1]);
+                }
+            });
+            return urls;
+        };
+
+        // Parse srcset in the document (supports responsive picture source elements)
+        try {
+            const srcsetElements = doc.querySelectorAll('[srcset]');
+            srcsetElements.forEach(el => {
+                const srcset = el.getAttribute('srcset');
+                const parsedUrls = parseSrcset(srcset);
+                parsedUrls.forEach(imgUrl => addImage(imgUrl));
+            });
+        } catch (e) {}
+
+        // Schema.org JSON-LD Extraction
+        try {
+            const ldScripts = doc.querySelectorAll('script[type="application/ld+json"]');
+            ldScripts.forEach(script => {
+                try {
+                    const json = JSON.parse(script.textContent);
+                    const traverseLd = (obj) => {
+                        if (!obj) return;
+                        if (typeof obj === 'string') {
+                            if (obj.startsWith('http') || obj.startsWith('/')) {
+                                addImage(obj);
+                            }
+                        } else if (Array.isArray(obj)) {
+                            obj.forEach(item => traverseLd(item));
+                        } else if (typeof obj === 'object') {
+                            if (obj.url) traverseLd(obj.url);
+                            if (obj.image) traverseLd(obj.image);
+                            if (obj.thumbnailUrl) traverseLd(obj.thumbnailUrl);
+                        }
+                    };
+                    traverseLd(json);
+                    if (json['@graph'] && Array.isArray(json['@graph'])) {
+                        json['@graph'].forEach(item => traverseLd(item));
+                    }
+                } catch (e) {}
+            });
+        } catch (e) {}
+
+        // Page Image elements scraping and scoring
+        try {
+            const imgElements = Array.from(doc.querySelectorAll('img'));
+            const scored = [];
+
+            imgElements.forEach(img => {
+                const src = img.getAttribute('src');
+                if (!src) return;
+
+                const resolved = resolveUrl(src);
+                if (!resolved || resolved.startsWith('data:image')) return;
+
+                const alt = img.getAttribute('alt') || '';
+                const width = parseInt(img.getAttribute('width') || '0');
+                const height = parseInt(img.getAttribute('height') || '0');
+
+                // Filter spacers/tracking pixels
+                const lowerSrc = resolved.toLowerCase();
+                if (lowerSrc.includes('spacer') || lowerSrc.includes('pixel') || lowerSrc.includes('tracking') || lowerSrc.includes('blank') || lowerSrc.includes('addec')) {
+                    return;
+                }
+
+                let score = 0;
+
+                // Keywords scoring
+                if (lowerSrc.includes('logo') || lowerSrc.includes('icon') || lowerSrc.includes('avatar') || lowerSrc.includes('nav') || lowerSrc.includes('btn') || lowerSrc.includes('button')) {
+                    score -= 15;
+                }
+                if (lowerSrc.includes('cover') || lowerSrc.includes('banner') || lowerSrc.includes('feature') || lowerSrc.includes('hero') || lowerSrc.includes('article') || lowerSrc.includes('thumb')) {
+                    score += 25;
+                }
+                if (alt.toLowerCase().includes('cover') || alt.toLowerCase().includes('thumbnail') || alt.toLowerCase().includes('main') || alt.toLowerCase().includes('featured')) {
+                    score += 20;
+                }
+
+                // Size scoring
+                if (width > 200) score += 10;
+                if (width > 500) score += 20;
+                if (height > 200) score += 10;
+
+                // Context scoring
+                let parent = img.parentElement;
+                let depth = 0;
+                while (parent && depth < 4) {
+                    const tag = parent.tagName.toLowerCase();
+                    if (tag === 'article' || tag === 'main') {
+                        score += 15;
+                        break;
+                    }
+                    if (tag === 'header' || tag === 'nav') {
+                        score -= 5;
+                        break;
+                    }
+                    parent = parent.parentElement;
+                    depth++;
+                }
+
+                scored.push({ url: resolved, score: score });
+            });
+
+            // Sort descending and grab top 6 page images
+            scored.sort((a, b) => b.score - a.score);
+            scored.slice(0, 6).forEach(item => addImage(item.url));
+        } catch (e) {}
+
+        // Favicons
+        const iconRels = ['apple-touch-icon', 'icon', 'shortcut icon'];
+        iconRels.forEach(rel => {
+            const href = doc.querySelector(`link[rel="${rel}"]`)?.getAttribute('href');
+            if (href) addImage(href);
+        });
+
+    } catch (e) {
+        console.error("HTML parsing error:", e);
+    }
+
+    return results;
+}
+
 class SachApp {
     constructor() {
         this.items = [];
@@ -574,16 +877,13 @@ class SachApp {
     }
 
     setTheme(theme) {
-        this.theme = theme;
-        document.body.className = theme === 'dark' ? 'dark-theme' : 'light-theme';
-        localStorage.setItem('sach_theme', theme);
+        // Enforce dark mode at all times
+        this.theme = 'dark';
+        document.body.className = 'dark-theme';
+        localStorage.setItem('sach_theme', 'dark');
         
         if (this.themeIcon) {
-            if (theme === 'dark') {
-                this.themeIcon.className = 'fas fa-sun';
-            } else {
-                this.themeIcon.className = 'fas fa-moon';
-            }
+            this.themeIcon.className = 'fas fa-sun';
         }
     }
 
@@ -1021,8 +1321,15 @@ class SachApp {
     showThumbPicker(images, overrideFB) {
         if (!this.thumbPicker) return;
         this.thumbPicker.innerHTML = '';
-        const allImages = overrideFB ? [overrideFB] : images;
-        const isScreenshotOnly = this.currentMetadata?.isScreenshot || (allImages.length === 1 && allImages[0].includes('mshots'));
+        
+        // Combine parsed images and screenshot fallback, removing duplicates
+        const allImages = [...(images || [])];
+        if (overrideFB && !allImages.includes(overrideFB)) {
+            allImages.push(overrideFB);
+        }
+        
+        const uniqueImages = [...new Set(allImages)].filter(Boolean);
+        const isScreenshotOnly = this.currentMetadata?.isScreenshot || (uniqueImages.length === 1 && uniqueImages[0].includes('mshots'));
 
         if (this.thumbStatus) {
             if (isScreenshotOnly) {
@@ -1034,18 +1341,49 @@ class SachApp {
             }
         }
 
-        allImages.forEach((img, index) => {
+        let firstLoaded = false;
+
+        uniqueImages.forEach((img) => {
             const div = document.createElement('div');
-            div.className = 'thumb-option' + (index === 0 ? ' selected' : '');
-            div.innerHTML = `<img src="${img}">`;
+            div.className = 'thumb-option';
+            
+            const imgEl = document.createElement('img');
+            imgEl.src = img;
+            
+            imgEl.onload = () => {
+                // If it is the first image that successfully loads, select it
+                if (!firstLoaded) {
+                    div.classList.add('selected');
+                    this.selectedThumb = img;
+                    firstLoaded = true;
+                }
+            };
+            
+            imgEl.onerror = () => {
+                div.remove();
+                // If the removed image was currently selected, select the first remaining option
+                if (this.selectedThumb === img) {
+                    const firstOption = this.thumbPicker.querySelector('.thumb-option');
+                    if (firstOption) {
+                        const nextImg = firstOption.querySelector('img')?.src;
+                        if (nextImg) {
+                            firstOption.classList.add('selected');
+                            this.selectedThumb = nextImg;
+                        }
+                    }
+                }
+            };
+
             div.onclick = () => {
                 this.thumbPicker.querySelectorAll('.thumb-option').forEach(o => o.classList.remove('selected'));
                 div.classList.add('selected');
                 this.selectedThumb = img;
             };
+
+            div.appendChild(imgEl);
             this.thumbPicker.appendChild(div);
         });
-        this.selectedThumb = allImages[0];
+
         this.showModal(this.thumbModal);
     }
 
@@ -1125,33 +1463,105 @@ class SachApp {
             try { return new URL(relative, url).href; } catch (e) { return relative; }
         };
 
-        // YouTube fast path check
-        if (url.includes('youtube.com/watch') || url.includes('youtu.be/')) {
-            try {
-                let ytUrl = url;
-                if (url.includes('youtu.be/')) {
-                    const id = url.split('youtu.be/')[1].split('?')[0];
-                    ytUrl = `https://www.youtube.com/watch?v=${id}`;
-                }
-                const data = await fetchWithTimeout(`https://www.youtube.com/oembed?url=${encodeURIComponent(ytUrl)}&format=json`, { timeout: 2500 });
-                if (data.title) {
-                    results.title = data.title;
-                    results.description = `YouTube Video by ${data.author_name}`;
-                    if (data.thumbnail_url) results.images.push(data.thumbnail_url);
-                    return results;
-                }
-            } catch (e) {}
+        // Determine hostname and domain info
+        let hostname = '';
+        let domainOnly = '';
+        try {
+            hostname = new URL(url).hostname;
+            domainOnly = hostname.replace('www.', '');
+        } catch (e) {
+            hostname = 'web';
+            domainOnly = 'web';
         }
 
-        // Parallel metadata lookups
+        // Predictable YouTube thumbnails
+        const ytMatch = url.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/ ]{11})/i);
+        if (ytMatch) {
+            const videoId = ytMatch[1];
+            results.images.push(`https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`);
+            results.images.push(`https://img.youtube.com/vi/${videoId}/sddefault.jpg`);
+            results.images.push(`https://img.youtube.com/vi/${videoId}/hqdefault.jpg`);
+            results.images.push(`https://img.youtube.com/vi/${videoId}/default.jpg`);
+        }
+
+        // Consolidated oEmbed Endpoint detector
+        const getOEmbedUrl = (targetUrl) => {
+            const lower = targetUrl.toLowerCase();
+            if (lower.includes('youtube.com/watch') || lower.includes('youtu.be/')) {
+                let ytUrl = targetUrl;
+                if (targetUrl.includes('youtu.be/')) {
+                    const id = targetUrl.split('youtu.be/')[1].split('?')[0];
+                    ytUrl = `https://www.youtube.com/watch?v=${id}`;
+                }
+                return `https://www.youtube.com/oembed?url=${encodeURIComponent(ytUrl)}&format=json`;
+            }
+            if (lower.includes('spotify.com/')) {
+                return `https://open.spotify.com/oembed?url=${encodeURIComponent(targetUrl)}`;
+            }
+            if (lower.includes('tiktok.com/')) {
+                return `https://www.tiktok.com/oembed?url=${encodeURIComponent(targetUrl)}`;
+            }
+            if (lower.includes('reddit.com/')) {
+                return `https://www.reddit.com/oembed?url=${encodeURIComponent(targetUrl)}`;
+            }
+            if (lower.includes('vimeo.com/')) {
+                return `https://vimeo.com/api/oembed.json?url=${encodeURIComponent(targetUrl)}`;
+            }
+            return null;
+        };
+
+        // Parallel metadata fetches
         await Promise.allSettled([
-            fetchWithTimeout(`https://noembed.com/embed?url=${encodeURIComponent(url)}`, { timeout: 2000 })
+            // 1. Wikipedia Summary REST API
+            (async () => {
+                const wikiMatch = url.match(/([a-z]+)\.wikipedia\.org\/wiki\/([^#?]+)/i);
+                if (wikiMatch) {
+                    try {
+                        const lang = wikiMatch[1];
+                        const title = wikiMatch[2];
+                        const wikiApiUrl = `https://${lang}.wikipedia.org/api/rest_v1/page/summary/${title}`;
+                        const data = await fetchWithTimeout(wikiApiUrl, { timeout: 3000 });
+                        if (data) {
+                            if (data.title) results.title = data.title;
+                            if (data.extract) results.description = data.extract;
+                            if (data.thumbnail && data.thumbnail.source) {
+                                results.images.push(data.thumbnail.source);
+                            }
+                        }
+                    } catch (e) {
+                        console.warn("Wikipedia API fetch failed:", e);
+                    }
+                }
+            })(),
+
+            // 2. Consolidate oEmbed for YouTube, Spotify, TikTok, Reddit, Vimeo
+            (async () => {
+                const oembedUrl = getOEmbedUrl(url);
+                if (oembedUrl) {
+                    try {
+                        const data = await fetchWithTimeout(oembedUrl, { timeout: 3000 });
+                        if (data) {
+                            results.title = data.title || results.title;
+                            results.description = data.description || `${data.type || 'Media'} by ${data.author_name || data.provider_name || 'Creator'}`;
+                            const imgUrl = data.thumbnail_url || data.url;
+                            if (imgUrl) results.images.push(resolveUrl(imgUrl));
+                        }
+                    } catch (e) {
+                        console.warn("oEmbed query failed:", e);
+                    }
+                }
+            })(),
+
+            // 3. Noembed (generic oEmbed fallback API)
+            fetchWithTimeout(`https://noembed.com/embed?url=${encodeURIComponent(url)}`, { timeout: 2500 })
                 .then(data => {
                     if (data.title && results.title === url) results.title = data.title;
                     if (data.author_name && results.description.startsWith('Fetching')) results.description = `Shared by ${data.author_name}`;
                     if (data.thumbnail_url) results.noembedImage = data.thumbnail_url;
                 }),
-            fetchWithTimeout(`https://api.microlink.io/?url=${encodeURIComponent(url)}`, { timeout: 2000 })
+
+            // 4. Microlink API
+            fetchWithTimeout(`https://api.microlink.io/?url=${encodeURIComponent(url)}`, { timeout: 2500 })
                 .then(data => {
                     if (data.status === 'success') {
                         const m = data.data;
@@ -1161,53 +1571,37 @@ class SachApp {
                         if (m.logo?.url) results.otherImages.push(m.logo.url);
                     }
                 }),
-            fetchWithTimeout(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`, { timeout: 1800 })
-                .then(data => {
-                    const doc = new DOMParser().parseFromString(data.contents, 'text/html');
-                    const getM = (s) => doc.querySelector(`meta[property="${s}"], meta[name="${s}"]`)?.getAttribute('content');
-                    
-                    const title = getM('og:title') || getM('twitter:title') || doc.querySelector('[itemprop="name"]')?.getAttribute('content') || doc.title;
-                    if (title && results.title === url) results.title = title;
-                    
-                    const desc = getM('og:description') || getM('twitter:description') || doc.querySelector('[itemprop="description"]')?.getAttribute('content') || getM('description');
-                    if (desc) results.description = desc;
-                    
-                    const og = getM('og:image');
-                    if (og) results.ogImage = resolveUrl(og);
 
-                    const twitter = getM('twitter:image');
-                    if (twitter) results.twitterImage = resolveUrl(twitter);
-
-                    const itemprop = doc.querySelector('[itemprop="image"]')?.getAttribute('content');
-                    if (itemprop) results.itempropImage = resolveUrl(itemprop);
-
-                    // Grab rel icons
-                    ['apple-touch-icon', 'icon', 'shortcut icon'].forEach(rel => {
-                        const href = doc.querySelector(`link[rel="${rel}"]`)?.getAttribute('href');
-                        if (href) results.otherImages.push(resolveUrl(href));
-                    });
-
-                    // Grab document images
-                    Array.from(doc.querySelectorAll('img'))
-                        .map(img => img.getAttribute('src'))
-                        .filter(Boolean)
-                        .filter(src => src.startsWith('http') || src.startsWith('/'))
-                        .slice(0, 10)
-                        .forEach(src => results.otherImages.push(resolveUrl(src)));
+            // 5. Custom Raced HTML Proxy Scraper + Parser
+            fetchHtmlFromProxies(url)
+                .then(html => {
+                    const parsed = parseHtmlMetadata(html, url);
+                    if (parsed.title && results.title === url) results.title = parsed.title;
+                    if (parsed.description && results.description.startsWith('Fetching')) results.description = parsed.description;
+                    if (parsed.images && parsed.images.length > 0) {
+                        results.otherImages = [...results.otherImages, ...parsed.images];
+                    }
                 })
-        ]).catch(err => console.warn("Proxy fetches finished with errors:", err));
+        ]).catch(err => console.warn("Scrapers finished with errors:", err));
 
         if (results.title === url) {
-            try { results.title = new URL(url).hostname; } catch (e) {}
+            try { results.title = hostname; } catch (e) {}
         }
 
+        // Add Fallback brand/favicon APIs
+        const brandLogos = [
+            `https://logo.clearbit.com/${domainOnly}`,
+            `https://www.google.com/s2/favicons?sz=256&domain=${hostname}`,
+            `https://unavatar.io/${domainOnly}`,
+            `https://icon.horse/icon/${hostname}`
+        ];
+
         const priorityList = [
-            results.ogImage,
-            results.twitterImage,
-            results.itempropImage,
+            ...results.images, // Predictable & oEmbed images
             results.microlinkImage,
             results.noembedImage,
-            ...results.otherImages
+            ...results.otherImages, // Parsed from HTML
+            ...brandLogos
         ];
 
         results.images = [...new Set(priorityList.filter(Boolean))];
@@ -1513,15 +1907,30 @@ class SachApp {
 
     renderEditThumbPicker(images) {
         if (!this.editThumbPicker) return;
-        const unique = [...new Set([...(images || []), this.selectedThumb])];
-        this.editThumbPicker.innerHTML = unique.map(img => {
-            const escapedImg = img.replace(/'/g, "\\'");
-            return `
-                <div class="thumb-option ${img === this.selectedThumb ? 'selected' : ''}" onclick="window.sachApp.selectEditThumb('${escapedImg}')">
-                    <img src="${img}">
-                </div>
-            `;
-        }).join('');
+        this.editThumbPicker.innerHTML = '';
+        const unique = [...new Set([...(images || []), this.selectedThumb])].filter(Boolean);
+        
+        unique.forEach(img => {
+            const div = document.createElement('div');
+            div.className = 'thumb-option' + (img === this.selectedThumb ? ' selected' : '');
+            div.onclick = () => this.selectEditThumb(img);
+            
+            const imgEl = document.createElement('img');
+            imgEl.src = img;
+            imgEl.onerror = () => {
+                div.remove();
+                if (this.selectedThumb === img) {
+                    const firstOption = this.editThumbPicker.querySelector('.thumb-option');
+                    if (firstOption) {
+                        const nextImg = firstOption.querySelector('img')?.src;
+                        if (nextImg) this.selectEditThumb(nextImg);
+                    }
+                }
+            };
+            
+            div.appendChild(imgEl);
+            this.editThumbPicker.appendChild(div);
+        });
     }
 
     selectEditThumb(img) {
@@ -2510,14 +2919,14 @@ class SachApp {
                         <h2 class="hero-title">${featured.title}</h2>
                         <p class="hero-desc">${featured.desc || 'No description available.'}</p>
                         <div class="hero-btn-row">
-                            <button class="btn primary" onclick="event.stopPropagation(); window.sachApp.openDetailsById('${featured.id}')">
-                                <i class="fas fa-circle-info"></i> More Info
-                            </button>
                             ${featured.url ? `
-                                <button class="btn secondary" onclick="event.stopPropagation(); window.open('${featured.url.replace(/'/g, "\\'")}', '_blank')">
-                                    <i class="fas fa-arrow-up-right-from-square"></i> Open Link
+                                <button class="btn-netflix-play" onclick="event.stopPropagation(); window.open('${featured.url.replace(/'/g, "\\'")}', '_blank')">
+                                    <i class="fas fa-play"></i> ${isMovie ? 'Play' : 'Open Link'}
                                 </button>
                             ` : ''}
+                            <button class="btn-netflix-info" onclick="event.stopPropagation(); window.sachApp.openDetailsById('${featured.id}')">
+                                <i class="fas fa-circle-info"></i> More Info
+                            </button>
                         </div>
                     </div>
                 </div>
