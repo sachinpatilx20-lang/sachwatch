@@ -8,7 +8,7 @@
     <meta name="theme-color" content="#111113">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link rel="stylesheet" href="style.css">
     <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js" defer></script>
@@ -56,7 +56,6 @@
         </span>
     </button>
 
-    <!-- Desktop Navigation Menu -->
     <nav class="desktop-nav" aria-label="Primary header navigation">
         <button class="header-nav-link active" data-nav="home">Home</button>
         <button class="header-nav-link" data-nav="movie">Movies &amp; TV</button>
@@ -71,7 +70,7 @@
             <input
                 id="searchInput"
                 type="search"
-                placeholder="Search movies, shows, or paste a URL…"
+                placeholder="Search your library…"
                 autocomplete="off"
                 spellcheck="false"
             >
@@ -99,8 +98,7 @@
     <!-- ── HOME (MY LIBRARY) ──────────────────── -->
     <section id="home-section" class="view-section">
         
-        <!-- Cinematic Hero Billboard Container -->
-        <div id="hero-banner-container"></div>
+
 
         <!-- Netflix-style Shelves Rail Container -->
         <div id="shelves-container"></div>
@@ -109,20 +107,15 @@
             <div class="lib-hd">
                 <h2 class="lib-title">My Library</h2>
                 <div class="lib-actions">
-                    <!-- Unified Filter segments -->
-                    <div class="filter-segments">
-                        <div class="segment-control" id="statusSegment" role="radiogroup" aria-label="Filter by status">
-                            <button class="segment-btn active" data-status="all" role="radio" aria-checked="true">All Status</button>
-                            <button class="segment-btn" data-status="pending" role="radio" aria-checked="false">Pending</button>
-                            <button class="segment-btn" data-status="completed" role="radio" aria-checked="false">Completed</button>
-                        </div>
-                    </div>
+
 
                     <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
                         <select id="sortSelect" class="sort-dropdown" aria-label="Sort items">
                             <option value="newest">Newest First</option>
                             <option value="oldest">Oldest First</option>
                             <option value="title">Alphabetical (A-Z)</option>
+                            <option value="priority">Priority (High-Low)</option>
+                            <option value="duedate">Due Date (Soonest first)</option>
                         </select>
                         <button id="lib-clear-all-btn" class="btn danger tiny" title="Clear entire library"><i class="fas fa-trash-can"></i> Clear All</button>
                     </div>
@@ -149,8 +142,8 @@
             <p class="sync-sub">Share your library instantly between devices using peer-to-peer technology. No account needed.</p>
             
             <div class="status-indicator-row" style="margin-top: -0.75rem; margin-bottom: 1.25rem;">
-                <span class="status-pulse disconnected" id="sync-status-indicator"></span>
-                <span id="sync-status-text">Offline / Ready</span>
+                <span class="status-pulse ready" id="sync-status-indicator"></span>
+                <span id="sync-status-text">Ready — click Generate to broadcast</span>
             </div>
 
             <div class="sync-grid">
@@ -206,6 +199,7 @@
         </div>
     </section>
 
+
 </div>
 <!-- end .page-body -->
 
@@ -238,6 +232,8 @@
 <div class="modal-overlay hidden" id="main-modal" role="dialog" aria-modal="true" aria-label="Item details">
 
     <div class="modal-content">
+        <!-- Ambient Backdrop Glow -->
+        <div class="modal-backdrop-glow" id="modal-backdrop-glow"></div>
 
         <!-- Drag handle -->
         <div class="modal-drag-handle" id="modal-drag-handle"></div>
@@ -258,104 +254,199 @@
             </div>
         </div>
 
-
+        <!-- Tabbed Navigation Inside Modal -->
+        <div class="segment-control tab-style-segment" id="detailsModalTabs" style="display: flex; background: rgba(255, 255, 255, 0.04); border-radius: var(--r-xs); padding: 2px; border: 1px solid var(--border); margin: 12px 16px 0;">
+            <button class="segment-btn active" data-tab="overview" style="flex: 1; font-size: 0.68rem; padding: 6px; font-weight:700;">🔍 Overview</button>
+            <button class="segment-btn" data-tab="notes" style="flex: 1; font-size: 0.68rem; padding: 6px; font-weight:700;">📝 Notes &amp; Tags</button>
+            <button class="segment-btn" data-tab="edit" style="flex: 1; font-size: 0.68rem; padding: 6px; font-weight:700;">⚙️ Edit</button>
+        </div>
 
         <!-- Action body -->
         <div class="modal-body modal-actions">
 
-            <!-- Link-specific actions -->
-            <div id="modal-link-actions" class="modal-btn-row hidden">
-                <button id="modal-open-url" class="btn secondary">
-                    <i class="fas fa-arrow-up-right-from-square"></i> Open
-                </button>
-                <button id="modal-copy-url" class="btn secondary">
-                    <i class="fas fa-copy"></i> Copy URL
-                </button>
-                <button id="modal-edit-toggle" class="btn secondary hidden">
-                    <i class="fas fa-pen"></i> Edit
-                </button>
-            </div>
+            <!-- 1️⃣ OVERVIEW TAB -->
+            <div id="details-tab-overview" class="details-tab-panel">
+                <!-- Link-specific actions -->
+                <div id="modal-link-actions" class="modal-btn-row hidden">
+                    <button id="modal-open-url" class="btn secondary">
+                        <i class="fas fa-arrow-up-right-from-square"></i> Open Link
+                    </button>
+                    <button id="modal-copy-url" class="btn secondary">
+                        <i class="fas fa-copy"></i> Copy URL
+                    </button>
+                </div>
 
-            <!-- Saved Item Quick-States Row (Favorite & Watch Status) -->
-            <div id="modal-state-actions" class="modal-btn-row hidden" style="margin-top: 4px;">
-                <button id="modal-fav-btn" class="btn secondary">
-                    <i class="far fa-star"></i> Favorite
-                </button>
-                <button id="modal-status-btn" class="btn secondary">
-                    <i class="far fa-circle-check"></i> Mark Completed
-                </button>
-            </div>
+                <!-- Saved Item Quick-States Row (Favorite & Watch Status) -->
+                <div id="modal-state-actions" class="modal-btn-row hidden" style="margin-top: 4px;">
+                    <button id="modal-fav-btn" class="btn secondary">
+                        <i class="far fa-star"></i> Favorite
+                    </button>
+                    <button id="modal-status-btn" class="btn secondary">
+                        <i class="far fa-circle-check"></i> Mark Completed
+                    </button>
+                </div>
 
-            <!-- Inline edit form -->
-            <div id="modal-edit-section" class="modal-edit-block hidden">
-                <div class="edit-row">
-                    <label class="edit-label">Title</label>
-                    <input type="text" id="modal-edit-title" class="edit-input" placeholder="Title">
-                </div>
-                <div class="edit-row">
-                    <label class="edit-label">Details / Actors</label>
-                    <input type="text" id="modal-edit-desc" class="edit-input" placeholder="Details">
-                </div>
-                <div class="edit-row">
-                    <label class="edit-label">Tags (comma-separated)</label>
-                    <input type="text" id="modal-edit-tags" class="edit-input" placeholder="e.g. movies, drama, personal">
-                </div>
-                <div class="edit-row">
-                    <label class="edit-label">Image / Poster URL</label>
-                    <input type="url" id="modal-edit-thumb" class="edit-input" placeholder="https://example.com/image.jpg">
-                </div>
-                <div class="edit-row">
-                    <label class="edit-label">Assign to Shelf</label>
-                    <select id="modal-edit-shelf" class="edit-input">
-                        <option value="">None (General Library)</option>
-                    </select>
-                </div>
-                <!-- Thumbnail selection section for links only -->
-                <div id="modal-edit-link-thumb-section" class="hidden" style="margin-top: 10px;">
-                    <label class="edit-label">Select Thumbnail</label>
-                    <div id="editThumbPicker" class="thumb-picker"></div>
-                    <div class="screenshot-tools" style="display: flex; flex-direction: column; gap: 8px; margin-top: 8px;">
-                        <label class="edit-label">Refresh Screenshot</label>
-                        <div class="crop-presets" style="display: flex; gap: 6px;">
-                            <button type="button" class="btn tiny active" data-crop="1200">Full</button>
-                            <button type="button" class="btn tiny" data-crop="800">Wide</button>
-                            <button type="button" class="btn tiny" data-crop="400">Square</button>
-                        </div>
-                        <button type="button" id="genScreenshotBtn" class="btn secondary tiny" style="width: fit-content;">
-                            <i class="fas fa-camera"></i> Fetch Screenshot
-                        </button>
-                    </div>
-                </div>
-                <button id="modal-edit-save" class="btn primary wide">
-                    <i class="fas fa-floppy-disk"></i> Save Changes
-                </button>
-            </div>
-
-            <!-- Tags & Actors section -->
-            <div id="modal-actors-section" class="modal-tags-block">
-                <div class="section-label" id="modal-tags-label">Tags &amp; Actors</div>
-                <div id="modal-actor-tags" class="actor-tags-wrap"></div>
-                <div id="modal-tag-suggestions" class="actor-tags-wrap" style="margin-top: 4px; margin-bottom: 6px; gap: 4px;"></div>
-                <div class="modal-actor-input-wrap">
-                    <input
-                        type="text"
-                        id="modal-actor-input"
-                        class="tag-input"
-                        placeholder="Add tag or actor name…"
-                    >
-                    <button id="modal-add-actor" class="add-tag-btn" aria-label="Add tag">
-                        <i class="fas fa-plus"></i>
+                <!-- Primary CTA buttons -->
+                <div class="modal-cta-group" style="margin-top: 12px;">
+                    <button id="add-to-library" class="btn primary wide">
+                        <i class="fas fa-circle-plus"></i> Add to My Library
                     </button>
                 </div>
             </div>
 
-            <!-- Primary CTA buttons -->
-            <div class="modal-cta-group">
-                <button id="add-to-library" class="btn primary wide">
-                    <i class="fas fa-circle-plus"></i> Add to My Library
-                </button>
+            <!-- 2️⃣ NOTES & TAGS TAB -->
+            <div id="details-tab-notes" class="details-tab-panel hidden">
+                <div class="edit-row">
+                    <label class="edit-label">Personal Notes / Comments</label>
+                    <textarea id="modal-edit-notes" class="edit-input" placeholder="Type your review, key quotes, or thoughts here..." style="min-height: 80px; resize: vertical; padding: 8px; font-family: var(--font); font-size: 0.8rem;"></textarea>
+                    <button id="modal-save-notes-btn" class="btn secondary tiny" style="margin-top: 6px; width: fit-content; align-self: flex-end;">Save Notes</button>
+                </div>
+
+                <!-- Tags & Actors section -->
+                <div id="modal-actors-section" class="modal-tags-block" style="border: none; padding: 0; margin-top: 12px;">
+                    <div class="section-label" id="modal-tags-label">Tags &amp; Actors</div>
+                    <div id="modal-actor-tags" class="actor-tags-wrap"></div>
+                    <div id="modal-tag-suggestions" class="actor-tags-wrap" style="margin-top: 4px; margin-bottom: 6px; gap: 4px;"></div>
+                    <div class="modal-actor-input-wrap">
+                        <input
+                            type="text"
+                            id="modal-actor-input"
+                            class="tag-input"
+                            placeholder="Add tag or actor name…"
+                        >
+                        <button id="modal-add-actor" class="add-tag-btn" aria-label="Add tag">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3️⃣ EDIT TAB -->
+            <div id="details-tab-edit" class="details-tab-panel hidden">
+                <!-- Inline edit form -->
+                <div id="modal-edit-section" class="modal-edit-block" style="padding: 0; background: none; border: none; box-shadow: none; margin: 0;">
+                    <div class="edit-row">
+                        <label class="edit-label">Item Type</label>
+                        <select id="modal-edit-type" class="edit-input">
+                            <option value="movie">Movie / TV Show</option>
+                            <option value="link">Web Link / Bookmark</option>
+                            <option value="book">Book</option>
+                            <option value="task">Task / To-Do</option>
+                        </select>
+                    </div>
+                    <div class="edit-row">
+                        <label class="edit-label">Title</label>
+                        <input type="text" id="modal-edit-title" class="edit-input" placeholder="Title">
+                    </div>
+                    
+                    <!-- Cinema Specific Fields -->
+                    <div id="edit-cinema-fields" class="type-fields-group">
+                        <div class="edit-row">
+                            <label class="edit-label">Director</label>
+                            <input type="text" id="modal-edit-director" class="edit-input" placeholder="Director's Name">
+                        </div>
+                        <div class="edit-row flex-row" style="display:flex; gap:10px; flex-wrap: wrap;">
+                            <div style="flex:1; min-width: 140px;">
+                                <label class="edit-label">Genre</label>
+                                <input type="text" id="modal-edit-genre" class="edit-input" placeholder="e.g. Sci-Fi, Drama">
+                            </div>
+                            <div style="flex:1; min-width: 140px;">
+                                <label class="edit-label">Runtime (minutes)</label>
+                                <input type="number" id="modal-edit-runtime" class="edit-input" placeholder="e.g. 120" min="0">
+                            </div>
+                        </div>
+                        <div class="edit-row">
+                            <label class="edit-label">Star Rating (1-5)</label>
+                            <div class="star-picker" id="modal-edit-star-picker">
+                                <i class="far fa-star" data-rating="1"></i>
+                                <i class="far fa-star" data-rating="2"></i>
+                                <i class="far fa-star" data-rating="3"></i>
+                                <i class="far fa-star" data-rating="4"></i>
+                                <i class="far fa-star" data-rating="5"></i>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Book Specific Fields -->
+                    <div id="edit-book-fields" class="type-fields-group hidden">
+                        <div class="edit-row">
+                            <label class="edit-label">Author</label>
+                            <input type="text" id="modal-edit-author" class="edit-input" placeholder="Author's Name">
+                        </div>
+                        <div class="edit-row flex-row" style="display:flex; gap:10px;">
+                            <div style="flex:1;">
+                                <label class="edit-label">Current Page</label>
+                                <input type="number" id="modal-edit-current-page" class="edit-input" placeholder="0" min="0">
+                            </div>
+                            <div style="flex:1;">
+                                <label class="edit-label">Total Pages</label>
+                                <input type="number" id="modal-edit-total-pages" class="edit-input" placeholder="100" min="1">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Task Specific Fields -->
+                    <div id="edit-task-fields" class="type-fields-group hidden">
+                        <div class="edit-row flex-row" style="display:flex; gap:10px;">
+                            <div style="flex:1;">
+                                <label class="edit-label">Priority</label>
+                                <select id="modal-edit-priority" class="edit-input">
+                                    <option value="low">Low</option>
+                                    <option value="medium">Medium</option>
+                                    <option value="high">High</option>
+                                </select>
+                            </div>
+                            <div style="flex:1;">
+                                <label class="edit-label">Due Date</label>
+                                <input type="date" id="modal-edit-due-date" class="edit-input">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="edit-row">
+                        <label class="edit-label">Details / Description</label>
+                        <input type="text" id="modal-edit-desc" class="edit-input" placeholder="Details">
+                    </div>
+                    <div class="edit-row">
+                        <label class="edit-label">Tags (comma-separated)</label>
+                        <input type="text" id="modal-edit-tags" class="edit-input" placeholder="e.g. movies, drama, personal">
+                    </div>
+                    <div class="edit-row">
+                        <label class="edit-label">Image / Poster URL</label>
+                        <input type="url" id="modal-edit-thumb" class="edit-input" placeholder="https://example.com/image.jpg">
+                    </div>
+                    <div class="edit-row">
+                        <label class="edit-label">Assign to Shelf</label>
+                        <select id="modal-edit-shelf" class="edit-input">
+                            <option value="">None (General Library)</option>
+                        </select>
+                    </div>
+                    <!-- Thumbnail selection section for links only -->
+                    <div id="modal-edit-link-thumb-section" class="hidden" style="margin-top: 10px;">
+                        <label class="edit-label">Select Thumbnail</label>
+                        <div id="editThumbPicker" class="thumb-picker"></div>
+                        <div class="screenshot-tools" style="display: flex; flex-direction: column; gap: 8px; margin-top: 8px;">
+                            <label class="edit-label">Refresh Screenshot</label>
+                            <div class="crop-presets" style="display: flex; gap: 6px;">
+                                <button type="button" class="btn tiny active" data-crop="1200">Full</button>
+                                <button type="button" class="btn tiny" data-crop="800">Wide</button>
+                                <button type="button" class="btn tiny" data-crop="400">Square</button>
+                            </div>
+                            <button type="button" id="genScreenshotBtn" class="btn secondary tiny" style="width: fit-content;">
+                                <i class="fas fa-camera"></i> Fetch Screenshot
+                            </button>
+                        </div>
+                    </div>
+                    <button id="modal-edit-save" class="btn primary wide" style="margin-top: 12px;">
+                        <i class="fas fa-floppy-disk"></i> Save Changes
+                    </button>
+                </div>
+            </div>
+
+            <!-- Global Footer Actions inside modal body -->
+            <div class="modal-cta-group" style="margin-top: 1.5rem; border-top: 1px solid var(--border); padding-top: 1rem;">
                 <button id="close-modal" class="btn ghost wide">
-                    Close
+                    Close Details
                 </button>
             </div>
 
@@ -393,6 +484,165 @@
         </div>
     </div>
 </div>
+
+<!-- Planner Movie Selection Modal -->
+<div class="modal-overlay hidden" id="plannerModal" role="dialog" aria-modal="true" aria-label="Schedule Movie">
+    <div class="modal-content" style="max-height: 85vh; overflow-y: auto;">
+        <div class="modal-drag-handle"></div>
+        <div class="modal-body" style="padding-top: 0.5rem;">
+            <h2 id="plannerModalTitle" style="font-size: 1.15rem; font-weight: 800; line-height: 1.25; margin-bottom: 6px; border: none; padding: 0;">Schedule Movie</h2>
+            <p class="modal-item-meta" style="font-size: 0.8rem; color: var(--text2); margin-bottom: 12px;">Choose a movie from your library to schedule:</p>
+            <div id="plannerMoviesList" style="display: flex; flex-direction: column; gap: 8px; max-height: 50vh; overflow-y: auto; padding: 4px;">
+                <!-- Watchlist options -->
+            </div>
+            <div class="modal-cta-group" style="margin-top: 1rem;">
+                <button id="closePlannerModalBtn" class="btn ghost wide">Cancel</button>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- end #plannerModal -->
+
+<!-- Quick Add Modal -->
+<div class="modal-overlay hidden" id="quickAddModal" role="dialog" aria-modal="true" aria-label="Quick Add Item">
+    <div class="modal-content" style="max-height: 90vh; overflow-y: auto;">
+        <!-- Drag handle -->
+        <div class="modal-drag-handle"></div>
+        <div class="modal-body" style="padding-top: 0.5rem;">
+            <h2 style="font-size: 1.15rem; font-weight: 800; line-height: 1.25; margin-bottom: 12px; border: none; padding: 0;">Quick Add Item</h2>
+            
+            <!-- Type segment selector inside modal -->
+            <div class="segment-control tab-style-segment" id="quickAddTypeSegment" style="display: flex; background: rgba(255, 255, 255, 0.04); border-radius: var(--r-xs); padding: 2px; border: 1px solid var(--border); margin-bottom: 1rem;">
+                <button class="segment-btn active" data-type="movie" style="flex: 1; font-size: 0.68rem; padding: 6px; font-weight:700;">🎬 Movie</button>
+                <button class="segment-btn" data-type="book" style="flex: 1; font-size: 0.68rem; padding: 6px; font-weight:700;">📖 Book</button>
+                <button class="segment-btn" data-type="link" style="flex: 1; font-size: 0.68rem; padding: 6px; font-weight:700;">🔗 Link</button>
+                <button class="segment-btn" data-type="task" style="flex: 1; font-size: 0.68rem; padding: 6px; font-weight:700;">📝 Task</button>
+            </div>
+
+            <!-- Form Container -->
+            <div id="quickAddForm" class="modal-edit-block" style="padding: 0; background: none; border: none; box-shadow: none;">
+                <!-- Common Field: Title -->
+                <div class="edit-row">
+                    <label class="edit-label">Title / Name</label>
+                    <input type="text" id="qa-title" class="edit-input" placeholder="Title" required autocomplete="off">
+                </div>
+
+                <!-- 🎬 Movie Specific Fields -->
+                <div id="qa-fields-movie" class="type-fields-group">
+                    <div class="edit-row">
+                        <label class="edit-label">Director</label>
+                        <input type="text" id="qa-movie-director" class="edit-input" placeholder="Director's Name">
+                    </div>
+                    <div class="edit-row flex-row" style="display:flex; gap:10px; flex-wrap: wrap;">
+                        <div style="flex:1; min-width: 140px;">
+                            <label class="edit-label">Genre</label>
+                            <input type="text" id="qa-movie-genre" class="edit-input" placeholder="e.g. Sci-Fi, Drama">
+                        </div>
+                        <div style="flex:1; min-width: 140px;">
+                            <label class="edit-label">Runtime (minutes)</label>
+                            <input type="number" id="qa-movie-runtime" class="edit-input" placeholder="e.g. 120" min="0">
+                        </div>
+                    </div>
+                    <div class="edit-row">
+                        <label class="edit-label">Star Rating (1-5)</label>
+                        <div class="star-picker" id="qa-movie-star-picker">
+                            <i class="far fa-star" data-rating="1"></i>
+                            <i class="far fa-star" data-rating="2"></i>
+                            <i class="far fa-star" data-rating="3"></i>
+                            <i class="far fa-star" data-rating="4"></i>
+                            <i class="far fa-star" data-rating="5"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 📖 Book Specific Fields -->
+                <div id="qa-fields-book" class="type-fields-group hidden">
+                    <div class="edit-row">
+                        <label class="edit-label">Author</label>
+                        <input type="text" id="qa-book-author" class="edit-input" placeholder="Author's Name">
+                    </div>
+                    <div class="edit-row flex-row" style="display:flex; gap:10px;">
+                        <div style="flex:1;">
+                            <label class="edit-label">Current Page</label>
+                            <input type="number" id="qa-book-current-page" class="edit-input" placeholder="0" min="0" value="0">
+                        </div>
+                        <div style="flex:1;">
+                            <label class="edit-label">Total Pages</label>
+                            <input type="number" id="qa-book-total-pages" class="edit-input" placeholder="100" min="1" value="100">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 🔗 Link Specific Fields -->
+                <div id="qa-fields-link" class="type-fields-group hidden">
+                    <div class="edit-row">
+                        <label class="edit-label">URL / Address</label>
+                        <div style="display: flex; gap: 8px;">
+                            <input type="url" id="qa-link-url" class="edit-input" placeholder="https://example.com" style="flex: 1;">
+                            <button type="button" id="qa-link-fetch-btn" class="btn secondary" style="font-size: 0.72rem; padding: 0 12px; height: auto;"><i class="fas fa-satellite-dish"></i> Fetch</button>
+                        </div>
+                    </div>
+                    <div id="qa-link-thumb-section" class="hidden" style="margin-top: 10px; margin-bottom: 10px;">
+                        <label class="edit-label">Select Thumbnail</label>
+                        <div id="qa-link-thumb-picker" class="thumb-picker"></div>
+                    </div>
+                </div>
+
+                <!-- 📝 Task Specific Fields -->
+                <div id="qa-fields-task" class="type-fields-group hidden">
+                    <div class="edit-row flex-row" style="display:flex; gap:10px;">
+                        <div style="flex:1;">
+                            <label class="edit-label">Priority</label>
+                            <select id="qa-task-priority" class="edit-input">
+                                <option value="low">Low</option>
+                                <option value="medium" selected>Medium</option>
+                                <option value="high">High</option>
+                            </select>
+                        </div>
+                        <div style="flex:1;">
+                            <label class="edit-label">Due Date</label>
+                            <input type="date" id="qa-task-due-date" class="edit-input">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Common Fields -->
+                <div class="edit-row">
+                    <label class="edit-label">Details / Description</label>
+                    <input type="text" id="qa-desc" class="edit-input" placeholder="Details">
+                </div>
+                <div class="edit-row">
+                    <label class="edit-label">Tags (comma-separated)</label>
+                    <input type="text" id="qa-tags" class="edit-input" placeholder="e.g. movies, personal, urgent">
+                </div>
+                <div class="edit-row" id="qa-thumb-row">
+                    <label class="edit-label">Image / Poster URL</label>
+                    <input type="url" id="qa-thumb" class="edit-input" placeholder="https://example.com/image.jpg">
+                </div>
+                <div class="edit-row">
+                    <label class="edit-label">Assign to Shelf</label>
+                    <select id="qa-shelf" class="edit-input">
+                        <option value="">None (General Library)</option>
+                    </select>
+                </div>
+
+                <div class="modal-cta-group" style="margin-top: 1.5rem;">
+                    <button id="qa-save-btn" class="btn primary wide">
+                        <i class="fas fa-circle-plus"></i> Add Item
+                    </button>
+                    <button id="qa-cancel-btn" class="btn ghost wide">
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Add FAB -->
+<button id="quickAddFab" class="quick-add-fab" aria-label="Quick Add Item" title="Quick Add Item">
+    <i class="fas fa-plus"></i>
+</button>
 
 <script src="app.js"></script>
 </body>

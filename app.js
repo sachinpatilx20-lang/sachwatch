@@ -355,6 +355,9 @@ class SachApp {
         this.suggestionAbortController = null;
         this.renderFrameId = null;
         this.shelves = JSON.parse(localStorage.getItem('sach_shelves')) || [];
+        this.planner = JSON.parse(localStorage.getItem('sach_weekly_planner')) || {};
+        this.plannerWeek = 1;
+        this.taskMode = 'list';
         this.heroIndex = 0;
         this.heroInterval = null;
 
@@ -625,9 +628,249 @@ class SachApp {
         this.modalEditLinkThumbSection = document.getElementById('modal-edit-link-thumb-section');
         this.modalTrailerContainer = document.getElementById('modal-trailer-container');
         this.modalTrailerIframe = document.getElementById('modal-trailer-iframe');
+
+        // New Workspace Expansion Elements
+        this.statsSection = document.getElementById('stats-section');
+        this.modalEditType = document.getElementById('modal-edit-type');
+        this.editCinemaFields = document.getElementById('edit-cinema-fields');
+        this.editBookFields = document.getElementById('edit-book-fields');
+        this.editTaskFields = document.getElementById('edit-task-fields');
+        this.modalEditDirector = document.getElementById('modal-edit-director');
+        this.modalEditGenre = document.getElementById('modal-edit-genre');
+        this.modalEditRuntime = document.getElementById('modal-edit-runtime');
+        this.modalEditAuthor = document.getElementById('modal-edit-author');
+        this.modalEditCurrentPage = document.getElementById('modal-edit-current-page');
+        this.modalEditTotalPages = document.getElementById('modal-edit-total-pages');
+        this.modalEditPriority = document.getElementById('modal-edit-priority');
+        this.modalEditDueDate = document.getElementById('modal-edit-due-date');
+        this.modalEditStarPicker = document.getElementById('modal-edit-star-picker');
+
+        // Planner elements
+        this.plannerModal = document.getElementById('plannerModal');
+        this.plannerModalTitle = document.getElementById('plannerModalTitle');
+        this.plannerMoviesList = document.getElementById('plannerMoviesList');
+        this.closePlannerModalBtn = document.getElementById('closePlannerModalBtn');
+        this.plannerSection = document.getElementById('planner-section');
+        this.fullPlannerGrid = document.getElementById('full-planner-grid');
+        this.plannerWeekTitle = document.getElementById('planner-week-title');
+        this.plannerWeekPrevBtn = document.getElementById('planner-week-prev-btn');
+        this.plannerWeekNextBtn = document.getElementById('planner-week-next-btn');
+
+        // Quick Add elements
+        this.quickAddFab = document.getElementById('quickAddFab');
+        this.quickAddModal = document.getElementById('quickAddModal');
+        this.quickAddTypeSegment = document.getElementById('quickAddTypeSegment');
+        this.qaTitle = document.getElementById('qa-title');
+        this.qaMovieDirector = document.getElementById('qa-movie-director');
+        this.qaMovieGenre = document.getElementById('qa-movie-genre');
+        this.qaMovieRuntime = document.getElementById('qa-movie-runtime');
+        this.qaMovieStarPicker = document.getElementById('qa-movie-star-picker');
+        this.qaBookAuthor = document.getElementById('qa-book-author');
+        this.qaBookCurrentPage = document.getElementById('qa-book-current-page');
+        this.qaBookTotalPages = document.getElementById('qa-book-total-pages');
+        this.qaLinkUrl = document.getElementById('qa-link-url');
+        this.qaLinkFetchBtn = document.getElementById('qa-link-fetch-btn');
+        this.qaLinkThumbPicker = document.getElementById('qa-link-thumb-picker');
+        this.qaLinkThumbSection = document.getElementById('qa-link-thumb-section');
+        this.qaTaskPriority = document.getElementById('qa-task-priority');
+        this.qaTaskDueDate = document.getElementById('qa-task-due-date');
+        this.qaDesc = document.getElementById('qa-desc');
+        this.qaTags = document.getElementById('qa-tags');
+        this.qaThumb = document.getElementById('qa-thumb');
+        this.qaShelf = document.getElementById('qa-shelf');
+        this.qaSaveBtn = document.getElementById('qa-save-btn');
+        this.qaCancelBtn = document.getElementById('qa-cancel-btn');
+
+        // Details Modal Redesign elements
+        this.modalBackdropGlow = document.getElementById('modal-backdrop-glow');
+        this.detailsModalTabs = document.getElementById('detailsModalTabs');
+        this.detailsTabOverview = document.getElementById('details-tab-overview');
+        this.detailsTabNotes = document.getElementById('details-tab-notes');
+        this.detailsTabEdit = document.getElementById('details-tab-edit');
+        this.modalEditNotes = document.getElementById('modal-edit-notes');
+        this.modalSaveNotesBtn = document.getElementById('modal-save-notes-btn');
     }
 
     initEvents() {
+        // ----------------------------------------------------
+        // QUICK ADD FAB & MODAL EVENTS
+        // ----------------------------------------------------
+        if (this.quickAddFab) {
+            this.quickAddFab.addEventListener('click', () => {
+                // Populate Shelves Dropdown
+                if (this.qaShelf) {
+                    this.qaShelf.innerHTML = '<option value="">None (General Library)</option>';
+                    this.shelves.forEach(sh => {
+                        const opt = document.createElement('option');
+                        opt.value = sh;
+                        opt.textContent = sh;
+                        this.qaShelf.appendChild(opt);
+                    });
+                }
+                
+                // Reset inputs
+                if (this.qaTitle) this.qaTitle.value = '';
+                if (this.qaMovieDirector) this.qaMovieDirector.value = '';
+                if (this.qaMovieGenre) this.qaMovieGenre.value = '';
+                if (this.qaMovieRuntime) this.qaMovieRuntime.value = '';
+                this.qaSelectedRating = 0;
+                this.updateQaStarPickerUI(0);
+                if (this.qaBookAuthor) this.qaBookAuthor.value = '';
+                if (this.qaBookCurrentPage) this.qaBookCurrentPage.value = 0;
+                if (this.qaBookTotalPages) this.qaBookTotalPages.value = 100;
+                if (this.qaLinkUrl) this.qaLinkUrl.value = '';
+                if (this.qaLinkThumbPicker) this.qaLinkThumbPicker.innerHTML = '';
+                if (this.qaLinkThumbSection) this.qaLinkThumbSection.classList.add('hidden');
+                if (this.qaTaskPriority) this.qaTaskPriority.value = 'medium';
+                if (this.qaTaskDueDate) this.qaTaskDueDate.value = '';
+                if (this.qaDesc) this.qaDesc.value = '';
+                if (this.qaTags) this.qaTags.value = '';
+                if (this.qaThumb) this.qaThumb.value = '';
+                this.qaSelectedThumb = '';
+                this.qaActiveType = 'movie';
+
+                // Reset Type Segment
+                if (this.quickAddTypeSegment) {
+                    this.quickAddTypeSegment.querySelectorAll('.segment-btn').forEach(btn => {
+                        btn.classList.toggle('active', btn.dataset.type === 'movie');
+                    });
+                }
+                this.toggleQaTypeFields('movie');
+                this.showModal(this.quickAddModal);
+            });
+        }
+
+        if (this.qaCancelBtn) {
+            this.qaCancelBtn.addEventListener('click', () => {
+                this.hideModal(this.quickAddModal);
+            });
+        }
+
+        if (this.quickAddModal) {
+            this.quickAddModal.addEventListener('click', (e) => {
+                if (e.target === this.quickAddModal) this.hideModal(this.quickAddModal);
+            });
+        }
+
+        if (this.quickAddTypeSegment) {
+            this.quickAddTypeSegment.addEventListener('click', (e) => {
+                const btn = e.target.closest('.segment-btn');
+                if (btn) {
+                    this.quickAddTypeSegment.querySelectorAll('.segment-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    this.qaActiveType = btn.dataset.type;
+                    this.toggleQaTypeFields(this.qaActiveType);
+                }
+            });
+        }
+
+        // Quick Add Star Picker
+        if (this.qaMovieStarPicker) {
+            this.qaMovieStarPicker.querySelectorAll('i').forEach(star => {
+                star.addEventListener('click', () => {
+                    this.qaSelectedRating = parseInt(star.dataset.rating) || 0;
+                    this.updateQaStarPickerUI(this.qaSelectedRating);
+                });
+            });
+        }
+
+        // Quick Add Link Meta Fetch
+        if (this.qaLinkFetchBtn) {
+            this.qaLinkFetchBtn.addEventListener('click', async () => {
+                const url = this.qaLinkUrl ? this.qaLinkUrl.value.trim() : '';
+                if (!url) return;
+                this.showLoader(true, "Scraping URL metadata...");
+                try {
+                    const m = await this.fetchLinkMetadata(url);
+                    if (m) {
+                        if (this.qaTitle) this.qaTitle.value = m.title || '';
+                        if (this.qaDesc) this.qaDesc.value = m.description || '';
+                        this.renderQaThumbPicker(m.images || [], `https://s.wordpress.com/mshots/v1/${encodeURIComponent(url)}?w=1200`);
+                    }
+                } catch (e) {
+                    console.error("Meta fetch failed:", e);
+                    this.showToast("Autofetch failed. Please fill manually.", "error");
+                } finally {
+                    this.showLoader(false);
+                }
+            });
+        }
+
+        // Save Quick Add Item
+        if (this.qaSaveBtn) {
+            this.qaSaveBtn.addEventListener('click', () => {
+                const title = this.qaTitle ? this.qaTitle.value.trim() : '';
+                if (!title) {
+                    this.showToast("Title is required!", "error");
+                    return;
+                }
+
+                const tags = this.qaTags ? this.qaTags.value.split(',').map(t => t.trim()).filter(Boolean) : [];
+                const desc = this.qaDesc ? this.qaDesc.value.trim() : '';
+                const shelf = this.qaShelf ? this.qaShelf.value : '';
+                const thumb = this.qaThumb ? this.qaThumb.value.trim() : '';
+
+                const item = {
+                    id: this.qaActiveType + '_' + Date.now(),
+                    type: this.qaActiveType,
+                    title: title,
+                    desc: desc,
+                    tags: tags,
+                    shelf: shelf,
+                    completed: false,
+                    date: Date.now(),
+                    favorite: false
+                };
+
+                // Add default placeholders for thumbnails
+                if (this.qaActiveType === 'movie') {
+                    item.thumb = thumb || 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?q=80&w=600&auto=format&fit=crop';
+                    item.director = this.qaMovieDirector ? this.qaMovieDirector.value.trim() : '';
+                    item.genre = this.qaMovieGenre ? this.qaMovieGenre.value.trim() : '';
+                    item.runtime = this.qaMovieRuntime ? (parseInt(this.qaMovieRuntime.value) || 0) : 0;
+                    item.rating = this.qaSelectedRating || 0;
+                    item.year = new Date().getFullYear().toString();
+                } else if (this.qaActiveType === 'book') {
+                    item.thumb = thumb || 'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?q=80&w=600&auto=format&fit=crop';
+                    item.author = this.qaBookAuthor ? this.qaBookAuthor.value.trim() : '';
+                    item.currentPage = this.qaBookCurrentPage ? (parseInt(this.qaBookCurrentPage.value) || 0) : 0;
+                    item.totalPages = this.qaBookTotalPages ? (parseInt(this.qaBookTotalPages.value) || 100) : 100;
+                    item.year = new Date().getFullYear().toString();
+                } else if (this.qaActiveType === 'link') {
+                    item.url = this.qaLinkUrl ? this.normalizeUrl(this.qaLinkUrl.value.trim()) : 'https://google.com';
+                    item.thumb = this.qaSelectedThumb || thumb || 'https://images.unsplash.com/photo-1546074177-3b1b98a31289?q=80&w=600&auto=format&fit=crop';
+                    item.year = this.getHostname(item.url);
+                } else if (this.qaActiveType === 'task') {
+                    item.thumb = '';
+                    item.priority = this.qaTaskPriority ? this.qaTaskPriority.value : 'medium';
+                    item.dueDate = this.qaTaskDueDate ? this.qaTaskDueDate.value : '';
+                    item.year = 'Task';
+                }
+
+                this.items.unshift(item);
+                this.saveItems();
+                this.hideModal(this.quickAddModal);
+                this.showToast(`Added "${title}" successfully!`, "success");
+                this.dirtyLibrary = true;
+                this.dirtyShelves = true;
+                this.render();
+            });
+        }
+
+        // ----------------------------------------------------
+        // DETAILS MODAL TABS EVENTS
+        // ----------------------------------------------------
+        if (this.detailsModalTabs) {
+            this.detailsModalTabs.addEventListener('click', (e) => {
+                const btn = e.target.closest('.segment-btn');
+                if (btn) {
+                    this.detailsModalTabs.querySelectorAll('.segment-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    this.switchDetailsTab(btn.dataset.tab);
+                }
+            });
+        }
+
         // Add link input triggers (via hidden fields in response to URL click)
         this.addBtn.addEventListener('click', () => this.handleAddLink());
 
@@ -774,9 +1017,39 @@ class SachApp {
 
 
 
+        // Planner modal close handlers
+        if (this.closePlannerModalBtn) {
+            this.closePlannerModalBtn.onclick = () => this.hideModal(this.plannerModal);
+        }
+        if (this.plannerModal) {
+            this.plannerModal.onclick = (e) => {
+                if (e.target === this.plannerModal) this.hideModal(this.plannerModal);
+            };
+        }
+
+
+
         // Main Details Modal
         this.closeModalBtnDetails.onclick = () => this.hideModal(this.mainModal);
         this.mainModal.onclick = (e) => { if (e.target === this.mainModal) this.hideModal(this.mainModal); };
+
+        // Type switcher event in modal
+        if (this.modalEditType) {
+            this.modalEditType.addEventListener('change', (e) => {
+                this.toggleEditTypeFields(e.target.value);
+            });
+        }
+
+        // Star rating picker event in modal
+        if (this.modalEditStarPicker) {
+            this.modalEditStarPicker.querySelectorAll('i').forEach(star => {
+                star.addEventListener('click', () => {
+                    const rating = parseInt(star.dataset.rating);
+                    this.selectedRating = rating;
+                    this.updateStarPickerUI(rating);
+                });
+            });
+        }
 
         // Theme toggle action
         if (this.themeToggle) {
@@ -828,22 +1101,7 @@ class SachApp {
             };
         });
 
-        const statusSegment = document.getElementById('statusSegment');
-        if (statusSegment) {
-            statusSegment.addEventListener('click', (e) => {
-                const btn = e.target.closest('.segment-btn');
-                if (btn) {
-                    statusSegment.querySelectorAll('.segment-btn').forEach(b => {
-                        b.classList.remove('active');
-                        b.setAttribute('aria-checked', 'false');
-                    });
-                    btn.classList.add('active');
-                    btn.setAttribute('aria-checked', 'true');
-                    this.activeStatus = btn.dataset.status;
-                    this.render();
-                }
-            });
-        }
+
 
         // Local backup buttons
         if (this.exportBtn) {
@@ -963,6 +1221,78 @@ class SachApp {
         }
     }
 
+    toggleQaTypeFields(type) {
+        const types = ['movie', 'book', 'link', 'task'];
+        types.forEach(t => {
+            const el = document.getElementById(`qa-fields-${t}`);
+            if (el) el.classList.toggle('hidden', t !== type);
+        });
+        
+        // Hide image/thumb URL field for tasks
+        const thumbRow = document.getElementById('qa-thumb-row');
+        if (thumbRow) thumbRow.classList.toggle('hidden', type === 'task');
+    }
+
+    updateQaStarPickerUI(rating) {
+        if (!this.qaMovieStarPicker) return;
+        this.qaMovieStarPicker.querySelectorAll('i').forEach(star => {
+            const r = parseInt(star.dataset.rating) || 0;
+            if (r <= rating) {
+                star.className = 'fas fa-star';
+                star.style.color = '#f5c518';
+            } else {
+                star.className = 'far fa-star';
+                star.style.color = '';
+            }
+        });
+    }
+
+    renderQaThumbPicker(images, fallback) {
+        if (!this.qaLinkThumbPicker) return;
+        this.qaLinkThumbPicker.innerHTML = '';
+        this.qaSelectedThumb = '';
+
+        const allImages = [...new Set([fallback, ...images])].filter(Boolean);
+        if (allImages.length === 0) {
+            if (this.qaLinkThumbSection) this.qaLinkThumbSection.classList.add('hidden');
+            return;
+        }
+
+        if (this.qaLinkThumbSection) this.qaLinkThumbSection.classList.remove('hidden');
+
+        allImages.forEach((imgUrl, i) => {
+            const item = document.createElement('div');
+            item.className = 'thumb-picker-item' + (i === 0 ? ' active' : '');
+            if (i === 0) {
+                this.qaSelectedThumb = imgUrl;
+                if (this.qaThumb) this.qaThumb.value = imgUrl;
+            }
+
+            const img = document.createElement('img');
+            img.src = imgUrl;
+            img.loading = 'lazy';
+            img.onerror = () => item.remove();
+
+            item.appendChild(img);
+            item.onclick = () => {
+                this.qaLinkThumbPicker.querySelectorAll('.thumb-picker-item').forEach(el => el.classList.remove('active'));
+                item.classList.add('active');
+                this.qaSelectedThumb = imgUrl;
+                if (this.qaThumb) this.qaThumb.value = imgUrl;
+            };
+
+            this.qaLinkThumbPicker.appendChild(item);
+        });
+    }
+
+    switchDetailsTab(tab) {
+        const panels = ['overview', 'notes', 'edit'];
+        panels.forEach(p => {
+            const el = document.getElementById(`details-tab-${p}`);
+            if (el) el.classList.toggle('hidden', p !== tab);
+        });
+    }
+
     switchTab(tab) {
         this.activeTab = tab;
         
@@ -993,9 +1323,10 @@ class SachApp {
         if (syncSection) syncSection.classList.toggle('hidden', tab !== 'sync');
 
         if (tab === 'sync') {
-            // Automate pairing code generation on visiting sync tab
+            // Do NOT auto-generate sync code — let the user initiate manually
+            // Just update status to ready if not already connected
             if (this.syncCodeDisplay && this.syncCodeDisplay.textContent === '——') {
-                this.generateSyncCode();
+                this.updateSyncStatus('ready', 'Ready — click Generate to broadcast');
             }
         }
 
@@ -1020,7 +1351,7 @@ class SachApp {
                             <div class="search-item" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px;" onclick="event.stopPropagation(); window.sachApp.quickSearchFill('${h.replace(/'/g, "\\'")}', '${dropdownEl.id}')">
                                 <div style="display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0;">
                                     <i class="fas fa-clock-rotate-left" style="font-size: 0.75rem; color: var(--text3); flex-shrink: 0;"></i>
-                                    <span style="font-size: 0.85rem; color: var(--text2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${h}</span>
+                                    <span style="font-size: 0.85rem; color: var(--text2); word-break: break-all;">${h}</span>
                                 </div>
                                 <button style="color: var(--text3); font-size: 0.85rem; padding: 4px; display: flex; align-items: center; justify-content: center; cursor: pointer; border: none; background: none;" onclick="event.stopPropagation(); window.sachApp.removeSearchHistoryItem(${index})">
                                     <i class="fas fa-xmark"></i>
@@ -1043,7 +1374,7 @@ class SachApp {
                         <div class="search-item" onclick="event.stopPropagation(); window.sachApp.openRecentItem('${item.id}', '${dropdownEl.id}')">
                             <div style="width:24px; text-align:center;">${icon}</div>
                             <div style="flex:1; min-width:0;">
-                                <h4 style="font-size:0.85rem; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${item.title}</h4>
+                                <h4 style="font-size:0.85rem; font-weight:700; word-break: break-word;">${item.title}</h4>
                             </div>
                         </div>
                     `;
@@ -1071,8 +1402,8 @@ class SachApp {
                         <i class="fas fa-link"></i>
                     </div>
                     <div style="flex:1; min-width:0;">
-                        <h4 style="font-size:0.85rem; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Import Web Link</h4>
-                        <p style="font-size:0.72rem; color:var(--text2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${query}</p>
+                        <h4 style="font-size:0.85rem; font-weight:700; word-break: break-word;">Import Web Link</h4>
+                        <p style="font-size:0.72rem; color:var(--text2); word-break: break-all;">${query}</p>
                     </div>
                 </div>
             `;
@@ -1140,7 +1471,7 @@ class SachApp {
                 row.innerHTML = `
                     <div style="width:24px; text-align:center;">${icon}</div>
                     <div style="flex:1; min-width:0;">
-                        <h4 style="font-size:0.85rem; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${item.title}</h4>
+                        <h4 style="font-size:0.85rem; font-weight:700; word-break: break-word;">${item.title}</h4>
                     </div>
                 `;
                 row.onclick = () => {
@@ -1177,9 +1508,9 @@ class SachApp {
                 row.className = 'search-item';
                 const isAlreadySaved = this.items.some(i => movie.imdbId && i.imdbId && i.imdbId.toLowerCase() === movie.imdbId.toLowerCase());
                 row.innerHTML = `
-                    <img src="${movie.poster || 'https://via.placeholder.com/30x45?text=🎞️'}" width="30" height="45" loading="lazy" decoding="async" style="border-radius:4px; object-fit:cover;">
+                    <img src="${movie.poster || 'https://via.placeholder.com/30x45?text=🎞️'}" width="30" height="45" loading="lazy" decoding="async" style="border-radius:4px; object-fit:contain; background:#000;">
                     <div style="flex:1; min-width:0;">
-                        <h4 style="font-size:0.85rem; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${movie.title}</h4>
+                        <h4 style="font-size:0.85rem; font-weight:700; word-break: break-word;">${movie.title}</h4>
                         <p style="font-size:0.72rem; color:var(--text2);">${movie.year} ${isAlreadySaved ? '· <span style="color:var(--accent); font-weight:bold;">On list</span>' : ''}</p>
                     </div>
                 `;
@@ -1213,12 +1544,16 @@ class SachApp {
                     <div style="display: flex; flex-direction: column; gap: 8px;">
                         <button class="btn secondary tiny" id="btnSearchAddMovie" style="width: 100%; border: 1px solid var(--border2); background: rgba(255,255,255,0.03);"><i class="fas fa-plus"></i> Add Custom Movie / Show</button>
                         <button class="btn secondary tiny" id="btnSearchAddLink" style="width: 100%; border: 1px solid var(--border2); background: rgba(255,255,255,0.03);"><i class="fas fa-link"></i> Add Custom Link</button>
+                        <button class="btn secondary tiny" id="btnSearchAddBook" style="width: 100%; border: 1px solid var(--border2); background: rgba(255,255,255,0.03);"><i class="fas fa-book"></i> Add Custom Book</button>
+                        <button class="btn secondary tiny" id="btnSearchAddTask" style="width: 100%; border: 1px solid var(--border2); background: rgba(255,255,255,0.03);"><i class="fas fa-circle-check"></i> Add Custom Task</button>
                     </div>
                 </div>
             `;
             
             const btnMovie = dropdownEl.querySelector('#btnSearchAddMovie');
             const btnLink = dropdownEl.querySelector('#btnSearchAddLink');
+            const btnBook = dropdownEl.querySelector('#btnSearchAddBook');
+            const btnTask = dropdownEl.querySelector('#btnSearchAddTask');
             
             if (btnMovie) {
                 btnMovie.onclick = (e) => {
@@ -1237,15 +1572,13 @@ class SachApp {
                         tags: [],
                         completed: false,
                         year: new Date().getFullYear().toString(),
-                        imdbId: 'custom_' + Date.now()
+                        imdbId: 'custom_' + Date.now(),
+                        date: Date.now()
                     };
                     
-                    // Immediately insert and save
                     this.items.unshift(movieItem);
                     this.saveItems();
                     this.render();
-                    
-                    // Open modal directly in Edit Mode
                     this.openDetails(movieItem, true);
                 };
             }
@@ -1270,13 +1603,69 @@ class SachApp {
                         year: this.getHostname(this.isLikelyUrl(query) ? this.normalizeUrl(query) : 'https://google.com')
                     };
                     
-                    // Immediately insert and save
                     this.items.unshift(linkItem);
                     this.saveItems();
                     this.render();
-                    
-                    // Open modal directly in Edit Mode
                     this.openDetails(linkItem, true);
+                };
+            }
+
+            if (btnBook) {
+                btnBook.onclick = (e) => {
+                    e.stopPropagation();
+                    dropdownEl.classList.add('hidden');
+                    if (this.searchInput) this.searchInput.value = '';
+                    this.searchQuery = '';
+                    
+                    const bookItem = {
+                        id: 'book_custom_' + Date.now(),
+                        type: 'book',
+                        title: query,
+                        desc: '',
+                        thumb: 'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?q=80&w=600&auto=format&fit=crop',
+                        url: '',
+                        tags: [],
+                        completed: false,
+                        year: new Date().getFullYear().toString(),
+                        author: '',
+                        currentPage: 0,
+                        totalPages: 100,
+                        date: Date.now()
+                    };
+                    
+                    this.items.unshift(bookItem);
+                    this.saveItems();
+                    this.render();
+                    this.openDetails(bookItem, true);
+                };
+            }
+
+            if (btnTask) {
+                btnTask.onclick = (e) => {
+                    e.stopPropagation();
+                    dropdownEl.classList.add('hidden');
+                    if (this.searchInput) this.searchInput.value = '';
+                    this.searchQuery = '';
+                    
+                    const taskItem = {
+                        id: 'task_custom_' + Date.now(),
+                        type: 'task',
+                        title: query,
+                        desc: '',
+                        thumb: '',
+                        url: '',
+                        tags: [],
+                        completed: false,
+                        year: 'Task',
+                        priority: 'medium',
+                        dueDate: '',
+                        date: Date.now()
+                    };
+                    
+                    this.items.unshift(taskItem);
+                    this.saveItems();
+                    this.render();
+                    this.openDetails(taskItem, true);
                 };
             }
         } else if (localMatches.length > 0 && imdbResults.length === 0 && !isLoadingOnline) {
@@ -1731,11 +2120,21 @@ class SachApp {
 
     // Modal Details quick opening
     openDetails(item, startEdit = false) {
-        const isSaved = this.items.some(i => i.id === item.id || (item.imdbId && i.imdbId && i.imdbId.toLowerCase() === item.imdbId.toLowerCase()));
-        const savedItem = this.items.find(i => i.id === item.id || (item.imdbId && i.imdbId && i.imdbId.toLowerCase() === item.imdbId.toLowerCase())) || item;
+        const isSaved = this.items.some(i => String(i.id) === String(item.id) || (item.imdbId && i.imdbId && String(i.imdbId).toLowerCase() === String(item.imdbId).toLowerCase()));
+        const savedItem = this.items.find(i => String(i.id) === String(item.id) || (item.imdbId && i.imdbId && String(i.imdbId).toLowerCase() === String(item.imdbId).toLowerCase())) || item;
         
-        this.modalImg.src = savedItem.thumb || 'https://via.placeholder.com/300x450?text=Unavailable';
+        const posterUrl = savedItem.thumb || 'https://via.placeholder.com/300x450?text=Unavailable';
+        this.modalImg.src = posterUrl;
+        const posterSideEl = document.querySelector('.modal-poster-side');
+        if (posterSideEl) {
+            posterSideEl.style.setProperty('--poster-bg', `url('${posterUrl.replace(/'/g, "\\'")}')`);
+        }
         this.modalTitle.textContent = savedItem.title;
+
+        // Dynamic Blurred Ambient Backdrop Glow
+        if (this.modalBackdropGlow) {
+            this.modalBackdropGlow.style.backgroundImage = `url('${posterUrl.replace(/'/g, "\\'")}')`;
+        }
 
         // Setup Trailer Preview if Movie
         if (savedItem.type === 'movie') {
@@ -1753,46 +2152,37 @@ class SachApp {
             if (this.modalTrailerIframe) this.modalTrailerIframe.src = '';
         }
         
-        // Modal layout settings depending on Link or Movie
-        const isLink = savedItem.type === 'link';
-        this.modalLinkActions.classList.toggle('hidden', !isLink && !isSaved);
-        this.modalOpenUrl.classList.toggle('hidden', !isLink);
-        this.modalCopyUrl.classList.toggle('hidden', !isLink);
-        this.modalEditToggle.classList.toggle('hidden', !isSaved);
-        this.modalEditSection.classList.add('hidden'); // hidden initially
+        this.renderModalDescription(savedItem);
+        this.modalLinkActions.classList.toggle('hidden', savedItem.type !== 'link' && !isSaved);
+        this.modalOpenUrl.classList.toggle('hidden', savedItem.type !== 'link');
+        this.modalCopyUrl.classList.toggle('hidden', savedItem.type !== 'link');
         
-        // Actors / tags section always visible
-        this.modalActorsSection.classList.remove('hidden');
-        
-        if (isLink) {
-            this.modalImg.style.aspectRatio = '16/9';
-            this.modalImg.parentElement.style.flex = '0 0 100%'; // Stretch top on mobile
-            this.modalTagsLabel.textContent = 'Tags';
-            this.modalDesc.innerHTML = `
-                <span class="year-badge"><i class="fas fa-globe"></i> ${savedItem.year}</span>
-                <span>${savedItem.desc || 'No description available'}</span>
-            `;
-
-            // Copy and Open action event listeners
-            this.modalOpenUrl.onclick = () => window.open(savedItem.url, '_blank');
-            this.modalCopyUrl.onclick = () => {
-                navigator.clipboard.writeText(savedItem.url);
-                this.showToast("URL Copied to clipboard!", "success");
-            };
-        } else {
-            this.modalImg.style.aspectRatio = '2/3';
-            this.modalImg.parentElement.style.flex = '0 0 280px';
-            this.modalTagsLabel.textContent = 'Actors & Tags';
-            this.modalDesc.innerHTML = `
-                <span class="year-badge"><i class="fas fa-calendar"></i> ${savedItem.year}</span>
-                <span>${savedItem.desc || 'Film Details'}</span>
-            `;
+        // Reset details tabs state
+        if (this.detailsModalTabs) {
+            this.detailsModalTabs.querySelectorAll('.segment-btn').forEach(b => {
+                b.classList.toggle('active', b.dataset.tab === 'overview');
+                if (b.dataset.tab === 'edit' || b.dataset.tab === 'notes') {
+                    b.classList.toggle('hidden', !isSaved);
+                }
+            });
+        }
+        this.switchDetailsTab(startEdit ? 'edit' : 'overview');
+        if (startEdit && this.detailsModalTabs) {
+            this.detailsModalTabs.querySelectorAll('.segment-btn').forEach(b => {
+                b.classList.toggle('active', b.dataset.tab === 'edit');
+            });
         }
 
-        // Hide/show the tag adding input based on isSaved
-        const inputWrap = this.modalActorsSection.querySelector('.modal-actor-input-wrap');
-        if (inputWrap) {
-            inputWrap.classList.toggle('hidden', !isSaved);
+        // Populate personal notes
+        if (this.modalEditNotes) {
+            this.modalEditNotes.value = savedItem.notes || '';
+        }
+        if (this.modalSaveNotesBtn) {
+            this.modalSaveNotesBtn.onclick = () => {
+                savedItem.notes = this.modalEditNotes.value.trim();
+                this.saveItems();
+                this.showToast("Notes saved!", "success");
+            };
         }
 
         // Populate shelves dropdown
@@ -1807,42 +2197,65 @@ class SachApp {
             this.modalEditShelf.value = savedItem.shelf || '';
         }
 
-        // Inline editor triggers
-        this.modalEditToggle.onclick = () => {
-            this.modalEditSection.classList.toggle('hidden');
-            if (!this.modalEditSection.classList.contains('hidden')) {
-                this.modalEditTitle.value = savedItem.title;
-                this.modalEditDesc.value = savedItem.desc;
-                if (this.modalEditTags) {
-                    this.modalEditTags.value = (savedItem.tags || []).join(', ');
-                }
-                if (this.modalEditThumb) {
-                    this.modalEditThumb.value = savedItem.thumb || '';
-                }
-                if (this.modalEditShelf) {
-                    this.modalEditShelf.value = savedItem.shelf || '';
-                }
-
-                // Toggle edit link thumbnail selection
-                if (this.modalEditLinkThumbSection) {
-                    this.modalEditLinkThumbSection.classList.toggle('hidden', !isLink);
-                }
-                if (isLink) {
-                    this.selectedThumb = savedItem.thumb;
-                    this.currentUrl = savedItem.url;
-                    this.renderEditThumbPicker([savedItem.thumb]);
-                    this.fetchLinkMetadata(savedItem.url).then(m => this.renderEditThumbPicker(m.images || []));
-                }
+        // Prepopulate inline editor fields if saved
+        if (isSaved) {
+            this.modalEditTitle.value = savedItem.title;
+            this.modalEditDesc.value = savedItem.desc || '';
+            if (this.modalEditTags) {
+                this.modalEditTags.value = (savedItem.tags || []).join(', ');
             }
-        };
+            if (this.modalEditThumb) {
+                this.modalEditThumb.value = savedItem.thumb || '';
+            }
+            if (this.modalEditShelf) {
+                this.modalEditShelf.value = savedItem.shelf || '';
+            }
 
+            if (this.modalEditType) {
+                this.modalEditType.value = savedItem.type || 'movie';
+            }
+            this.toggleEditTypeFields(savedItem.type || 'movie');
+            
+            if (savedItem.type === 'movie') {
+                if (this.modalEditDirector) this.modalEditDirector.value = savedItem.director || '';
+                if (this.modalEditGenre) this.modalEditGenre.value = savedItem.genre || '';
+                if (this.modalEditRuntime) this.modalEditRuntime.value = savedItem.runtime || '';
+                this.selectedRating = savedItem.rating || 0;
+                this.updateStarPickerUI(this.selectedRating);
+            } else if (savedItem.type === 'book') {
+                if (this.modalEditAuthor) this.modalEditAuthor.value = savedItem.author || '';
+                if (this.modalEditCurrentPage) this.modalEditCurrentPage.value = savedItem.currentPage || 0;
+                if (this.modalEditTotalPages) this.modalEditTotalPages.value = savedItem.totalPages || 100;
+            } else if (savedItem.type === 'task') {
+                if (this.modalEditPriority) this.modalEditPriority.value = savedItem.priority || 'medium';
+                if (this.modalEditDueDate) this.modalEditDueDate.value = savedItem.dueDate || '';
+            }
+
+            // Toggle edit link thumbnail selection
+            if (this.modalEditLinkThumbSection) {
+                this.modalEditLinkThumbSection.classList.toggle('hidden', savedItem.type !== 'link');
+            }
+            if (savedItem.type === 'link') {
+                this.selectedThumb = savedItem.thumb;
+                this.currentUrl = savedItem.url;
+                this.renderEditThumbPicker([savedItem.thumb]);
+                this.fetchLinkMetadata(savedItem.url).then(m => this.renderEditThumbPicker(m.images || []));
+            }
+        }
+
+        // Save edit button callback
         this.modalEditSave.onclick = () => {
             savedItem.title = this.modalEditTitle.value || savedItem.title;
             savedItem.desc = this.modalEditDesc.value || savedItem.desc;
+            
+            const newType = this.modalEditType ? this.modalEditType.value : savedItem.type;
+            savedItem.type = newType;
+
             if (this.modalEditTags) {
                 savedItem.tags = this.modalEditTags.value.split(',').map(t => t.trim()).filter(Boolean);
             }
-            if (isLink) {
+
+            if (newType === 'link') {
                 const manualThumb = this.modalEditThumb ? this.modalEditThumb.value.trim() : '';
                 if (manualThumb && manualThumb !== savedItem.thumb && manualThumb !== this.selectedThumb) {
                     savedItem.thumb = manualThumb;
@@ -1850,30 +2263,60 @@ class SachApp {
                     savedItem.thumb = this.selectedThumb;
                 }
                 this.modalImg.src = savedItem.thumb;
-            } else if (this.modalEditThumb) {
-                savedItem.thumb = this.modalEditThumb.value.trim() || savedItem.thumb;
-                this.modalImg.src = savedItem.thumb;
+            } else {
+                if (this.modalEditThumb) {
+                    savedItem.thumb = this.modalEditThumb.value.trim() || savedItem.thumb;
+                }
+                
+                // Set default thumbnails for books/tasks if empty
+                if (!savedItem.thumb) {
+                    if (newType === 'book') {
+                        savedItem.thumb = 'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?q=80&w=600&auto=format&fit=crop';
+                    }
+                }
+                this.modalImg.src = savedItem.thumb || 'https://via.placeholder.com/300x450?text=Unavailable';
             }
+
+            // Save type-specific fields
+            if (newType === 'movie') {
+                savedItem.director = this.modalEditDirector ? this.modalEditDirector.value.trim() : '';
+                savedItem.genre = this.modalEditGenre ? this.modalEditGenre.value.trim() : '';
+                savedItem.runtime = this.modalEditRuntime ? (parseInt(this.modalEditRuntime.value) || 0) : 0;
+                savedItem.rating = this.selectedRating || 0;
+            } else if (newType === 'book') {
+                savedItem.author = this.modalEditAuthor ? this.modalEditAuthor.value.trim() : '';
+                savedItem.currentPage = this.modalEditCurrentPage ? (parseInt(this.modalEditCurrentPage.value) || 0) : 0;
+                savedItem.totalPages = this.modalEditTotalPages ? (parseInt(this.modalEditTotalPages.value) || 100) : 100;
+            } else if (newType === 'task') {
+                savedItem.priority = this.modalEditPriority ? this.modalEditPriority.value : 'medium';
+                savedItem.dueDate = this.modalEditDueDate ? this.modalEditDueDate.value : '';
+            }
+
             if (this.modalEditShelf) {
                 savedItem.shelf = this.modalEditShelf.value;
             }
+
             this.saveItems();
             this.modalTitle.textContent = savedItem.title;
-            if (isLink) {
-                this.modalDesc.innerHTML = `
-                    <span class="year-badge"><i class="fas fa-globe"></i> ${savedItem.year}</span>
-                    <span>${savedItem.desc || 'No description available'}</span>
-                `;
-            } else {
-                this.modalDesc.innerHTML = `
-                    <span class="year-badge"><i class="fas fa-calendar"></i> ${savedItem.year}</span>
-                    <span>${savedItem.desc || 'Film Details'}</span>
-                `;
-            }
+            this.renderModalDescription(savedItem);
             this.renderModalTags(savedItem);
-            this.modalEditSection.classList.add('hidden');
+            
+            // Update backdrop glow image
+            if (this.modalBackdropGlow) {
+                this.modalBackdropGlow.style.backgroundImage = `url('${savedItem.thumb || ''}')`;
+            }
+
+            // Switch back to overview tab
+            if (this.detailsModalTabs) {
+                this.detailsModalTabs.querySelectorAll('.segment-btn').forEach(b => {
+                    b.classList.toggle('active', b.dataset.tab === 'overview');
+                });
+            }
+            this.switchDetailsTab('overview');
             this.showToast("Changes Saved!");
+            
             this.dirtyLibrary = true;
+            this.dirtyShelves = true;
             this.render();
         };
 
@@ -1912,16 +2355,34 @@ class SachApp {
                     favBtn.innerHTML = savedItem.favorite 
                         ? '<i class="fas fa-star" style="color:#f5c518"></i> Favorited' 
                         : '<i class="far fa-star"></i> Favorite';
-                    favBtn.onclick = () => this.toggleFavorite(savedItem.id);
+                    favBtn.onclick = () => {
+                        this.toggleFavorite(savedItem.id);
+                        const isFavNow = !savedItem.favorite;
+                        favBtn.classList.toggle('active', isFavNow);
+                        favBtn.innerHTML = isFavNow 
+                            ? '<i class="fas fa-star" style="color:#f5c518"></i> Favorited' 
+                            : '<i class="far fa-star"></i> Favorite';
+                    };
                 }
                 
                 if (statusBtn) {
                     statusBtn.classList.toggle('active', !!savedItem.completed);
-                    const label = savedItem.type === 'link' ? 'Read' : 'Watched';
+                    let label = 'Completed';
+                    if (savedItem.type === 'movie') label = 'Watched';
+                    else if (savedItem.type === 'link') label = 'Read';
+                    else if (savedItem.type === 'book') label = 'Finished';
+                    
                     statusBtn.innerHTML = savedItem.completed 
                         ? `<i class="fas fa-circle-check" style="color:var(--green)"></i> ${label}` 
-                        : `<i class="far fa-circle-check"></i> Mark Completed`;
-                    statusBtn.onclick = () => this.toggleCompleted(savedItem.id);
+                        : `<i class="far fa-circle-check"></i> Mark ${label}`;
+                    statusBtn.onclick = () => {
+                        this.toggleCompleted(savedItem.id);
+                        const isCompNow = !savedItem.completed;
+                        statusBtn.classList.toggle('active', isCompNow);
+                        statusBtn.innerHTML = isCompNow 
+                            ? `<i class="fas fa-circle-check" style="color:var(--green)"></i> ${label}` 
+                            : `<i class="far fa-circle-check"></i> Mark ${label}`;
+                    };
                 }
             } else {
                 stateActions.classList.add('hidden');
@@ -1945,6 +2406,8 @@ class SachApp {
                 this.saveItems();
                 this.hideModal(this.mainModal);
                 this.showToast("Added to library!", "success");
+                this.dirtyLibrary = true;
+                this.dirtyShelves = true;
                 this.render();
             }
         };
@@ -1956,42 +2419,19 @@ class SachApp {
         if (isSaved) {
             const rBtn = document.createElement('button');
             rBtn.id = 'details-remove-btn';
-            rBtn.className = 'btn danger';
-            rBtn.style.marginTop = '4px';
-            rBtn.innerHTML = '<i class="fas fa-trash-alt"></i> Remove';
+            rBtn.className = 'btn danger wide';
+            rBtn.style.marginTop = '12px';
+            rBtn.innerHTML = '<i class="fas fa-trash-alt"></i> Delete Item';
             rBtn.onclick = () => {
                 this.items = this.items.filter(i => i.id !== savedItem.id);
                 this.saveItems();
                 this.hideModal(this.mainModal);
                 this.showToast("Removed from Library", "success");
+                this.dirtyLibrary = true;
+                this.dirtyShelves = true;
                 this.render();
             };
-            this.mainModal.querySelector('.modal-actions').appendChild(rBtn);
-        }
-        if (startEdit && isSaved) {
-            this.modalEditSection.classList.remove('hidden');
-            this.modalEditTitle.value = savedItem.title;
-            this.modalEditDesc.value = savedItem.desc || '';
-            if (this.modalEditTags) {
-                this.modalEditTags.value = (savedItem.tags || []).join(', ');
-            }
-            if (this.modalEditThumb) {
-                this.modalEditThumb.value = savedItem.thumb || '';
-            }
-            if (this.modalEditShelf) {
-                this.modalEditShelf.value = savedItem.shelf || '';
-            }
-
-            // Toggle edit link thumbnail selection
-            if (this.modalEditLinkThumbSection) {
-                this.modalEditLinkThumbSection.classList.toggle('hidden', !isLink);
-            }
-            if (isLink) {
-                this.selectedThumb = savedItem.thumb;
-                this.currentUrl = savedItem.url;
-                this.renderEditThumbPicker([savedItem.thumb]);
-                this.fetchLinkMetadata(savedItem.url).then(m => this.renderEditThumbPicker(m.images || []));
-            }
+            this.detailsTabOverview.appendChild(rBtn);
         }
 
         this.showModal(this.mainModal);
@@ -2076,7 +2516,7 @@ class SachApp {
         container.innerHTML = '';
         
         // Only show suggestions for saved items
-        const isSaved = this.items.some(i => i.id === item.id || (item.imdbId && i.imdbId && i.imdbId.toLowerCase() === item.imdbId.toLowerCase()));
+        const isSaved = this.items.some(i => String(i.id) === String(item.id) || (item.imdbId && i.imdbId && String(i.imdbId).toLowerCase() === String(item.imdbId).toLowerCase()));
         if (!isSaved) return;
 
         let suggestions = [];
@@ -2129,7 +2569,7 @@ class SachApp {
         this.modalActorTags.innerHTML = '';
         if (!item.tags) item.tags = [];
         
-        const isSaved = this.items.some(i => i.id === item.id || (item.imdbId && i.imdbId && i.imdbId.toLowerCase() === item.imdbId.toLowerCase()));
+        const isSaved = this.items.some(i => String(i.id) === String(item.id) || (item.imdbId && i.imdbId && String(i.imdbId).toLowerCase() === String(item.imdbId).toLowerCase()));
         
         item.tags.forEach((tag, idx) => {
             const tagEl = document.createElement('div');
@@ -2232,32 +2672,191 @@ class SachApp {
             `;
         }
 
-        // 2. Watchlist Shelf (pending movies)
-        const watchlistItems = this.items.filter(item => item.type === 'movie' && !item.completed);
-        if (watchlistItems.length > 0) {
-            const carouselId = 'shelf-watchlist';
-            const cardsHtml = watchlistItems.map(item => this.createCardHtml(item)).join('');
-            shelvesHtml += `
-                <div class="shelf-block">
-                    <div class="shelf-hd">
-                        <h3 class="shelf-title"><i class="fas fa-film"></i> Movie Watchlist <span class="shelf-count">${watchlistItems.length}</span></h3>
-                        <div class="carousel-controls">
-                            <button class="carousel-control-btn" onclick="window.sachApp.scrollCarousel('${carouselId}', -1)" title="Scroll Left"><i class="fas fa-chevron-left"></i></button>
-                            <button class="carousel-control-btn" onclick="window.sachApp.scrollCarousel('${carouselId}', 1)" title="Scroll Right"><i class="fas fa-chevron-right"></i></button>
+        // 2. Weekly Cinema Plan Shelf
+        const carouselId = 'shelf-watchlist';
+        
+        let cardsHtml = '';
+        // Weekly Cinema Planner cards strictly
+        const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+        days.forEach(day => {
+            const key = day + '_w' + this.plannerWeek;
+            const scheduledId = this.planner ? this.planner[key] : null;
+            const movie = scheduledId ? this.items.find(i => String(i.id) === String(scheduledId)) : null;
+            
+            if (movie) {
+                const posterUrl = movie.thumb || '';
+                const completedBadge = movie.completed 
+                    ? `<div class="card-completed-badge"><i class="fas fa-check"></i> Watched</div>`
+                    : '';
+                
+                cardsHtml += `
+                    <div class="card type-movie planner-card ${movie.completed ? 'completed-active' : ''}" data-id="${movie.id}" onclick="window.sachApp.openDetailsById('${movie.id}')" style="position: relative;">
+                        <span class="planner-day-badge">${day.substring(0, 3)}</span>
+                        
+                        <!-- Quick Action Buttons -->
+                        <button class="quick-action complete-action ${movie.completed ? 'active' : ''}" title="${movie.completed ? 'Mark Pending' : 'Mark Watched'}" onclick="event.stopPropagation(); window.sachApp.markScheduledMovieCompleted('${movie.id}', '${day}')">
+                            <i class="${movie.completed ? 'fas fa-circle-check' : 'far fa-circle-check'}"></i>
+                        </button>
+                        <button class="quick-action edit-action" title="Change Movie" onclick="event.stopPropagation(); window.sachApp.openPlannerMovieSelector('${day}')" style="right: 36px;">
+                            <i class="fas fa-arrows-rotate"></i>
+                        </button>
+                        <button class="quick-action delete-action" title="Clear Slot" onclick="event.stopPropagation(); window.sachApp.removeScheduledMovie('${day}')" style="right: 8px;">
+                            <i class="fas fa-trash-can" style="color: var(--red);"></i>
+                        </button>
+                        
+                        <div class="card-img-wrapper" onclick="event.stopPropagation(); window.sachApp.openDetailsById('${movie.id}')">
+                            <img src="${posterUrl || 'https://via.placeholder.com/400x600?text=No+Cover'}" class="card-img" loading="lazy" decoding="async">
+                            ${completedBadge}
+                        </div>
+                        <div class="card-body">
+                            <div class="card-info-header" style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+                                <span class="card-match-score" style="color: var(--green); font-weight: 800; font-size: 0.72rem;">${this.getMatchScore(movie.title)}</span>
+                                <span class="card-host-text" style="font-size: 0.68rem; color: var(--text3); font-weight: 600;"><i class="fas fa-calendar-alt"></i> ${movie.year}</span>
+                            </div>
+                            <h3 class="card-title">${movie.title}</h3>
+                            <p class="card-desc">${movie.desc || ''}</p>
                         </div>
                     </div>
-                    <div class="carousel-shelf" id="${carouselId}">
-                        ${cardsHtml}
+                `;
+            } else {
+                cardsHtml += `
+                    <div class="card type-movie planner-empty-card" onclick="window.sachApp.openPlannerMovieSelector('${day}')" style="position: relative; border-style: dashed; border-width: 1px; border-color: rgba(255,255,255,0.15); background: rgba(255,255,255,0.02);">
+                        <span class="planner-day-badge empty">${day.substring(0, 3)}</span>
+                        
+                        <div class="card-img-wrapper" style="aspect-ratio: 2/3; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.01);">
+                            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; color: var(--text3);">
+                                <i class="far fa-calendar-plus" style="font-size: 1.5rem; color: var(--accent);"></i>
+                                <span style="font-size: 0.68rem; font-weight: 700; opacity: 0.8;">Add Movie</span>
+                            </div>
+                        </div>
+                        <div class="card-body" style="text-align: center; justify-content: center; height: auto;">
+                            <h3 class="card-title" style="color: var(--text3); font-size: 0.72rem; font-weight: 600; opacity: 0.7; margin: 0;">Empty Slot</h3>
+                        </div>
+                    </div>
+                `;
+            }
+        });
+
+        shelvesHtml += `
+            <div class="shelf-block">
+                <div class="shelf-hd">
+                    <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                        <h3 class="shelf-title"><i class="fas fa-film"></i> Weekly Cinema Plan</h3>
+                        
+                        <!-- Weeks switcher -->
+                        <div class="planner-controls" style="display: flex; gap: 4px; align-items: center; margin-left: 8px;">
+                            <button class="btn ${this.plannerWeek === 1 ? 'primary' : 'secondary'} tiny" onclick="window.sachApp.togglePlannerWeek(1)" style="font-size:0.62rem; padding:2px 6px; height:auto; line-height:1;">This Week</button>
+                            <button class="btn ${this.plannerWeek === 2 ? 'primary' : 'secondary'} tiny" onclick="window.sachApp.togglePlannerWeek(2)" style="font-size:0.62rem; padding:2px 6px; height:auto; line-height:1;">Next Week</button>
+                        </div>
+                    </div>
+                    
+                    <div class="carousel-controls">
+                        <button class="carousel-control-btn" onclick="window.sachApp.scrollCarousel('${carouselId}', -1)" title="Scroll Left"><i class="fas fa-chevron-left"></i></button>
+                        <button class="carousel-control-btn" onclick="window.sachApp.scrollCarousel('${carouselId}', 1)" title="Scroll Right"><i class="fas fa-chevron-right"></i></button>
                     </div>
                 </div>
-            `;
+                <div class="carousel-shelf" id="${carouselId}">
+                    ${cardsHtml}
+                </div>
+            </div>
+        `;
+
+        // 3. Tasks Shelf
+        const pendingTasks = this.items.filter(item => item.type === 'task' && !item.completed);
+        const taskCarouselId = 'shelf-tasks';
+        
+        let tasksHtml = '';
+        if (this.taskMode === 'list') {
+            tasksHtml = pendingTasks.length > 0 
+                ? pendingTasks.map(item => this.createCardHtml(item)).join('')
+                : `<div class="shelf-empty" style="padding: 2rem; width: 100%; text-align: center; color: var(--text3);">No pending tasks. Great job!</div>`;
+        } else {
+            // Agenda Mode
+            const todayStr = new Date().toISOString().split('T')[0];
+            const todayMs = new Date(todayStr).getTime();
+            const sevenDaysLaterMs = todayMs + (7 * 24 * 60 * 60 * 1000);
+
+            const groups = {
+                overdue: { title: 'Overdue', icon: 'fa-triangle-exclamation', class: 'overdue', items: [] },
+                today: { title: 'Today', icon: 'fa-calendar-day', class: 'today', items: [] },
+                thisweek: { title: 'This Week', icon: 'fa-calendar-week', class: 'thisweek', items: [] },
+                later: { title: 'Later', icon: 'fa-calendar-days', class: 'later', items: [] },
+                nodate: { title: 'No Date', icon: 'fa-circle-question', class: 'nodate', items: [] }
+            };
+
+            pendingTasks.forEach(task => {
+                if (!task.dueDate) {
+                    groups.nodate.items.push(task);
+                } else {
+                    const taskDateMs = new Date(task.dueDate).getTime();
+                    if (task.dueDate < todayStr) {
+                        groups.overdue.items.push(task);
+                    } else if (task.dueDate === todayStr) {
+                        groups.today.items.push(task);
+                    } else if (taskDateMs > todayMs && taskDateMs <= sevenDaysLaterMs) {
+                        groups.thisweek.items.push(task);
+                    } else {
+                        groups.later.items.push(task);
+                    }
+                }
+            });
+
+            let groupsHtml = '';
+            let totalGrouped = 0;
+            for (const key in groups) {
+                const grp = groups[key];
+                if (grp.items.length > 0) {
+                    totalGrouped += grp.items.length;
+                    const groupCards = grp.items.map(item => this.createCardHtml(item)).join('');
+                    groupsHtml += `
+                        <div class="agenda-group">
+                            <div class="agenda-group-title ${grp.class}">
+                                <i class="fas ${grp.icon}"></i> ${grp.title} <span class="shelf-count" style="margin-left:4px;">${grp.items.length}</span>
+                            </div>
+                            <div class="agenda-cards-container">
+                                ${groupCards}
+                            </div>
+                        </div>
+                    `;
+                }
+            }
+
+            tasksHtml = totalGrouped > 0 
+                ? `<div class="agenda-timeline" style="padding: 8px 4px; width: 100%; display: flex; flex-direction: column; width: 100%; gap: 16px;">` + groupsHtml + `</div>`
+                : `<div class="shelf-empty" style="padding: 2rem; width: 100%; text-align: center; color: var(--text3);">No pending tasks. Great job!</div>`;
         }
 
-        // 3. Custom Shelves
+        shelvesHtml += `
+            <div class="shelf-block">
+                <div class="shelf-hd">
+                    <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                        <h3 class="shelf-title"><i class="fas fa-list-check"></i> Tasks Agenda <span class="shelf-count">${pendingTasks.length}</span></h3>
+                        <div class="segment-control tab-style-segment" style="display: flex; background: rgba(255, 255, 255, 0.04); border-radius: var(--r-xs); padding: 2px; border: 1px solid var(--border);">
+                            <button class="segment-btn ${this.taskMode === 'list' ? 'active' : ''}" onclick="window.sachApp.setTaskMode('list')" style="font-size: 0.65rem; padding: 4px 10px; font-weight:700;">List</button>
+                            <button class="segment-btn ${this.taskMode === 'agenda' ? 'active' : ''}" onclick="window.sachApp.setTaskMode('agenda')" style="font-size: 0.65rem; padding: 4px 10px; font-weight:700;">Agenda</button>
+                        </div>
+                    </div>
+                    
+                    ${this.taskMode === 'list' ? `
+                    <div class="carousel-controls">
+                        <button class="carousel-control-btn" onclick="window.sachApp.scrollCarousel('${taskCarouselId}', -1)" title="Scroll Left"><i class="fas fa-chevron-left"></i></button>
+                        <button class="carousel-control-btn" onclick="window.sachApp.scrollCarousel('${taskCarouselId}', 1)" title="Scroll Right"><i class="fas fa-chevron-right"></i></button>
+                    </div>
+                    ` : ''}
+                </div>
+                ${this.taskMode === 'list' ? `
+                <div class="carousel-shelf" id="${taskCarouselId}">
+                    ${tasksHtml}
+                </div>
+                ` : `<div style="display:block; width:100%;">${tasksHtml}</div>`}
+            </div>
+        `;
+
+        // 4. Custom Shelves
         this.shelves.forEach((shelfName, idx) => {
             const shelfItems = this.items.filter(item => item.shelf === shelfName);
-            const carouselId = `shelf-custom-${idx}`;
-            const cardsHtml = shelfItems.length > 0 
+            const customCarouselId = `shelf-custom-${idx}`;
+            const shelfCardsHtml = shelfItems.length > 0 
                 ? shelfItems.map(item => this.createCardHtml(item)).join('')
                 : `<div class="shelf-empty">This shelf is empty. Edit items to assign them here.</div>`;
             
@@ -2267,12 +2866,12 @@ class SachApp {
                         <h3 class="shelf-title"><i class="fas fa-list-ul"></i> ${shelfName} <span class="shelf-count">${shelfItems.length}</span></h3>
                         <button class="section-del-btn" title="Delete Shelf" onclick="window.sachApp.deleteShelf('${shelfName.replace(/'/g, "\\'")}')"><i class="fas fa-trash-alt"></i></button>
                         <div class="carousel-controls" style="${shelfItems.length === 0 ? 'display:none;' : ''}">
-                            <button class="carousel-control-btn" onclick="window.sachApp.scrollCarousel('${carouselId}', -1)" title="Scroll Left"><i class="fas fa-chevron-left"></i></button>
-                            <button class="carousel-control-btn" onclick="window.sachApp.scrollCarousel('${carouselId}', 1)" title="Scroll Right"><i class="fas fa-chevron-right"></i></button>
+                            <button class="carousel-control-btn" onclick="window.sachApp.scrollCarousel('${customCarouselId}', -1)" title="Scroll Left"><i class="fas fa-chevron-left"></i></button>
+                            <button class="carousel-control-btn" onclick="window.sachApp.scrollCarousel('${customCarouselId}', 1)" title="Scroll Right"><i class="fas fa-chevron-right"></i></button>
                         </div>
                     </div>
-                    <div class="carousel-shelf" id="${carouselId}">
-                        ${cardsHtml}
+                    <div class="carousel-shelf" id="${customCarouselId}">
+                        ${shelfCardsHtml}
                     </div>
                 </div>
             `;
@@ -2283,11 +2882,28 @@ class SachApp {
         this.dirtyShelves = false;
     }
 
+    togglePlannerWeek(week) {
+        this.plannerWeek = week;
+        this.dirtyShelves = true;
+        this.renderShelves();
+    }
+
+    setTaskMode(mode) {
+        this.taskMode = mode;
+        this.dirtyShelves = true;
+        this.renderShelves();
+    }
+
     // Grid rendering logic
     render() {
         if (this.activeTab !== 'home') return;
 
         if (!this.linkGrid) return;
+
+        const libWrap = this.linkGrid ? this.linkGrid.closest('.lib-wrap') : null;
+        if (libWrap) {
+            libWrap.classList.toggle('is-empty', this.items.length === 0);
+        }
 
         const libClearAllBtn = document.getElementById('lib-clear-all-btn');
         if (libClearAllBtn) {
@@ -2306,30 +2922,10 @@ class SachApp {
 
             if (this.items.length === 0) {
                 this.linkGrid.innerHTML = `
-                    <div class="empty-state-welcome">
-                        <div class="welcome-header">
-                            <i class="fas fa-folder-open welcome-icon"></i>
-                            <h2>Start Your Premium Collection</h2>
-                            <p>Paste a website URL or search movies & TV shows in the search bar above. Try importing these popular quick-links instantly:</p>
-                        </div>
-                        <div class="quick-add-grid">
-                            <div class="quick-add-card" onclick="window.sachApp.quickImport('https://www.youtube.com')">
-                                <i class="fab fa-youtube qa-icon yt"></i>
-                                <span>YouTube</span>
-                            </div>
-                            <div class="quick-add-card" onclick="window.sachApp.quickImport('https://www.imdb.com')">
-                                <i class="fas fa-film qa-icon imdb"></i>
-                                <span>IMDb</span>
-                            </div>
-                            <div class="quick-add-card" onclick="window.sachApp.quickImport('https://github.com')">
-                                <i class="fab fa-github qa-icon github"></i>
-                                <span>GitHub</span>
-                            </div>
-                            <div class="quick-add-card" onclick="window.sachApp.quickImport('https://news.ycombinator.com')">
-                                <i class="fab fa-y-combinator qa-icon yc"></i>
-                                <span>Hacker News</span>
-                            </div>
-                        </div>
+                    <div class="empty-state-welcome" style="padding: 4rem 1.5rem; text-align: center; max-width: 420px; margin: 0 auto; width: 100%; opacity: 0.7;">
+                        <i class="fas fa-folder-open" style="font-size: 2.5rem; color: var(--text3); margin-bottom: 16px; display: block;"></i>
+                        <h3 style="font-size: 1.1rem; font-weight: 700; color: var(--text); margin-bottom: 8px;">Your Library is Empty</h3>
+                        <p style="font-size: 0.8rem; color: var(--text2); line-height: 1.5; margin: 0;">Add movies, tasks, books, or links using the Floating Quick Add button at the bottom right.</p>
                     </div>
                 `;
                 this.cardElements.clear();
@@ -2341,6 +2937,19 @@ class SachApp {
                     sorted.sort((a, b) => (a.date || 0) - (b.date || 0));
                 } else if (this.activeSort === 'title') {
                     sorted.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+                } else if (this.activeSort === 'priority') {
+                    const priorityWeight = { 'high': 3, 'medium': 2, 'low': 1 };
+                    sorted.sort((a, b) => {
+                        const weightA = priorityWeight[(a.priority || '').toLowerCase()] || 0;
+                        const weightB = priorityWeight[(b.priority || '').toLowerCase()] || 0;
+                        return weightB - weightA;
+                    });
+                } else if (this.activeSort === 'duedate') {
+                    sorted.sort((a, b) => {
+                        if (!a.dueDate) return 1;
+                        if (!b.dueDate) return -1;
+                        return a.dueDate.localeCompare(b.dueDate);
+                    });
                 }
                 
                 // Add an empty state container to toggle inline
@@ -2476,6 +3085,95 @@ class SachApp {
             `;
         }
 
+        if (item.type === 'book') {
+            const pagePercentage = item.totalPages ? Math.min(100, Math.round((item.currentPage || 0) * 100 / item.totalPages)) : 0;
+            const completedBadgeHTML = item.completed || pagePercentage === 100
+                ? `<div class="card-completed-badge" style="background:#eab308; color:#111;"><i class="fas fa-check"></i> Read</div>`
+                : '';
+            const clickHandler = `window.sachApp.openDetailsById('${item.id}')`;
+            const authorText = item.author ? `by ${item.author}` : 'Unknown Author';
+            const progressHTML = `
+                <div class="progress-bar-container">
+                    <div class="progress-bar-fill" style="width: ${pagePercentage}%;"></div>
+                </div>
+                <div class="progress-percentage-label">Page ${item.currentPage || 0} of ${item.totalPages || 100} (${pagePercentage}%)</div>
+            `;
+            
+            return `
+                <div class="card type-book ${item.favorite ? 'fav-active' : ''} ${item.completed ? 'completed-active' : ''}" data-id="${item.id}" onclick="${clickHandler}">
+                    <button class="quick-action edit-action" title="Edit details" onclick="event.stopPropagation(); window.sachApp.openDetailsById('${item.id}', true)">
+                        <i class="fas fa-pen"></i>
+                    </button>
+                    <button class="quick-action complete-action ${item.completed ? 'active' : ''}" title="Mark Read" onclick="event.stopPropagation(); window.sachApp.toggleCompleted('${item.id}')">
+                        <i class="${item.completed ? 'fas fa-circle-check' : 'far fa-circle-check'}"></i>
+                    </button>
+                    <button class="quick-action fav-action ${item.favorite ? 'active' : ''}" title="Favorite" onclick="event.stopPropagation(); window.sachApp.toggleFavorite('${item.id}')">
+                        <i class="${item.favorite ? 'fas fa-star' : 'far fa-star'}"></i>
+                    </button>
+                    <button class="quick-action" title="Delete" onclick="event.stopPropagation(); window.sachApp.removeLink('${item.id}')">
+                        <i class="fas fa-times"></i>
+                    </button>
+                    <div class="card-img-wrapper" style="aspect-ratio: 2/3;">
+                        <img src="${item.thumb || 'https://via.placeholder.com/400x600?text=Book+Cover'}" class="card-img" loading="lazy" decoding="async" onerror="this.onerror=null; this.src='https://via.placeholder.com/400x600?text=Book+Cover'">
+                        ${completedBadgeHTML}
+                    </div>
+                    <div class="card-body">
+                        <div class="card-info-header" style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+                            <span style="color: #eab308; font-weight: 800; font-size: 0.72rem;"><i class="fas fa-book"></i> Book</span>
+                            <span class="card-host-text" style="font-size: 0.68rem; color: var(--text3); font-weight: 600;">${timeAgo}</span>
+                        </div>
+                        <h3 class="card-title">${item.title}</h3>
+                        <p class="card-desc" style="margin-top: 2px;">${authorText}</p>
+                        ${progressHTML}
+                    </div>
+                </div>
+            `;
+        }
+
+        if (item.type === 'task') {
+            const clickHandler = `window.sachApp.openDetailsById('${item.id}')`;
+            const isCompleted = !!item.completed;
+            const checkboxClass = isCompleted ? 'checked' : '';
+            const checkboxIcon = isCompleted ? '<i class="fas fa-check"></i>' : '';
+            const priorityClass = (item.priority || 'medium').toLowerCase();
+            
+            // Overdue check
+            let isOverdue = false;
+            if (item.dueDate && !isCompleted) {
+                const today = new Date().toISOString().split('T')[0];
+                if (item.dueDate < today) {
+                    isOverdue = true;
+                }
+            }
+            const dateStyle = isOverdue ? 'color: var(--red); font-weight: bold;' : 'color: var(--text3);';
+            const dueDateText = item.dueDate ? `<div style="font-size:0.7rem; ${dateStyle} margin-top:2px;"><i class="far fa-calendar"></i> ${item.dueDate} ${isOverdue ? '(OVERDUE)' : ''}</div>` : '';
+            
+            return `
+                <div class="card type-task ${item.favorite ? 'fav-active' : ''} ${item.completed ? 'completed-active' : ''}" data-id="${item.id}" onclick="${clickHandler}">
+                    <button class="quick-action edit-action" title="Edit details" onclick="event.stopPropagation(); window.sachApp.openDetailsById('${item.id}', true)">
+                        <i class="fas fa-pen"></i>
+                    </button>
+                    <button class="quick-action" title="Delete" onclick="event.stopPropagation(); window.sachApp.removeLink('${item.id}')">
+                        <i class="fas fa-times"></i>
+                    </button>
+                    <div class="card-body" style="padding: 1rem; display: flex; gap: 12px; align-items: flex-start;">
+                        <div class="task-checkbox-btn ${checkboxClass}" onclick="event.stopPropagation(); window.sachApp.toggleCompleted('${item.id}')">
+                            ${checkboxIcon}
+                        </div>
+                        <div style="flex:1; min-width:0; display:flex; flex-direction:column; gap:4px;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; width:100%;">
+                                <span class="priority-badge ${priorityClass}">${priorityClass}</span>
+                                <span style="font-size:0.68rem; color:var(--text3); font-weight:600;">${timeAgo}</span>
+                            </div>
+                            <h3 class="card-title" style="margin:0; white-space:normal; overflow:visible;">${item.title}</h3>
+                            <p class="card-desc" style="margin:0; white-space:normal; overflow:visible; font-size:0.75rem; color:var(--text2);">${item.desc || 'No description'}</p>
+                            ${dueDateText}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
         // Movie card (type === 'movie')
         const completeIconClass = item.completed ? 'fas fa-circle-check' : 'far fa-circle-check';
         const isCompleteActive = item.completed ? 'active' : '';
@@ -2487,6 +3185,23 @@ class SachApp {
             ? `<div class="card-completed-badge"><i class="fas fa-check"></i> Watched</div>`
             : '';
         const hostOrYear = `<i class="fas fa-calendar-alt"></i> ${item.year}`;
+        
+        let scheduledText = '';
+        if (this.planner) {
+            for (const [key, value] of Object.entries(this.planner)) {
+                if (String(value) === String(item.id)) {
+                    const parts = key.split('_w');
+                    const day = parts[0];
+                    const week = parts[1] || '1';
+                    scheduledText = `${day} (W${week})`;
+                    break;
+                }
+            }
+        }
+        const scheduleBadge = scheduledText 
+            ? `<span class="schedule-badge" onclick="event.stopPropagation(); window.sachApp.navigateToSchedule('${scheduledText}')" title="Click to jump to planner"><i class="far fa-calendar-days"></i> ${scheduledText}</span>`
+            : '';
+
         const tagsHTML = (item.tags || []).slice(0, 2).map(t => `<span class="card-tag-pill">${t}</span>`).join('');
         const clickHandler = `window.sachApp.openDetailsById('${item.id}')`;
         const overlayClickHandler = `event.stopPropagation(); window.sachApp.openDetailsById('${item.id}')`;
@@ -2498,6 +3213,11 @@ class SachApp {
             descHTML = `<p class="card-desc">${item.desc}</p>`;
         } else {
             descHTML = `<p class="card-desc add-placeholder" onclick="event.stopPropagation(); window.sachApp.openDetailsById('${item.id}', true)">+ Add Actor</p>`;
+        }
+
+        let starRatingHTML = '';
+        if (item.rating) {
+            starRatingHTML = `<div class="card-rating-stars">${'<i class="fas fa-star"></i>'.repeat(item.rating)}${'<i class="far fa-star"></i>'.repeat(5 - item.rating)}</div>`;
         }
 
         return `
@@ -2527,11 +3247,406 @@ class SachApp {
                         <span class="card-host-text" style="font-size: 0.68rem; color: var(--text3); font-weight: 600;">${hostOrYear}</span>
                     </div>
                     <h3 class="card-title">${item.title}</h3>
+                    ${starRatingHTML}
                     ${descHTML}
-                    ${tagsHTML ? `<div class="card-tags">${tagsHTML}</div>` : ''}
+                    ${(scheduleBadge || tagsHTML) ? `<div class="card-tags">${scheduleBadge}${tagsHTML}</div>` : ''}
                 </div>
             </div>
         `;
+    }
+
+    // Helper methods for the workspace expansion
+    toggleEditTypeFields(type) {
+        this.editCinemaFields?.classList.toggle('hidden', type !== 'movie');
+        this.editBookFields?.classList.toggle('hidden', type !== 'book');
+        this.editTaskFields?.classList.toggle('hidden', type !== 'task');
+        if (this.modalEditLinkThumbSection) {
+            this.modalEditLinkThumbSection.classList.toggle('hidden', type !== 'link');
+        }
+    }
+
+    updateStarPickerUI(rating) {
+        if (!this.modalEditStarPicker) return;
+        this.modalEditStarPicker.querySelectorAll('i').forEach(s => {
+            const r = parseInt(s.dataset.rating);
+            if (r <= rating) {
+                s.className = 'fas fa-star active';
+            } else {
+                s.className = 'far fa-star';
+            }
+        });
+    }
+
+    renderModalDescription(savedItem) {
+        if (savedItem.type === 'link') {
+            this.modalImg.style.aspectRatio = '16/9';
+            this.modalImg.parentElement.style.flex = '0 0 100%';
+            this.modalTagsLabel.textContent = 'Tags';
+            this.modalDesc.innerHTML = `
+                <span class="year-badge"><i class="fas fa-globe"></i> ${savedItem.year}</span>
+                <span>${savedItem.desc || 'No description available'}</span>
+            `;
+            this.modalOpenUrl.onclick = () => window.open(savedItem.url, '_blank');
+            this.modalCopyUrl.onclick = () => {
+                navigator.clipboard.writeText(savedItem.url);
+                this.showToast("URL Copied to clipboard!", "success");
+            };
+        } else if (savedItem.type === 'movie') {
+            this.modalImg.style.aspectRatio = '2/3';
+            this.modalImg.parentElement.style.flex = '0 0 280px';
+            this.modalTagsLabel.textContent = 'Actors & Tags';
+            
+            let cinemaDetails = '';
+            if (savedItem.director) cinemaDetails += `<strong>Director:</strong> ${savedItem.director}<br/>`;
+            if (savedItem.genre) cinemaDetails += `<strong>Genre:</strong> ${savedItem.genre}<br/>`;
+            if (savedItem.runtime) cinemaDetails += `<strong>Runtime:</strong> ${savedItem.runtime} min<br/>`;
+            if (savedItem.rating) {
+                cinemaDetails += `<strong>Rating:</strong> ${'★'.repeat(savedItem.rating)}${'☆'.repeat(5 - savedItem.rating)}<br/>`;
+            }
+            this.modalDesc.innerHTML = `
+                <span class="year-badge"><i class="fas fa-calendar"></i> ${savedItem.year}</span>
+                <div style="margin-top:8px; line-height:1.6;">
+                    ${cinemaDetails}
+                    <p style="margin-top:6px; color:var(--text2);">${savedItem.desc || 'Film Details'}</p>
+                </div>
+            `;
+        } else if (savedItem.type === 'book') {
+            this.modalImg.style.aspectRatio = '2/3';
+            this.modalImg.parentElement.style.flex = '0 0 280px';
+            this.modalTagsLabel.textContent = 'Tags';
+            
+            const pagePercentage = savedItem.totalPages ? Math.min(100, Math.round((savedItem.currentPage || 0) * 100 / savedItem.totalPages)) : 0;
+            const progressText = savedItem.totalPages ? `Page ${savedItem.currentPage || 0} of ${savedItem.totalPages} (${pagePercentage}%)` : '';
+            this.modalDesc.innerHTML = `
+                <span class="year-badge" style="background:#eab308; color:#111;"><i class="fas fa-book"></i> Book</span>
+                <div style="margin-top:8px; line-height:1.6;">
+                    <strong>Author:</strong> ${savedItem.author || 'Unknown'}<br/>
+                    <strong>Progress:</strong> ${progressText}
+                    <p style="margin-top:6px; color:var(--text2);">${savedItem.desc || 'No description available'}</p>
+                </div>
+            `;
+        } else if (savedItem.type === 'task') {
+            this.modalImg.style.aspectRatio = '16/9';
+            this.modalImg.parentElement.style.flex = '0 0 100%';
+            this.modalTagsLabel.textContent = 'Tags';
+            
+            this.modalDesc.innerHTML = `
+                <span class="year-badge" style="background:var(--green); color:#111;"><i class="fas fa-circle-check"></i> Task</span>
+                <div style="margin-top:8px; line-height:1.6;">
+                    <strong>Priority:</strong> <span class="priority-badge ${savedItem.priority || 'medium'}">${savedItem.priority || 'medium'}</span><br/>
+                    <strong>Due Date:</strong> ${savedItem.dueDate || 'No due date'}<br/>
+                    <p style="margin-top:6px; color:var(--text2);">${savedItem.desc || 'No description'}</p>
+                </div>
+            `;
+        }
+    }
+
+    renderStats() {
+        const movies = this.items.filter(i => i.type === 'movie');
+        const books = this.items.filter(i => i.type === 'book');
+        const tasks = this.items.filter(i => i.type === 'task');
+
+        const watchedMovies = movies.filter(m => m.completed);
+        const readBooks = books.filter(b => b.completed || (b.currentPage && b.currentPage === b.totalPages));
+        const doneTasks = tasks.filter(t => t.completed);
+
+        // 1. Movies Count
+        const moviesCountEl = document.getElementById('stat-movies-count');
+        if (moviesCountEl) moviesCountEl.textContent = watchedMovies.length;
+
+        // 2. Average Rating
+        const ratedMovies = movies.filter(m => m.rating > 0);
+        const avgRating = ratedMovies.length > 0
+            ? (ratedMovies.reduce((sum, m) => sum + m.rating, 0) / ratedMovies.length).toFixed(1)
+            : '0.0';
+        const moviesRatingEl = document.getElementById('stat-movies-rating');
+        if (moviesRatingEl) moviesRatingEl.textContent = avgRating;
+
+        // 3. Watch Hours (only count movies with actual runtime logged)
+        const totalMins = watchedMovies.reduce((sum, m) => sum + (m.runtime > 0 ? m.runtime : 0), 0);
+        const totalHours = Math.round(totalMins / 60);
+        const moviesHoursEl = document.getElementById('stat-movies-hours');
+        if (moviesHoursEl) moviesHoursEl.textContent = totalHours;
+
+        // 4. Books Read
+        const booksCountEl = document.getElementById('stat-books-count');
+        if (booksCountEl) booksCountEl.textContent = readBooks.length;
+
+        // 5. Tasks Done + Overdue
+        const tasksCountEl = document.getElementById('stat-tasks-count');
+        if (tasksCountEl) tasksCountEl.textContent = doneTasks.length;
+        const today = new Date().toISOString().split('T')[0];
+        const overdueTasks = tasks.filter(t => !t.completed && t.dueDate && t.dueDate < today);
+        const overdueEl = document.getElementById('stat-overdue-tasks');
+        if (overdueEl) overdueEl.textContent = overdueTasks.length;
+
+        // Workspace Rank calculation
+        const rankEl = document.getElementById('stat-workspace-rank');
+        const rankSubEl = document.getElementById('stat-workspace-rank-sub');
+        if (rankEl && rankSubEl) {
+            let rank = 'Fresh Slate 🌟';
+            if (this.items.length > 0) {
+                if (watchedMovies.length >= 10) {
+                    rank = 'Movie Director 🎬';
+                } else if (readBooks.length >= 5) {
+                    rank = 'Bibliophile 📚';
+                } else if (doneTasks.length >= 8) {
+                    rank = 'Productivity Guru ⚡';
+                } else if (this.items.length >= 15) {
+                    rank = 'Workspace Champ 🏆';
+                } else if (this.items.length >= 5) {
+                    rank = 'Active Collector 🎟️';
+                } else {
+                    rank = 'Cinema Rookie 🍿';
+                }
+            }
+            rankEl.textContent = rank;
+            rankSubEl.textContent = `Logged: ${this.items.length} ${this.items.length === 1 ? 'item' : 'items'}`;
+        }
+
+        // Daily Quote selection
+        const quotes = [
+            { text: "Frankly, my dear, I don't give a damn.", author: "Gone with the Wind (1939)" },
+            { text: "I'm going to make him an offer he can't refuse.", author: "The Godfather (1972)" },
+            { text: "May the Force be with you.", author: "Star Wars (1977)" },
+            { text: "Here's looking at you, kid.", author: "Casablanca (1942)" },
+            { text: "There's no place like home.", author: "The Wizard of Oz (1939)" },
+            { text: "All we have to decide is what to do with the time that is given us.", author: "J.R.R. Tolkien, The Fellowship of the Ring" },
+            { text: "Not all those who wander are lost.", author: "J.R.R. Tolkien, The Fellowship of the Ring" },
+            { text: "It is our choices, Harry, that show what we truly are, far more than our abilities.", author: "J.K. Rowling, Harry Potter and the Chamber of Secrets" },
+            { text: "The way to get started is to quit talking and begin doing.", author: "Walt Disney" },
+            { text: "Focus on being productive instead of busy.", author: "Tim Ferriss" },
+            { text: "Action is the foundational key to all success.", author: "Pablo Picasso" },
+            { text: "The secret of getting ahead is getting started.", author: "Mark Twain" }
+        ];
+        const quoteTextEl = document.getElementById('stats-quote-text');
+        const quoteAuthorEl = document.getElementById('stats-quote-author');
+        if (quoteTextEl && quoteAuthorEl) {
+            const index = new Date().getDate() % quotes.length;
+            const quote = quotes[index];
+            quoteTextEl.textContent = `"${quote.text}"`;
+            quoteAuthorEl.textContent = `— ${quote.author}`;
+        }
+
+        // 6. Genres Breakdown
+        const genresListEl = document.getElementById('stats-genres-list');
+        if (genresListEl) {
+            const genreCounts = {};
+            movies.forEach(m => {
+                if (m.genre) {
+                    const parts = m.genre.split(',').map(g => g.trim()).filter(Boolean);
+                    parts.forEach(g => {
+                        genreCounts[g] = (genreCounts[g] || 0) + 1;
+                    });
+                }
+            });
+
+            const sortedGenres = Object.entries(genreCounts)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 5);
+
+            if (sortedGenres.length === 0) {
+                genresListEl.innerHTML = '<div class="shelf-empty" style="padding:0;">No genre data logged yet. Add genres in Movie details.</div>';
+            } else {
+                const totalMovies = movies.length;
+                genresListEl.innerHTML = sortedGenres.map(([genre, count]) => {
+                    const percentage = totalMovies > 0 ? Math.round(count * 100 / totalMovies) : 0;
+                    return `
+                        <div class="genre-row">
+                            <div class="genre-row-meta">
+                                <span class="genre-row-name">${genre}</span>
+                                <span class="genre-row-count">${count} ${count === 1 ? 'movie' : 'movies'} (${percentage}%)</span>
+                            </div>
+                            <div class="genre-progress-bg">
+                                <div class="genre-progress-bar" style="width: ${percentage}%;"></div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+        }
+
+        // 7. Reading Progress
+        const totalBookPages = books.reduce((sum, b) => sum + (b.totalPages || 100), 0);
+        const currentBookPages = books.reduce((sum, b) => sum + (b.currentPage || 0), 0);
+        const readingPercentage = totalBookPages > 0 ? Math.round(currentBookPages * 100 / totalBookPages) : 0;
+        const readingPercentageEl = document.getElementById('stats-reading-percentage');
+        if (readingPercentageEl) readingPercentageEl.textContent = `${readingPercentage}%`;
+        const readingProgressBarEl = document.getElementById('stats-reading-progress-bar');
+        if (readingProgressBarEl) readingProgressBarEl.style.width = `${readingPercentage}%`;
+
+        // 8. Tasks Progress
+        const totalTaskCount = tasks.length;
+        const tasksPercentage = totalTaskCount > 0 ? Math.round(doneTasks.length * 100 / totalTaskCount) : 0;
+        const tasksPercentageEl = document.getElementById('stats-tasks-percentage');
+        if (tasksPercentageEl) tasksPercentageEl.textContent = `${tasksPercentage}%`;
+        const tasksProgressBarEl = document.getElementById('stats-tasks-progress-bar');
+        if (tasksProgressBarEl) tasksProgressBarEl.style.width = `${tasksPercentage}%`;
+    }
+
+
+
+    openPlannerMovieSelector(day) {
+        if (!this.plannerModal || !this.plannerMoviesList) return;
+        
+        const pendingMovies = this.items.filter(i => i.type === 'movie' && !i.completed);
+        const watchedMovies = this.items.filter(i => i.type === 'movie' && i.completed);
+        const container = this.plannerMoviesList;
+        container.innerHTML = '';
+
+        if (this.plannerModalTitle) {
+            this.plannerModalTitle.textContent = `Schedule Movie for ${day}`;
+        }
+
+        if (pendingMovies.length === 0 && watchedMovies.length === 0) {
+            container.innerHTML = `
+                <div class="shelf-empty" style="padding: 1rem 0; text-align: center;">
+                    <i class="fas fa-clapperboard" style="font-size: 2rem; color: var(--text3); margin-bottom: 8px; display: block;"></i>
+                    No movies in your library.<br/>Search and add movies first!
+                </div>
+            `;
+            this.showModal(this.plannerModal);
+            return;
+        }
+
+        // Render Pending Movies Header
+        if (pendingMovies.length > 0) {
+            if (watchedMovies.length > 0) {
+                const pendingHeader = document.createElement('div');
+                pendingHeader.style.cssText = 'padding: 6px 4px; font-size: 0.65rem; font-weight: 800; text-transform: uppercase; color: var(--accent); border-bottom: 1px solid var(--border); margin-bottom: 8px;';
+                pendingHeader.textContent = 'Pending Watchlist';
+                container.appendChild(pendingHeader);
+            }
+            
+            pendingMovies.forEach(movie => {
+                const opt = document.createElement('div');
+                opt.className = 'planner-movie-option';
+                const thumbUrl = movie.thumb || '';
+                const thumbHtml = thumbUrl ? `<img src="${thumbUrl}" class="planner-movie-option-thumb" />` : `<div class="planner-movie-option-thumb" style="display:flex; align-items:center; justify-content:center; background:var(--surface2);"><i class="fas fa-film" style="color:var(--text3);"></i></div>`;
+                
+                opt.innerHTML = `
+                    ${thumbHtml}
+                    <div style="flex: 1; min-width: 0;">
+                        <h4 style="font-size: 0.85rem; font-weight: 700; margin:0; white-space:normal;">${movie.title}</h4>
+                        <p style="font-size: 0.72rem; color: var(--text2); margin: 0; white-space:normal;">${movie.year} ${movie.genre ? '• ' + movie.genre : ''}</p>
+                    </div>
+                `;
+                
+                opt.onclick = () => {
+                    if (!this.planner) this.planner = {};
+                    const key = day + '_w' + this.plannerWeek;
+                    this.planner[key] = movie.id;
+                    localStorage.setItem('sach_weekly_planner', JSON.stringify(this.planner));
+                    this.hideModal(this.plannerModal);
+                    this.dirtyShelves = true;
+                    this.renderShelves();
+                    this.render();
+                    this.showToast(`Scheduled "${movie.title}" for ${day}!`, "success");
+                };
+                container.appendChild(opt);
+            });
+        }
+
+        // Render Completed/Watched Movies (Recover/Re-watch Section)
+        if (watchedMovies.length > 0) {
+            const watchedHeader = document.createElement('div');
+            watchedHeader.style.cssText = 'padding: 6px 4px; font-size: 0.65rem; font-weight: 800; text-transform: uppercase; color: var(--green); border-bottom: 1px solid var(--border); margin-top: 12px; margin-bottom: 8px;';
+            watchedHeader.textContent = 'Watched Movies (Re-watch / Recover)';
+            container.appendChild(watchedHeader);
+            
+            watchedMovies.forEach(movie => {
+                const opt = document.createElement('div');
+                opt.className = 'planner-movie-option';
+                opt.style.borderColor = 'var(--green)';
+                const thumbUrl = movie.thumb || '';
+                const thumbHtml = thumbUrl ? `<img src="${thumbUrl}" class="planner-movie-option-thumb" />` : `<div class="planner-movie-option-thumb" style="display:flex; align-items:center; justify-content:center; background:var(--surface2);"><i class="fas fa-film" style="color:var(--text3);"></i></div>`;
+                
+                opt.innerHTML = `
+                    ${thumbHtml}
+                    <div style="flex: 1; min-width: 0;">
+                        <h4 style="font-size: 0.85rem; font-weight: 700; margin:0; white-space:normal;">${movie.title}</h4>
+                        <p style="font-size: 0.72rem; color: var(--text2); margin: 0; white-space:normal;">${movie.year} • <span style="color:var(--green); font-weight:700;"><i class="fas fa-check"></i> Watched</span></p>
+                    </div>
+                `;
+                
+                opt.onclick = () => {
+                    if (!this.planner) this.planner = {};
+                    const key = day + '_w' + this.plannerWeek;
+                    this.planner[key] = movie.id;
+                    
+                    // Recover completion state so it goes back to pending watchlist for planning
+                    movie.completed = false;
+                    this.saveItems();
+                    localStorage.setItem('sach_weekly_planner', JSON.stringify(this.planner));
+                    
+                    this.hideModal(this.plannerModal);
+                    this.dirtyShelves = true;
+                    this.renderShelves();
+                    this.render();
+                    this.showToast(`Recovered & scheduled "${movie.title}" for ${day}!`, "success");
+                };
+                container.appendChild(opt);
+            });
+        }
+
+        this.showModal(this.plannerModal);
+    }
+
+    removeScheduledMovie(day) {
+        const key = day + '_w' + this.plannerWeek;
+        if (this.planner && this.planner[key]) {
+            delete this.planner[key];
+            localStorage.setItem('sach_weekly_planner', JSON.stringify(this.planner));
+            this.dirtyShelves = true;
+            this.renderShelves();
+            this.render();
+            this.showToast(`Removed scheduled movie for ${day}.`);
+        }
+    }
+
+
+
+    navigateToSchedule(text) {
+        const parts = text.split(' (W');
+        const day = parts[0];
+        const week = parseInt(parts[1]) || 1;
+        
+        this.plannerWeek = week;
+        this.dirtyShelves = true;
+        this.switchTab('home');
+        this.renderShelves();
+        
+        // Scroll to the day card and flash highlight
+        setTimeout(() => {
+            const plannerCards = document.querySelectorAll('.planner-card, .planner-empty-card');
+            plannerCards.forEach(card => {
+                const badgeEl = card.querySelector('.planner-day-badge');
+                if (badgeEl && badgeEl.textContent.trim().toUpperCase() === day.substring(0, 3).toUpperCase()) {
+                    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    card.style.outline = '3px solid var(--accent)';
+                    card.style.outlineOffset = '3px';
+                    card.style.transition = 'outline 0.3s ease';
+                    setTimeout(() => {
+                        card.style.outline = '';
+                        card.style.outlineOffset = '';
+                    }, 1800);
+                }
+            });
+        }, 150);
+    }
+
+    markScheduledMovieCompleted(movieId, day) {
+        const movie = this.items.find(i => String(i.id) === String(movieId));
+        if (movie) {
+            movie.completed = true;
+            this.saveItems();
+            // Remove from all planner slots automatically
+            this.removePlannerEntry(movieId);
+            this.dirtyShelves = true;
+            this.renderShelves();
+            this.render();
+            this.showToast(`Congratulations! "${movie.title}" marked as watched 🎉`, "success");
+        }
     }
 
     updateCardDOM(item, cardEl) {
@@ -2676,7 +3791,7 @@ class SachApp {
     }
 
     openDetailsById(id, startEdit = false) {
-        const item = this.items.find(i => i.id === id);
+        const item = this.items.find(i => String(i.id) === String(id));
         if (item) this.openDetails(item, startEdit);
     }
 
@@ -2717,17 +3832,6 @@ class SachApp {
         this.activeType = 'all';
         this.activeStatus = 'all';
         this.activeTag = 'all';
-
-        // Reset UI segment classes
-
-        const statusSegment = document.getElementById('statusSegment');
-        if (statusSegment) {
-            statusSegment.querySelectorAll('.segment-btn').forEach(b => {
-                const isAll = b.dataset.status === 'all';
-                b.classList.toggle('active', isAll);
-                b.setAttribute('aria-checked', isAll ? 'true' : 'false');
-            });
-        }
 
         this.dirtyLibrary = true;
         this.dirtyShelves = true;
@@ -2859,20 +3963,29 @@ class SachApp {
                         incomingItems = [...incomingWatchlist, ...incomingHistory];
                     }
 
-                    // Perform library merges, deduplicating by URL or IMDb IDs
+                    // Perform library merges, deduplicating by ID, URL, or IMDb IDs
                     const originalCount = this.items.length;
+                    const existingIds = new Set(this.items.map(i => i.id));
                     const existingUrls = new Set(this.items.filter(i => i.url).map(i => i.url.toLowerCase()));
                     const existingImdbs = new Set(this.items.filter(i => i.imdbId).map(i => i.imdbId.toLowerCase()));
 
                     incomingItems.forEach(item => {
+                        if (existingIds.has(item.id)) return;
+                        
                         if (item.type === 'link' && item.url && !existingUrls.has(item.url.toLowerCase())) {
                             this.items.push(item);
                             existingUrls.add(item.url.toLowerCase());
+                            existingIds.add(item.id);
                         } else if (item.type === 'movie' && item.imdbId && !existingImdbs.has(item.imdbId.toLowerCase())) {
                             this.items.push(item);
                             existingImdbs.add(item.imdbId.toLowerCase());
+                            existingIds.add(item.id);
+                        } else if (item.type === 'book' || item.type === 'task') {
+                            this.items.push(item);
+                            existingIds.add(item.id);
                         } else if (!item.url && !item.imdbId && !this.items.some(i => i.title === item.title)) {
                             this.items.push(item);
+                            existingIds.add(item.id);
                         }
                     });
 
@@ -3017,16 +4130,25 @@ class SachApp {
         } else if (status === 'broadcasting') {
             this.syncStatusIndicator.classList.add('broadcasting');
             this.syncStatusText.textContent = text || 'Broadcasting...';
-        } else {
+        } else if (status === 'disconnected') {
             this.syncStatusIndicator.classList.add('disconnected');
-            this.syncStatusText.textContent = text || 'Offline / Ready';
+            this.syncStatusText.textContent = text || 'Connection failed';
+        } else {
+            // 'ready' — neutral state, no active connection
+            this.syncStatusIndicator.classList.add('ready');
+            this.syncStatusText.textContent = text || 'Ready — click Generate to broadcast';
         }
     }
 
-    // Dynamic Cinematic Hero Billboard banner rendering
     renderHeroBanner() {
         const container = document.getElementById('hero-banner-container');
-        if (!container) return;
+        if (!container) {
+            if (this.heroInterval) {
+                clearInterval(this.heroInterval);
+                this.heroInterval = null;
+            }
+            return;
+        }
 
         if (this.items.length === 0) {
             container.innerHTML = '';
@@ -3086,27 +4208,58 @@ class SachApp {
         const badgeIcon = featured.favorite ? 'fa-star' : 'fa-play';
         const yearOrHost = isMovie ? featured.year : this.getHostname(featured.url);
         
+        let recBadge = '';
+        if (featured.rating && featured.rating >= 4) {
+            recBadge = `<span class="hero-rec-badge gold"><i class="fas fa-trophy"></i> Cinephile Favorite</span>`;
+        } else if (featured.type === 'movie' && !featured.completed) {
+            recBadge = `<span class="hero-rec-badge red"><i class="fas fa-ticket"></i> Popcorn Pick</span>`;
+        } else if (featured.type === 'link') {
+            recBadge = `<span class="hero-rec-badge purple"><i class="fas fa-fire"></i> Tech Resource</span>`;
+        } else if (featured.type === 'book') {
+            recBadge = `<span class="hero-rec-badge yellow"><i class="fas fa-bolt"></i> Must Read</span>`;
+        }
+
+        let ratingStarsHtml = '';
+        if (featured.rating) {
+            ratingStarsHtml = `<div class="hero-rating-stars" style="color:#f5c518; margin-top:2px;">` + 
+                Array(5).fill(0).map((_, i) => `<i class="${i < featured.rating ? 'fas' : 'far'} fa-star"></i>`).join('') + 
+                `</div>`;
+        }
+        
+        const featuredThumb = featured.thumb || 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?q=80&w=1200&auto=format&fit=crop';
         container.innerHTML = `
             <div class="hero-wrap">
-                <div class="hero-banner" onclick="window.sachApp.openDetailsById('${featured.id}')" style="cursor: pointer;">
-                    <img class="hero-bg-img" src="${featured.thumb || 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?q=80&w=1200&auto=format&fit=crop'}" alt="${featured.title}">
+                <div class="hero-banner" style="--hero-bg: url('${featuredThumb.replace(/'/g, "\\'")}')">
                     <div class="hero-scrim"></div>
-                    <div class="hero-content">
-                        <div class="hero-badge-row">
-                            <span class="hero-type-badge"><i class="fas ${badgeIcon}"></i> ${badgeText}</span>
-                            <span class="hero-year-pill">${yearOrHost}</span>
+                    <div class="hero-content-split">
+                        <div class="hero-poster-col" onclick="window.sachApp.openDetailsById('${featured.id}')" style="cursor: pointer;">
+                            <img class="hero-poster-img" src="${featuredThumb}" alt="${featured.title}">
                         </div>
-                        <h2 class="hero-title">${featured.title}</h2>
-                        <p class="hero-desc">${featured.desc || 'No description available.'}</p>
-                        <div class="hero-btn-row">
-                            ${featured.url ? `
-                                <button class="btn-netflix-play" onclick="event.stopPropagation(); window.open('${featured.url.replace(/'/g, "\\'")}', '_blank')">
-                                    <i class="fas fa-play"></i> ${isMovie ? 'Play' : 'Open Link'}
+                        <div class="hero-text-col">
+                            <div class="hero-badge-row">
+                                <span class="hero-type-badge"><i class="fas ${badgeIcon}"></i> ${badgeText}</span>
+                                <span class="hero-year-pill">${yearOrHost}</span>
+                                ${recBadge}
+                            </div>
+                            <h2 class="hero-title" onclick="window.sachApp.openDetailsById('${featured.id}')" style="cursor: pointer;">${featured.title}</h2>
+                            ${ratingStarsHtml}
+                            <p class="hero-desc">${featured.desc || 'No description available.'}</p>
+                            <div class="hero-btn-row">
+                                ${featured.url ? `
+                                    <button class="btn-netflix-play" onclick="event.stopPropagation(); window.open('${featured.url.replace(/'/g, "\\'")}', '_blank')">
+                                        <i class="fas fa-play"></i> ${isMovie ? 'Play' : 'Open Link'}
+                                    </button>
+                                ` : ''}
+                                <button class="btn-netflix-info" onclick="event.stopPropagation(); window.sachApp.openDetailsById('${featured.id}')">
+                                    <i class="fas fa-circle-info"></i> Details
                                 </button>
-                            ` : ''}
-                            <button class="btn-netflix-info" onclick="event.stopPropagation(); window.sachApp.openDetailsById('${featured.id}')">
-                                <i class="fas fa-circle-info"></i> More Info
-                            </button>
+                                <button class="btn-netflix-fav ${featured.favorite ? 'active' : ''}" onclick="event.stopPropagation(); window.sachApp.toggleFavorite('${featured.id}')">
+                                    <i class="${featured.favorite ? 'fas' : 'far'} fa-star"></i> ${featured.favorite ? 'Favorited' : 'Favorite'}
+                                </button>
+                                <button class="btn-netflix-watch ${featured.completed ? 'active' : ''}" onclick="event.stopPropagation(); window.sachApp.toggleCompleted('${featured.id}')">
+                                    <i class="${featured.completed ? 'fas' : 'far'} fa-circle-check"></i> ${featured.completed ? (featured.type === 'link' ? 'Read' : 'Watched') : (featured.type === 'link' ? 'Mark Read' : 'Mark Watched')}
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -3118,7 +4271,7 @@ class SachApp {
 
     // Toggle favorite state
     toggleFavorite(id) {
-        const item = this.items.find(i => i.id === id);
+        const item = this.items.find(i => String(i.id) === String(id));
         if (item) {
             item.favorite = !item.favorite;
             this.saveItems(false);
@@ -3151,14 +4304,34 @@ class SachApp {
         }
     }
 
+    // Remove a movie from all planner slots
+    removePlannerEntry(id) {
+        if (!this.planner) return;
+        let changed = false;
+        Object.keys(this.planner).forEach(key => {
+            if (String(this.planner[key]) === String(id)) {
+                delete this.planner[key];
+                changed = true;
+            }
+        });
+        if (changed) {
+            localStorage.setItem('sach_weekly_planner', JSON.stringify(this.planner));
+        }
+    }
+
     // Toggle watch/completion state
     toggleCompleted(id) {
-        const item = this.items.find(i => i.id === id);
+        const item = this.items.find(i => String(i.id) === String(id));
         if (item) {
             item.completed = !item.completed;
             this.saveItems(false);
             this.dirtyShelves = true;
             this.dirtyHero = true;
+
+            // If marked as watched, auto-remove from planner
+            if (item.completed && item.type === 'movie') {
+                this.removePlannerEntry(id);
+            }
             
             const label = item.type === 'link' ? 'Read' : 'Watched';
             this.showToast(item.completed ? `Marked as ${label}!` : `Marked as pending.`);
@@ -3171,6 +4344,7 @@ class SachApp {
 
             // Re-render card grids & billboard
             this.renderHeroBanner();
+            this.renderShelves();
             this.render();
 
             // Refresh modal UI if matches
@@ -3264,13 +4438,16 @@ class SachApp {
         const container = document.getElementById('toast-container');
         if (!container) return;
         
+        // Remove any existing toasts immediately to prevent stacking
+        container.querySelectorAll('.toast').forEach(t => t.remove());
+        
         const toast = document.createElement('div');
         toast.className = `toast ${type}`;
-        const icon = type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle';
+        const icon = type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-exclamation-circle' : 'fa-circle-info';
         toast.innerHTML = `<i class="fas ${icon}"></i><span>${message}</span>`;
         
         container.appendChild(toast);
-        // animate trigger
+        // Trigger animation on next paint
         requestAnimationFrame(() => {
             requestAnimationFrame(() => {
                 toast.classList.add('show');
@@ -3279,8 +4456,8 @@ class SachApp {
 
         setTimeout(() => {
             toast.classList.remove('show');
-            setTimeout(() => toast.remove(), 300);
-        }, 3000);
+            setTimeout(() => toast.remove(), 350);
+        }, 3200);
     }
 }
 
