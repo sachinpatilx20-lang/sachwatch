@@ -47,20 +47,14 @@
     <!-- Logo -->
     <button class="logo-btn" id="logoHome" aria-label="Go home">
         <span class="logo-icon">
-            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <!-- Bookmark ribbon (light blue) -->
-                <path d="M5 3C5 1.89543 5.89543 1 7 1H17C18.1046 1 19 1.89543 19 3V23L12 18L5 23V3Z" fill="var(--accent)" opacity="0.85"/>
-                <!-- Play triangle (light red) -->
-                <path d="M9 7L17 12L9 17V7Z" fill="var(--accent-red)"/>
-            </svg>
+            <img src="logo.png" alt="Logo" class="logo-img">
         </span>
     </button>
 
     <nav class="desktop-nav" aria-label="Primary header navigation">
         <button class="header-nav-link active" data-nav="home">Home</button>
-        <button class="header-nav-link" data-nav="movie">Movies &amp; TV</button>
-        <button class="header-nav-link" data-nav="link">Bookmarks</button>
-        <button class="header-nav-link" data-nav="sync">Sync Hub</button>
+        <button class="header-nav-link" data-nav="search" onclick="document.getElementById('searchInput').focus(); document.getElementById('searchInput').select();">Search</button>
+        <button class="header-nav-link" data-nav="sync">Sync</button>
     </nav>
 
     <!-- Unified search bar -->
@@ -81,13 +75,6 @@
         <div id="search-dropdown" class="topbar-dropdown hidden"></div>
     </div>
 
-    <!-- Top-right actions -->
-    <div class="topbar-actions header-actions">
-        <!-- Theme toggle -->
-        <button id="themeToggle" class="icon-action btn-utility" aria-label="Toggle theme" title="Toggle theme">
-            <i class="fas fa-sun" id="themeIcon"></i>
-        </button>
-    </div>
 </header>
 
 <!-- ═══════════════════════════════════════════
@@ -104,24 +91,10 @@
         <div id="shelves-container"></div>
 
         <div class="lib-wrap">
-            <div class="lib-hd">
-                <h2 class="lib-title">My Library</h2>
-                <div class="lib-actions">
-
-
-                    <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-                        <select id="sortSelect" class="sort-dropdown" aria-label="Sort items">
-                            <option value="newest">Newest First</option>
-                            <option value="oldest">Oldest First</option>
-                            <option value="title">Alphabetical (A-Z)</option>
-                            <option value="priority">Priority (High-Low)</option>
-                            <option value="duedate">Due Date (Soonest first)</option>
-                        </select>
-                        <button id="lib-clear-all-btn" class="btn danger tiny" title="Clear entire library"><i class="fas fa-trash-can"></i> Clear All</button>
-                    </div>
-                </div>
+            <div style="display: flex; gap: 12px; align-items: center; margin-bottom: 1rem; flex-wrap: wrap;">
+                <button id="lib-clear-all-btn" class="btn danger tiny" title="Clear entire library" style="border-radius: var(--r-xl); padding: 6px 14px; font-weight: 700; font-size: 0.74rem; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; height: 32px; margin-bottom: 12px;"><i class="fas fa-trash-can"></i> Clear All</button>
+                <div id="tagFilter" class="pill-bar category-bar" style="flex: 1; margin-bottom: 12px; padding-bottom: 2px;"></div>
             </div>
-            <div id="tagFilter" class="pill-bar category-bar"></div>
             <div id="linkGrid" class="card-grid link-grid"></div>
 
             <!-- Create Custom Shelf Form -->
@@ -199,6 +172,82 @@
         </div>
     </section>
 
+    <!-- ── DASHBOARD (STATS) ─────────────────── -->
+    <section id="stats-section" class="view-section hidden">
+        <div class="stats-wrap" style="max-width: 1200px; margin: 0 auto; padding: 2rem 1.5rem 5rem;">
+            <div class="stats-header-row" style="margin-bottom: 2rem;">
+                <h2 class="stats-heading" style="font-size: 1.75rem; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 4px;">Personal Dashboard</h2>
+                <p class="stats-sub" style="color: var(--text2); font-size: 0.88rem;">Insights and metrics from your library collection.</p>
+            </div>
+            
+            <!-- Rank & Quote card -->
+            <div class="stats-quote-card" style="margin-bottom: 2rem; display: flex; justify-content: space-between; align-items: center; gap: 20px; flex-wrap: wrap; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md); padding: 1.5rem; position: relative; overflow: hidden;">
+                <div class="quote-content" style="flex: 1; min-width: 280px;">
+                    <p id="stats-quote-text" class="quote-text" style="font-style: italic; font-size: 0.95rem; margin-bottom: 6px; font-weight: 500; color: var(--text);">"The way to get started is to quit talking and begin doing."</p>
+                    <p id="stats-quote-author" class="quote-author" style="font-size: 0.76rem; color: var(--text3); font-weight: 600;">— Walt Disney</p>
+                </div>
+                <div class="rank-badge-wrap" style="text-align: right; min-width: 150px; display: flex; flex-direction: column; gap: 4px;">
+                    <div id="stat-workspace-rank" class="rank-value" style="font-size: 1.15rem; font-weight: 800; color: var(--accent);">Fresh Slate 🌟</div>
+                    <div id="stat-workspace-rank-sub" class="rank-label" style="font-size: 0.72rem; color: var(--text2); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Logged: 0 items</div>
+                </div>
+            </div>
+
+            <!-- Stats grid -->
+            <div class="stats-grid">
+                <!-- Movies -->
+                <div class="stat-card">
+                    <div class="stat-card-icon cinema-icon"><i class="fas fa-film"></i></div>
+                    <div id="stat-movies-count" class="stat-card-val">0</div>
+                    <div class="stat-card-label">Movies Watched</div>
+                </div>
+                <!-- Movies Avg Rating -->
+                <div class="stat-card">
+                    <div class="stat-card-icon cinema-icon"><i class="fas fa-star" style="color:#f5c518"></i></div>
+                    <div id="stat-movies-rating" class="stat-card-val">0.0</div>
+                    <div class="stat-card-label">Avg Rating</div>
+                </div>
+                <!-- Movies Hours -->
+                <div class="stat-card">
+                    <div class="stat-card-icon cinema-icon"><i class="fas fa-hourglass-half"></i></div>
+                    <div id="stat-movies-hours" class="stat-card-val">0</div>
+                    <div class="stat-card-label">Hours Logged</div>
+                </div>
+                <!-- Books -->
+                <div class="stat-card">
+                    <div class="stat-card-icon book-icon"><i class="fas fa-book"></i></div>
+                    <div id="stat-books-count" class="stat-card-val">0</div>
+                    <div class="stat-card-label">Books Read</div>
+                </div>
+
+            </div>
+
+            <!-- Analytics panels grid -->
+            <div class="analytics-grid" style="margin-top: 1.5rem;">
+                <!-- Top Genres -->
+                <div class="analytics-panel">
+                    <h3 class="panel-title">Top Movie Genres</h3>
+                    <div id="stats-genres-list" class="genre-chart-list">
+                        <div class="shelf-empty" style="padding:0;">No genre data logged yet. Add genres in Movie details.</div>
+                    </div>
+                </div>
+                <!-- Reading & Task Progress -->
+                <div class="analytics-panel" style="display: flex; flex-direction: column; gap: 24px;">
+                    <!-- Reading Progress -->
+                    <div>
+                        <h3 class="panel-title" style="margin-bottom: 12px; border: none; padding: 0;">Reading Progress</h3>
+                        <div class="progress-info-row" style="display: flex; justify-content: space-between; font-size: 0.8rem; font-weight: 700; margin-bottom: 6px;">
+                            <span style="color: var(--text2);">Total Pages Logged</span>
+                            <span id="stats-reading-percentage" style="color: #facc15;">0%</span>
+                        </div>
+                        <div class="genre-progress-bg">
+                            <div id="stats-reading-progress-bar" class="genre-progress-bar" style="width: 0%; background: linear-gradient(135deg, #facc15 0%, #ca8a04 100%); border-radius: var(--r-xl);"></div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </section>
 
 </div>
 <!-- end .page-body -->
@@ -210,6 +259,11 @@
     <button class="nav-tab tab-item active" data-tab="home" aria-label="Home">
         <i class="fas fa-house"></i>
         <span>Home</span>
+    </button>
+    <button class="nav-tab tab-item" data-tab="search" aria-label="Search"
+        onclick="document.getElementById('searchInput').focus(); document.getElementById('searchInput').select();">
+        <i class="fas fa-magnifying-glass"></i>
+        <span>Search</span>
     </button>
     <button class="nav-tab tab-item" data-tab="sync" aria-label="Sync">
         <i class="fas fa-rotate"></i>
@@ -289,7 +343,7 @@
                 <!-- Primary CTA buttons -->
                 <div class="modal-cta-group" style="margin-top: 12px;">
                     <button id="add-to-library" class="btn primary wide">
-                        <i class="fas fa-circle-plus"></i> Add to My Library
+                        <i class="fas fa-circle-plus"></i> Add to Library
                     </button>
                 </div>
             </div>
@@ -325,120 +379,58 @@
             <div id="details-tab-edit" class="details-tab-panel hidden">
                 <!-- Inline edit form -->
                 <div id="modal-edit-section" class="modal-edit-block" style="padding: 0; background: none; border: none; box-shadow: none; margin: 0;">
-                    <div class="edit-row">
-                        <label class="edit-label">Item Type</label>
+                    <!-- Hidden fields kept for JS compatibility -->
+                    <div class="edit-row" style="display:none">
                         <select id="modal-edit-type" class="edit-input">
                             <option value="movie">Movie / TV Show</option>
                             <option value="link">Web Link / Bookmark</option>
                             <option value="book">Book</option>
-                            <option value="task">Task / To-Do</option>
                         </select>
                     </div>
-                    <div class="edit-row">
-                        <label class="edit-label">Title</label>
+                    <div class="edit-row" style="display:none">
                         <input type="text" id="modal-edit-title" class="edit-input" placeholder="Title">
                     </div>
-                    
-                    <!-- Cinema Specific Fields -->
-                    <div id="edit-cinema-fields" class="type-fields-group">
-                        <div class="edit-row">
-                            <label class="edit-label">Director</label>
-                            <input type="text" id="modal-edit-director" class="edit-input" placeholder="Director's Name">
-                        </div>
-                        <div class="edit-row flex-row" style="display:flex; gap:10px; flex-wrap: wrap;">
-                            <div style="flex:1; min-width: 140px;">
-                                <label class="edit-label">Genre</label>
-                                <input type="text" id="modal-edit-genre" class="edit-input" placeholder="e.g. Sci-Fi, Drama">
-                            </div>
-                            <div style="flex:1; min-width: 140px;">
-                                <label class="edit-label">Runtime (minutes)</label>
-                                <input type="number" id="modal-edit-runtime" class="edit-input" placeholder="e.g. 120" min="0">
-                            </div>
-                        </div>
-                        <div class="edit-row">
-                            <label class="edit-label">Star Rating (1-5)</label>
-                            <div class="star-picker" id="modal-edit-star-picker">
-                                <i class="far fa-star" data-rating="1"></i>
-                                <i class="far fa-star" data-rating="2"></i>
-                                <i class="far fa-star" data-rating="3"></i>
-                                <i class="far fa-star" data-rating="4"></i>
-                                <i class="far fa-star" data-rating="5"></i>
-                            </div>
+                    <div id="edit-cinema-fields" class="type-fields-group" style="display:none">
+                        <input type="text" id="modal-edit-director" class="edit-input">
+                        <input type="text" id="modal-edit-genre" class="edit-input">
+                        <input type="number" id="modal-edit-runtime" class="edit-input">
+                        <div class="star-picker" id="modal-edit-star-picker" style="display:none">
+                            <i class="far fa-star" data-rating="1"></i>
+                            <i class="far fa-star" data-rating="2"></i>
+                            <i class="far fa-star" data-rating="3"></i>
+                            <i class="far fa-star" data-rating="4"></i>
+                            <i class="far fa-star" data-rating="5"></i>
                         </div>
                     </div>
-
-                    <!-- Book Specific Fields -->
-                    <div id="edit-book-fields" class="type-fields-group hidden">
-                        <div class="edit-row">
-                            <label class="edit-label">Author</label>
-                            <input type="text" id="modal-edit-author" class="edit-input" placeholder="Author's Name">
-                        </div>
-                        <div class="edit-row flex-row" style="display:flex; gap:10px;">
-                            <div style="flex:1;">
-                                <label class="edit-label">Current Page</label>
-                                <input type="number" id="modal-edit-current-page" class="edit-input" placeholder="0" min="0">
-                            </div>
-                            <div style="flex:1;">
-                                <label class="edit-label">Total Pages</label>
-                                <input type="number" id="modal-edit-total-pages" class="edit-input" placeholder="100" min="1">
-                            </div>
-                        </div>
+                    <div id="edit-book-fields" class="type-fields-group hidden" style="display:none">
+                        <input type="text" id="modal-edit-author" class="edit-input">
+                        <input type="number" id="modal-edit-current-page" class="edit-input">
+                        <input type="number" id="modal-edit-total-pages" class="edit-input">
                     </div>
-
-                    <!-- Task Specific Fields -->
-                    <div id="edit-task-fields" class="type-fields-group hidden">
-                        <div class="edit-row flex-row" style="display:flex; gap:10px;">
-                            <div style="flex:1;">
-                                <label class="edit-label">Priority</label>
-                                <select id="modal-edit-priority" class="edit-input">
-                                    <option value="low">Low</option>
-                                    <option value="medium">Medium</option>
-                                    <option value="high">High</option>
-                                </select>
-                            </div>
-                            <div style="flex:1;">
-                                <label class="edit-label">Due Date</label>
-                                <input type="date" id="modal-edit-due-date" class="edit-input">
-                            </div>
-                        </div>
+                    <div class="edit-row" style="display:none">
+                        <input type="text" id="modal-edit-desc" class="edit-input">
                     </div>
-
-                    <div class="edit-row">
-                        <label class="edit-label">Details / Description</label>
-                        <input type="text" id="modal-edit-desc" class="edit-input" placeholder="Details">
+                    <!-- Tag / actor chip builder -->
+                    <div id="tag-chip-container" style="
+                        display: flex; flex-wrap: wrap; gap: 6px;
+                        min-height: 38px; padding: 6px 8px;
+                        border: 1px solid var(--border3);
+                        border-radius: var(--r-md);
+                        background: var(--surface2);
+                        cursor: text;
+                        margin-bottom: 10px;
+                        align-items: center;
+                    " onclick="document.getElementById('tag-chip-input').focus()">
+                        <!-- chips injected here by JS -->
+                        <input id="tag-chip-input" type="text"
+                            placeholder="Type name &amp; press Enter…"
+                            style="border:none; outline:none; background:transparent;
+                                   color:var(--text); font-size:0.82rem; flex:1; min-width:120px; padding:2px 4px;">
                     </div>
-                    <div class="edit-row">
-                        <label class="edit-label">Tags (comma-separated)</label>
-                        <input type="text" id="modal-edit-tags" class="edit-input" placeholder="e.g. movies, drama, personal">
-                    </div>
-                    <div class="edit-row">
-                        <label class="edit-label">Image / Poster URL</label>
-                        <input type="url" id="modal-edit-thumb" class="edit-input" placeholder="https://example.com/image.jpg">
-                    </div>
-                    <div class="edit-row">
-                        <label class="edit-label">Assign to Shelf</label>
-                        <select id="modal-edit-shelf" class="edit-input">
-                            <option value="">None (General Library)</option>
-                        </select>
-                    </div>
-                    <!-- Thumbnail selection section for links only -->
-                    <div id="modal-edit-link-thumb-section" class="hidden" style="margin-top: 10px;">
-                        <label class="edit-label">Select Thumbnail</label>
-                        <div id="editThumbPicker" class="thumb-picker"></div>
-                        <div class="screenshot-tools" style="display: flex; flex-direction: column; gap: 8px; margin-top: 8px;">
-                            <label class="edit-label">Refresh Screenshot</label>
-                            <div class="crop-presets" style="display: flex; gap: 6px;">
-                                <button type="button" class="btn tiny active" data-crop="1200">Full</button>
-                                <button type="button" class="btn tiny" data-crop="800">Wide</button>
-                                <button type="button" class="btn tiny" data-crop="400">Square</button>
-                            </div>
-                            <button type="button" id="genScreenshotBtn" class="btn secondary tiny" style="width: fit-content;">
-                                <i class="fas fa-camera"></i> Fetch Screenshot
-                            </button>
-                        </div>
-                    </div>
-                    <button id="modal-edit-save" class="btn primary wide" style="margin-top: 12px;">
-                        <i class="fas fa-floppy-disk"></i> Save Changes
+                    <!-- Hidden field keeps existing JS save logic working -->
+                    <input type="text" id="modal-edit-tags" style="display:none">
+                    <button id="modal-edit-save" class="btn primary wide">
+                        <i class="fas fa-floppy-disk"></i> Save
                     </button>
                 </div>
             </div>
@@ -516,7 +508,7 @@
                 <button class="segment-btn active" data-type="movie" style="flex: 1; font-size: 0.68rem; padding: 6px; font-weight:700;">🎬 Movie</button>
                 <button class="segment-btn" data-type="book" style="flex: 1; font-size: 0.68rem; padding: 6px; font-weight:700;">📖 Book</button>
                 <button class="segment-btn" data-type="link" style="flex: 1; font-size: 0.68rem; padding: 6px; font-weight:700;">🔗 Link</button>
-                <button class="segment-btn" data-type="task" style="flex: 1; font-size: 0.68rem; padding: 6px; font-weight:700;">📝 Task</button>
+
             </div>
 
             <!-- Form Container -->
@@ -588,23 +580,7 @@
                     </div>
                 </div>
 
-                <!-- 📝 Task Specific Fields -->
-                <div id="qa-fields-task" class="type-fields-group hidden">
-                    <div class="edit-row flex-row" style="display:flex; gap:10px;">
-                        <div style="flex:1;">
-                            <label class="edit-label">Priority</label>
-                            <select id="qa-task-priority" class="edit-input">
-                                <option value="low">Low</option>
-                                <option value="medium" selected>Medium</option>
-                                <option value="high">High</option>
-                            </select>
-                        </div>
-                        <div style="flex:1;">
-                            <label class="edit-label">Due Date</label>
-                            <input type="date" id="qa-task-due-date" class="edit-input">
-                        </div>
-                    </div>
-                </div>
+
 
                 <!-- Common Fields -->
                 <div class="edit-row">

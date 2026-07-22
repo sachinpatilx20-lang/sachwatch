@@ -343,9 +343,8 @@ class SachApp {
         this.activeTag = 'all';
         this.searchQuery = '';
         this.activeSort = 'newest';   // 'newest', 'oldest', 'title'
-        
         this.currentUrl = '';
-        this.theme = localStorage.getItem('sach_theme') || 'dark';
+        this.theme = 'dark';
         this.peer = null;
         this.currentMetadata = null;
         this.selectedThumb = '';
@@ -357,7 +356,6 @@ class SachApp {
         this.shelves = JSON.parse(localStorage.getItem('sach_shelves')) || [];
         this.planner = JSON.parse(localStorage.getItem('sach_weekly_planner')) || {};
         this.plannerWeek = 1;
-        this.taskMode = 'list';
         this.heroIndex = 0;
         this.heroInterval = null;
 
@@ -378,13 +376,13 @@ class SachApp {
         // Parallax background glow movement (desktop only) - Throttled with requestAnimationFrame
         if (window.matchMedia('(hover: hover)').matches) {
             let tick = false;
+            const glowContainer = document.querySelector('.ambient-glow');
             document.addEventListener('mousemove', (e) => {
                 if (!tick) {
                     requestAnimationFrame(() => {
-                        const x = (e.clientX / window.innerWidth - 0.5) * 45;
-                        const y = (e.clientY / window.innerHeight - 0.5) * 45;
-                        if (this.glowSphere1) this.glowSphere1.style.transform = `translate3d(${x}px, ${y}px, 0)`;
-                        if (this.glowSphere2) this.glowSphere2.style.transform = `translate3d(${-x}px, ${-y}px, 0)`;
+                        const x = (e.clientX / window.innerWidth - 0.5) * 35;
+                        const y = (e.clientY / window.innerHeight - 0.5) * 35;
+                        if (glowContainer) glowContainer.style.transform = `translate3d(${x}px, ${y}px, 0)`;
                         tick = false;
                     });
                     tick = true;
@@ -553,7 +551,6 @@ class SachApp {
         // Grid & Lists
         this.linkGrid = document.getElementById('linkGrid');
         this.tagFilter = document.getElementById('tagFilter');
-        this.sortSelect = document.getElementById('sortSelect');
         this.loader = document.getElementById('loader');
         this.loaderText = document.getElementById('loader-text');
 
@@ -934,13 +931,7 @@ class SachApp {
             });
         }
 
-        if (this.sortSelect) {
-            this.sortSelect.addEventListener('change', (e) => {
-                this.activeSort = e.target.value;
-                this.dirtyLibrary = true;
-                this.render();
-            });
-        }
+
 
         // Search trigger suggest
         this.searchInput.addEventListener('input', (e) => {
@@ -1075,26 +1066,13 @@ class SachApp {
                 link.classList.add('active');
 
                 if (targetNav === 'home') {
-                    // Switch to home, show all
                     this.activeType = 'all';
                     this.activeTag = 'all';
                     this.activeStatus = 'all';
                     this.switchTab('home');
-                    this.clearAllFilters(); // Reset filters
-                } else if (targetNav === 'movie') {
-                    // Switch to home, filter to movies
-                    this.activeType = 'movie';
-                    this.activeTag = 'all';
-                    this.activeStatus = 'all';
-                    this.switchTab('home');
-                    this.render();
-                } else if (targetNav === 'link') {
-                    // Switch to home, filter to bookmarks
-                    this.activeType = 'link';
-                    this.activeTag = 'all';
-                    this.activeStatus = 'all';
-                    this.switchTab('home');
-                    this.render();
+                    this.clearAllFilters();
+                } else if (targetNav === 'search') {
+                    this.switchTab('search');
                 } else if (targetNav === 'sync') {
                     this.switchTab('sync');
                 }
@@ -1295,36 +1273,38 @@ class SachApp {
 
     switchTab(tab) {
         this.activeTab = tab;
-        
-        // Update header links state
+
+        // Update header nav links
         document.querySelectorAll('.header-nav-link').forEach(l => {
-            let isMatch = false;
-            if (tab === 'sync' && l.dataset.nav === 'sync') {
-                isMatch = true;
-            } else if (tab === 'home') {
-                if (this.activeType === 'all' && l.dataset.nav === 'home') isMatch = true;
-                if (this.activeType === 'movie' && l.dataset.nav === 'movie') isMatch = true;
-                if (this.activeType === 'link' && l.dataset.nav === 'link') isMatch = true;
-            }
-            l.classList.toggle('active', isMatch);
+            l.classList.toggle('active',
+                (tab === 'sync'   && l.dataset.nav === 'sync') ||
+                (tab === 'search' && l.dataset.nav === 'search') ||
+                (tab === 'home'   && l.dataset.nav === 'home')
+            );
         });
 
-        // Update tabs active state
+        // Update bottom tab items
         document.querySelectorAll('.nav-btn, .tab-item, .nav-tab').forEach(b => {
             b.classList.remove('active');
             if (b.dataset.tab === tab) b.classList.add('active');
         });
 
-        // Hide show sections
+        // Show/hide sections — search reuses home section with the topbar input
         const homeSection = document.getElementById('home-section');
         const syncSection = document.getElementById('sync-section');
 
-        if (homeSection) homeSection.classList.toggle('hidden', tab !== 'home');
+        if (homeSection) homeSection.classList.toggle('hidden', tab !== 'home' && tab !== 'search');
         if (syncSection) syncSection.classList.toggle('hidden', tab !== 'sync');
+        if (this.statsSection) this.statsSection.classList.add('hidden');
+
+        if (tab === 'search') {
+            setTimeout(() => {
+                const si = document.getElementById('searchInput');
+                if (si) { si.focus(); si.select(); }
+            }, 80);
+        }
 
         if (tab === 'sync') {
-            // Do NOT auto-generate sync code — let the user initiate manually
-            // Just update status to ready if not already connected
             if (this.syncCodeDisplay && this.syncCodeDisplay.textContent === '——') {
                 this.updateSyncStatus('ready', 'Ready — click Generate to broadcast');
             }
@@ -1692,22 +1672,76 @@ class SachApp {
         }
         this.suggestionAbortController = new AbortController();
 
-        // 3. Online IMDb query
+        // Clean query to conform to IMDb JSONP suggests format:
+        // Lowercase, only alphanumeric and space, then replace spaces with underscores.
+        let cleanQuery = q.replace(/[^a-z0-9\s]/g, '').trim().replace(/\s+/g, '_');
+        if (!cleanQuery) {
+            this.renderSuggestions(query, localMatches, [], false, dropdownEl);
+            return;
+        }
+
+        const firstLetter = cleanQuery.charAt(0);
+        const callbackName = `imdb$${cleanQuery}`;
+        const url = `https://sg.media-imdb.com/suggests/${firstLetter}/${cleanQuery}.json`;
+        const controller = this.suggestionAbortController;
+
         try {
-            const data = await fetchWithTimeout(`https://imdb.iamidiotareyoutoo.com/search?q=${encodeURIComponent(query)}`, {
-                timeout: 4000,
-                signal: this.suggestionAbortController.signal
+            const fetchPromise = new Promise((resolve, reject) => {
+                let script = document.createElement('script');
+                script.src = url;
+                script.async = true;
+
+                // Setup global callback
+                window[callbackName] = (data) => {
+                    cleanup();
+                    resolve(data);
+                };
+
+                // Setup error handling
+                script.onerror = () => {
+                    cleanup();
+                    reject(new Error("JSONP script load error"));
+                };
+
+                // Setup timeout
+                const timeoutId = setTimeout(() => {
+                    cleanup();
+                    reject(new Error("JSONP request timeout"));
+                }, 4000);
+
+                // Add abort signal listener
+                const abortHandler = () => {
+                    cleanup();
+                    reject(new Error("JSONP request aborted"));
+                };
+                if (controller && controller.signal) {
+                    controller.signal.addEventListener('abort', abortHandler);
+                }
+
+                function cleanup() {
+                    clearTimeout(timeoutId);
+                    if (script && script.parentNode) {
+                        script.parentNode.removeChild(script);
+                    }
+                    delete window[callbackName];
+                    if (controller && controller.signal) {
+                        controller.signal.removeEventListener('abort', abortHandler);
+                    }
+                }
+
+                document.head.appendChild(script);
             });
+
+            const data = await fetchPromise;
             let imdbResults = [];
-            const desc = data ? (data.description || data) : null;
-            if (Array.isArray(desc)) {
-                imdbResults = desc.map(m => ({
-                    title: m.title || m['#TITLE'] || 'Untitled',
-                    year: m.year || m['#YEAR'] || '—',
-                    poster: m.poster || m['#IMG_POSTER'] || '',
-                    imdbId: m.imdbId || m['#IMDB_ID'] || '',
-                    actors: m.actors || m['#ACTORS'] || ''
-                })).filter(m => m.imdbId).slice(0, 6);
+            if (data && Array.isArray(data.d)) {
+                imdbResults = data.d.map(m => ({
+                    title: m.l || 'Untitled',
+                    year: m.y || '—',
+                    poster: (m.i && m.i[0]) ? m.i[0] : '',
+                    imdbId: m.id || '',
+                    actors: m.s || ''
+                })).filter(m => m.imdbId && m.imdbId.startsWith('tt')).slice(0, 6);
             }
             
             // Limit cache size to 50 items
@@ -1719,10 +1753,10 @@ class SachApp {
 
             this.renderSuggestions(query, localMatches, imdbResults, false, dropdownEl);
         } catch (e) {
-            if (e.name === 'AbortError') {
+            if (e.message === 'JSONP request aborted') {
                 return; // Suppress errors for aborted requests
             }
-            console.warn("IMDb fetch failed or timed out:", e);
+            console.warn("IMDb suggestions fetch failed or timed out:", e);
             this.renderSuggestions(query, localMatches, [], false, dropdownEl);
         }
     }
@@ -2201,9 +2235,64 @@ class SachApp {
         if (isSaved) {
             this.modalEditTitle.value = savedItem.title;
             this.modalEditDesc.value = savedItem.desc || '';
-            if (this.modalEditTags) {
-                this.modalEditTags.value = (savedItem.tags || []).join(', ');
+
+            // ── Chip tag builder ──────────────────────────────────────────
+            const chipContainer = document.getElementById('tag-chip-container');
+            const chipInput     = document.getElementById('tag-chip-input');
+            const hiddenTags    = this.modalEditTags;
+
+            if (chipContainer && chipInput && hiddenTags) {
+                // Remove old chips (keep the input element)
+                chipContainer.querySelectorAll('.tag-chip').forEach(c => c.remove());
+
+                // Helper: sync hidden input from displayed chips
+                const syncHidden = () => {
+                    hiddenTags.value = [...chipContainer.querySelectorAll('.tag-chip')]
+                        .map(c => c.dataset.tag).join(', ');
+                };
+
+                // Helper: add one chip
+                const addChip = (raw) => {
+                    const val = raw.trim();
+                    if (!val) return;
+                    // Avoid duplicates
+                    const existing = [...chipContainer.querySelectorAll('.tag-chip')].map(c => c.dataset.tag.toLowerCase());
+                    if (existing.includes(val.toLowerCase())) return;
+
+                    const chip = document.createElement('span');
+                    chip.className = 'tag-chip';
+                    chip.dataset.tag = val;
+                    chip.style.cssText = `
+                        display:inline-flex; align-items:center; gap:4px;
+                        background:var(--accent-dim); color:var(--accent);
+                        border:1px solid var(--accent); border-radius:20px;
+                        padding:2px 10px 2px 10px; font-size:0.75rem; font-weight:600;
+                        cursor:default; white-space:nowrap;
+                    `;
+                    chip.innerHTML = `${val} <span style="cursor:pointer;font-size:0.85rem;margin-left:2px;opacity:0.7" title="Remove">×</span>`;
+                    chip.querySelector('span').onclick = () => { chip.remove(); syncHidden(); };
+                    chipContainer.insertBefore(chip, chipInput);
+                    syncHidden();
+                };
+
+                // Load existing tags as chips
+                (savedItem.tags || []).forEach(t => addChip(t));
+
+                // Clear old listener and add new one
+                chipInput.value = '';
+                chipInput.onkeydown = (e) => {
+                    if (e.key === 'Enter' || e.key === ',') {
+                        e.preventDefault();
+                        addChip(chipInput.value.replace(',',''));
+                        chipInput.value = '';
+                    } else if (e.key === 'Backspace' && chipInput.value === '') {
+                        const chips = chipContainer.querySelectorAll('.tag-chip');
+                        if (chips.length) { chips[chips.length - 1].remove(); syncHidden(); }
+                    }
+                };
             }
+            // ─────────────────────────────────────────────────────────────
+
             if (this.modalEditThumb) {
                 this.modalEditThumb.value = savedItem.thumb || '';
             }
@@ -2672,185 +2761,7 @@ class SachApp {
             `;
         }
 
-        // 2. Weekly Cinema Plan Shelf
-        const carouselId = 'shelf-watchlist';
-        
-        let cardsHtml = '';
-        // Weekly Cinema Planner cards strictly
-        const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-        days.forEach(day => {
-            const key = day + '_w' + this.plannerWeek;
-            const scheduledId = this.planner ? this.planner[key] : null;
-            const movie = scheduledId ? this.items.find(i => String(i.id) === String(scheduledId)) : null;
-            
-            if (movie) {
-                const posterUrl = movie.thumb || '';
-                const completedBadge = movie.completed 
-                    ? `<div class="card-completed-badge"><i class="fas fa-check"></i> Watched</div>`
-                    : '';
-                
-                cardsHtml += `
-                    <div class="card type-movie planner-card ${movie.completed ? 'completed-active' : ''}" data-id="${movie.id}" onclick="window.sachApp.openDetailsById('${movie.id}')" style="position: relative;">
-                        <span class="planner-day-badge">${day.substring(0, 3)}</span>
-                        
-                        <!-- Quick Action Buttons -->
-                        <button class="quick-action complete-action ${movie.completed ? 'active' : ''}" title="${movie.completed ? 'Mark Pending' : 'Mark Watched'}" onclick="event.stopPropagation(); window.sachApp.markScheduledMovieCompleted('${movie.id}', '${day}')">
-                            <i class="${movie.completed ? 'fas fa-circle-check' : 'far fa-circle-check'}"></i>
-                        </button>
-                        <button class="quick-action edit-action" title="Change Movie" onclick="event.stopPropagation(); window.sachApp.openPlannerMovieSelector('${day}')" style="right: 36px;">
-                            <i class="fas fa-arrows-rotate"></i>
-                        </button>
-                        <button class="quick-action delete-action" title="Clear Slot" onclick="event.stopPropagation(); window.sachApp.removeScheduledMovie('${day}')" style="right: 8px;">
-                            <i class="fas fa-trash-can" style="color: var(--red);"></i>
-                        </button>
-                        
-                        <div class="card-img-wrapper" onclick="event.stopPropagation(); window.sachApp.openDetailsById('${movie.id}')">
-                            <img src="${posterUrl || 'https://via.placeholder.com/400x600?text=No+Cover'}" class="card-img" loading="lazy" decoding="async">
-                            ${completedBadge}
-                        </div>
-                        <div class="card-body">
-                            <div class="card-info-header" style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
-                                <span class="card-match-score" style="color: var(--green); font-weight: 800; font-size: 0.72rem;">${this.getMatchScore(movie.title)}</span>
-                                <span class="card-host-text" style="font-size: 0.68rem; color: var(--text3); font-weight: 600;"><i class="fas fa-calendar-alt"></i> ${movie.year}</span>
-                            </div>
-                            <h3 class="card-title">${movie.title}</h3>
-                            <p class="card-desc">${movie.desc || ''}</p>
-                        </div>
-                    </div>
-                `;
-            } else {
-                cardsHtml += `
-                    <div class="card type-movie planner-empty-card" onclick="window.sachApp.openPlannerMovieSelector('${day}')" style="position: relative; border-style: dashed; border-width: 1px; border-color: rgba(255,255,255,0.15); background: rgba(255,255,255,0.02);">
-                        <span class="planner-day-badge empty">${day.substring(0, 3)}</span>
-                        
-                        <div class="card-img-wrapper" style="aspect-ratio: 2/3; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.01);">
-                            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; color: var(--text3);">
-                                <i class="far fa-calendar-plus" style="font-size: 1.5rem; color: var(--accent);"></i>
-                                <span style="font-size: 0.68rem; font-weight: 700; opacity: 0.8;">Add Movie</span>
-                            </div>
-                        </div>
-                        <div class="card-body" style="text-align: center; justify-content: center; height: auto;">
-                            <h3 class="card-title" style="color: var(--text3); font-size: 0.72rem; font-weight: 600; opacity: 0.7; margin: 0;">Empty Slot</h3>
-                        </div>
-                    </div>
-                `;
-            }
-        });
 
-        shelvesHtml += `
-            <div class="shelf-block">
-                <div class="shelf-hd">
-                    <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-                        <h3 class="shelf-title"><i class="fas fa-film"></i> Weekly Cinema Plan</h3>
-                        
-                        <!-- Weeks switcher -->
-                        <div class="planner-controls" style="display: flex; gap: 4px; align-items: center; margin-left: 8px;">
-                            <button class="btn ${this.plannerWeek === 1 ? 'primary' : 'secondary'} tiny" onclick="window.sachApp.togglePlannerWeek(1)" style="font-size:0.62rem; padding:2px 6px; height:auto; line-height:1;">This Week</button>
-                            <button class="btn ${this.plannerWeek === 2 ? 'primary' : 'secondary'} tiny" onclick="window.sachApp.togglePlannerWeek(2)" style="font-size:0.62rem; padding:2px 6px; height:auto; line-height:1;">Next Week</button>
-                        </div>
-                    </div>
-                    
-                    <div class="carousel-controls">
-                        <button class="carousel-control-btn" onclick="window.sachApp.scrollCarousel('${carouselId}', -1)" title="Scroll Left"><i class="fas fa-chevron-left"></i></button>
-                        <button class="carousel-control-btn" onclick="window.sachApp.scrollCarousel('${carouselId}', 1)" title="Scroll Right"><i class="fas fa-chevron-right"></i></button>
-                    </div>
-                </div>
-                <div class="carousel-shelf" id="${carouselId}">
-                    ${cardsHtml}
-                </div>
-            </div>
-        `;
-
-        // 3. Tasks Shelf
-        const pendingTasks = this.items.filter(item => item.type === 'task' && !item.completed);
-        const taskCarouselId = 'shelf-tasks';
-        
-        let tasksHtml = '';
-        if (this.taskMode === 'list') {
-            tasksHtml = pendingTasks.length > 0 
-                ? pendingTasks.map(item => this.createCardHtml(item)).join('')
-                : `<div class="shelf-empty" style="padding: 2rem; width: 100%; text-align: center; color: var(--text3);">No pending tasks. Great job!</div>`;
-        } else {
-            // Agenda Mode
-            const todayStr = new Date().toISOString().split('T')[0];
-            const todayMs = new Date(todayStr).getTime();
-            const sevenDaysLaterMs = todayMs + (7 * 24 * 60 * 60 * 1000);
-
-            const groups = {
-                overdue: { title: 'Overdue', icon: 'fa-triangle-exclamation', class: 'overdue', items: [] },
-                today: { title: 'Today', icon: 'fa-calendar-day', class: 'today', items: [] },
-                thisweek: { title: 'This Week', icon: 'fa-calendar-week', class: 'thisweek', items: [] },
-                later: { title: 'Later', icon: 'fa-calendar-days', class: 'later', items: [] },
-                nodate: { title: 'No Date', icon: 'fa-circle-question', class: 'nodate', items: [] }
-            };
-
-            pendingTasks.forEach(task => {
-                if (!task.dueDate) {
-                    groups.nodate.items.push(task);
-                } else {
-                    const taskDateMs = new Date(task.dueDate).getTime();
-                    if (task.dueDate < todayStr) {
-                        groups.overdue.items.push(task);
-                    } else if (task.dueDate === todayStr) {
-                        groups.today.items.push(task);
-                    } else if (taskDateMs > todayMs && taskDateMs <= sevenDaysLaterMs) {
-                        groups.thisweek.items.push(task);
-                    } else {
-                        groups.later.items.push(task);
-                    }
-                }
-            });
-
-            let groupsHtml = '';
-            let totalGrouped = 0;
-            for (const key in groups) {
-                const grp = groups[key];
-                if (grp.items.length > 0) {
-                    totalGrouped += grp.items.length;
-                    const groupCards = grp.items.map(item => this.createCardHtml(item)).join('');
-                    groupsHtml += `
-                        <div class="agenda-group">
-                            <div class="agenda-group-title ${grp.class}">
-                                <i class="fas ${grp.icon}"></i> ${grp.title} <span class="shelf-count" style="margin-left:4px;">${grp.items.length}</span>
-                            </div>
-                            <div class="agenda-cards-container">
-                                ${groupCards}
-                            </div>
-                        </div>
-                    `;
-                }
-            }
-
-            tasksHtml = totalGrouped > 0 
-                ? `<div class="agenda-timeline" style="padding: 8px 4px; width: 100%; display: flex; flex-direction: column; width: 100%; gap: 16px;">` + groupsHtml + `</div>`
-                : `<div class="shelf-empty" style="padding: 2rem; width: 100%; text-align: center; color: var(--text3);">No pending tasks. Great job!</div>`;
-        }
-
-        shelvesHtml += `
-            <div class="shelf-block">
-                <div class="shelf-hd">
-                    <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-                        <h3 class="shelf-title"><i class="fas fa-list-check"></i> Tasks Agenda <span class="shelf-count">${pendingTasks.length}</span></h3>
-                        <div class="segment-control tab-style-segment" style="display: flex; background: rgba(255, 255, 255, 0.04); border-radius: var(--r-xs); padding: 2px; border: 1px solid var(--border);">
-                            <button class="segment-btn ${this.taskMode === 'list' ? 'active' : ''}" onclick="window.sachApp.setTaskMode('list')" style="font-size: 0.65rem; padding: 4px 10px; font-weight:700;">List</button>
-                            <button class="segment-btn ${this.taskMode === 'agenda' ? 'active' : ''}" onclick="window.sachApp.setTaskMode('agenda')" style="font-size: 0.65rem; padding: 4px 10px; font-weight:700;">Agenda</button>
-                        </div>
-                    </div>
-                    
-                    ${this.taskMode === 'list' ? `
-                    <div class="carousel-controls">
-                        <button class="carousel-control-btn" onclick="window.sachApp.scrollCarousel('${taskCarouselId}', -1)" title="Scroll Left"><i class="fas fa-chevron-left"></i></button>
-                        <button class="carousel-control-btn" onclick="window.sachApp.scrollCarousel('${taskCarouselId}', 1)" title="Scroll Right"><i class="fas fa-chevron-right"></i></button>
-                    </div>
-                    ` : ''}
-                </div>
-                ${this.taskMode === 'list' ? `
-                <div class="carousel-shelf" id="${taskCarouselId}">
-                    ${tasksHtml}
-                </div>
-                ` : `<div style="display:block; width:100%;">${tasksHtml}</div>`}
-            </div>
-        `;
 
         // 4. Custom Shelves
         this.shelves.forEach((shelfName, idx) => {
@@ -2882,20 +2793,15 @@ class SachApp {
         this.dirtyShelves = false;
     }
 
-    togglePlannerWeek(week) {
-        this.plannerWeek = week;
-        this.dirtyShelves = true;
-        this.renderShelves();
-    }
 
-    setTaskMode(mode) {
-        this.taskMode = mode;
-        this.dirtyShelves = true;
-        this.renderShelves();
-    }
+
 
     // Grid rendering logic
     render() {
+        if (this.activeTab === 'stats') {
+            this.renderStats();
+            return;
+        }
         if (this.activeTab !== 'home') return;
 
         if (!this.linkGrid) return;
@@ -2931,26 +2837,7 @@ class SachApp {
                 this.cardElements.clear();
             } else {
                 let sorted = [...this.items];
-                if (this.activeSort === 'newest') {
-                    sorted.sort((a, b) => (b.date || 0) - (a.date || 0));
-                } else if (this.activeSort === 'oldest') {
-                    sorted.sort((a, b) => (a.date || 0) - (b.date || 0));
-                } else if (this.activeSort === 'title') {
-                    sorted.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
-                } else if (this.activeSort === 'priority') {
-                    const priorityWeight = { 'high': 3, 'medium': 2, 'low': 1 };
-                    sorted.sort((a, b) => {
-                        const weightA = priorityWeight[(a.priority || '').toLowerCase()] || 0;
-                        const weightB = priorityWeight[(b.priority || '').toLowerCase()] || 0;
-                        return weightB - weightA;
-                    });
-                } else if (this.activeSort === 'duedate') {
-                    sorted.sort((a, b) => {
-                        if (!a.dueDate) return 1;
-                        if (!b.dueDate) return -1;
-                        return a.dueDate.localeCompare(b.dueDate);
-                    });
-                }
+                sorted.sort((a, b) => (b.date || 0) - (a.date || 0));
                 
                 // Add an empty state container to toggle inline
                 const gridHTML = sorted.map(item => this.createCardHtml(item)).join('') + `
@@ -3041,6 +2928,18 @@ class SachApp {
             
             return `
                 <div class="card type-link ${item.favorite ? 'fav-active' : ''} ${item.completed ? 'completed-active' : ''}" data-id="${item.id}">
+                    <button class="quick-action edit-action" title="Edit" onclick="event.stopPropagation(); window.sachApp.openDetailsById('${item.id}', true)">
+                        <i class="fas fa-pen"></i>
+                    </button>
+                    <button class="quick-action complete-action ${item.completed ? 'active' : ''}" title="Mark Read" onclick="event.stopPropagation(); window.sachApp.toggleCompleted('${item.id}')">
+                        <i class="${item.completed ? 'fas fa-circle-check' : 'far fa-circle-check'}"></i>
+                    </button>
+                    <button class="quick-action fav-action ${item.favorite ? 'active' : ''}" title="Favorite" onclick="event.stopPropagation(); window.sachApp.toggleFavorite('${item.id}')">
+                        <i class="${item.favorite ? 'fas fa-star' : 'far fa-star'}"></i>
+                    </button>
+                    <button class="quick-action" title="Delete" onclick="event.stopPropagation(); window.sachApp.removeLink('${item.id}')">
+                        <i class="fas fa-times"></i>
+                    </button>
                     <div class="card-img-wrapper" onclick="window.open('${item.url.replace(/'/g, "\\'")}', '_blank')">
                         <img src="${item.thumb || 'https://via.placeholder.com/400x225?text=Image+Unavailable'}" class="card-img" loading="lazy" decoding="async" onerror="this.onerror=null; this.src='https://via.placeholder.com/400x225?text=Image+Unavailable'">
                         <div class="card-hover-overlay">
@@ -3130,49 +3029,7 @@ class SachApp {
             `;
         }
 
-        if (item.type === 'task') {
-            const clickHandler = `window.sachApp.openDetailsById('${item.id}')`;
-            const isCompleted = !!item.completed;
-            const checkboxClass = isCompleted ? 'checked' : '';
-            const checkboxIcon = isCompleted ? '<i class="fas fa-check"></i>' : '';
-            const priorityClass = (item.priority || 'medium').toLowerCase();
-            
-            // Overdue check
-            let isOverdue = false;
-            if (item.dueDate && !isCompleted) {
-                const today = new Date().toISOString().split('T')[0];
-                if (item.dueDate < today) {
-                    isOverdue = true;
-                }
-            }
-            const dateStyle = isOverdue ? 'color: var(--red); font-weight: bold;' : 'color: var(--text3);';
-            const dueDateText = item.dueDate ? `<div style="font-size:0.7rem; ${dateStyle} margin-top:2px;"><i class="far fa-calendar"></i> ${item.dueDate} ${isOverdue ? '(OVERDUE)' : ''}</div>` : '';
-            
-            return `
-                <div class="card type-task ${item.favorite ? 'fav-active' : ''} ${item.completed ? 'completed-active' : ''}" data-id="${item.id}" onclick="${clickHandler}">
-                    <button class="quick-action edit-action" title="Edit details" onclick="event.stopPropagation(); window.sachApp.openDetailsById('${item.id}', true)">
-                        <i class="fas fa-pen"></i>
-                    </button>
-                    <button class="quick-action" title="Delete" onclick="event.stopPropagation(); window.sachApp.removeLink('${item.id}')">
-                        <i class="fas fa-times"></i>
-                    </button>
-                    <div class="card-body" style="padding: 1rem; display: flex; gap: 12px; align-items: flex-start;">
-                        <div class="task-checkbox-btn ${checkboxClass}" onclick="event.stopPropagation(); window.sachApp.toggleCompleted('${item.id}')">
-                            ${checkboxIcon}
-                        </div>
-                        <div style="flex:1; min-width:0; display:flex; flex-direction:column; gap:4px;">
-                            <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; width:100%;">
-                                <span class="priority-badge ${priorityClass}">${priorityClass}</span>
-                                <span style="font-size:0.68rem; color:var(--text3); font-weight:600;">${timeAgo}</span>
-                            </div>
-                            <h3 class="card-title" style="margin:0; white-space:normal; overflow:visible;">${item.title}</h3>
-                            <p class="card-desc" style="margin:0; white-space:normal; overflow:visible; font-size:0.75rem; color:var(--text2);">${item.desc || 'No description'}</p>
-                            ${dueDateText}
-                        </div>
-                    </div>
-                </div>
-            `;
-        }
+
 
         // Movie card (type === 'movie')
         const completeIconClass = item.completed ? 'fas fa-circle-check' : 'far fa-circle-check';
@@ -3186,21 +3043,7 @@ class SachApp {
             : '';
         const hostOrYear = `<i class="fas fa-calendar-alt"></i> ${item.year}`;
         
-        let scheduledText = '';
-        if (this.planner) {
-            for (const [key, value] of Object.entries(this.planner)) {
-                if (String(value) === String(item.id)) {
-                    const parts = key.split('_w');
-                    const day = parts[0];
-                    const week = parts[1] || '1';
-                    scheduledText = `${day} (W${week})`;
-                    break;
-                }
-            }
-        }
-        const scheduleBadge = scheduledText 
-            ? `<span class="schedule-badge" onclick="event.stopPropagation(); window.sachApp.navigateToSchedule('${scheduledText}')" title="Click to jump to planner"><i class="far fa-calendar-days"></i> ${scheduledText}</span>`
-            : '';
+        const scheduleBadge = '';
 
         const tagsHTML = (item.tags || []).slice(0, 2).map(t => `<span class="card-tag-pill">${t}</span>`).join('');
         const clickHandler = `window.sachApp.openDetailsById('${item.id}')`;
@@ -3325,30 +3168,16 @@ class SachApp {
                     <p style="margin-top:6px; color:var(--text2);">${savedItem.desc || 'No description available'}</p>
                 </div>
             `;
-        } else if (savedItem.type === 'task') {
-            this.modalImg.style.aspectRatio = '16/9';
-            this.modalImg.parentElement.style.flex = '0 0 100%';
-            this.modalTagsLabel.textContent = 'Tags';
-            
-            this.modalDesc.innerHTML = `
-                <span class="year-badge" style="background:var(--green); color:#111;"><i class="fas fa-circle-check"></i> Task</span>
-                <div style="margin-top:8px; line-height:1.6;">
-                    <strong>Priority:</strong> <span class="priority-badge ${savedItem.priority || 'medium'}">${savedItem.priority || 'medium'}</span><br/>
-                    <strong>Due Date:</strong> ${savedItem.dueDate || 'No due date'}<br/>
-                    <p style="margin-top:6px; color:var(--text2);">${savedItem.desc || 'No description'}</p>
-                </div>
-            `;
+
         }
     }
 
     renderStats() {
         const movies = this.items.filter(i => i.type === 'movie');
         const books = this.items.filter(i => i.type === 'book');
-        const tasks = this.items.filter(i => i.type === 'task');
 
         const watchedMovies = movies.filter(m => m.completed);
         const readBooks = books.filter(b => b.completed || (b.currentPage && b.currentPage === b.totalPages));
-        const doneTasks = tasks.filter(t => t.completed);
 
         // 1. Movies Count
         const moviesCountEl = document.getElementById('stat-movies-count');
@@ -3372,14 +3201,6 @@ class SachApp {
         const booksCountEl = document.getElementById('stat-books-count');
         if (booksCountEl) booksCountEl.textContent = readBooks.length;
 
-        // 5. Tasks Done + Overdue
-        const tasksCountEl = document.getElementById('stat-tasks-count');
-        if (tasksCountEl) tasksCountEl.textContent = doneTasks.length;
-        const today = new Date().toISOString().split('T')[0];
-        const overdueTasks = tasks.filter(t => !t.completed && t.dueDate && t.dueDate < today);
-        const overdueEl = document.getElementById('stat-overdue-tasks');
-        if (overdueEl) overdueEl.textContent = overdueTasks.length;
-
         // Workspace Rank calculation
         const rankEl = document.getElementById('stat-workspace-rank');
         const rankSubEl = document.getElementById('stat-workspace-rank-sub');
@@ -3390,8 +3211,6 @@ class SachApp {
                     rank = 'Movie Director 🎬';
                 } else if (readBooks.length >= 5) {
                     rank = 'Bibliophile 📚';
-                } else if (doneTasks.length >= 8) {
-                    rank = 'Productivity Guru ⚡';
                 } else if (this.items.length >= 15) {
                     rank = 'Workspace Champ 🏆';
                 } else if (this.items.length >= 5) {
@@ -3474,180 +3293,13 @@ class SachApp {
         if (readingPercentageEl) readingPercentageEl.textContent = `${readingPercentage}%`;
         const readingProgressBarEl = document.getElementById('stats-reading-progress-bar');
         if (readingProgressBarEl) readingProgressBarEl.style.width = `${readingPercentage}%`;
-
-        // 8. Tasks Progress
-        const totalTaskCount = tasks.length;
-        const tasksPercentage = totalTaskCount > 0 ? Math.round(doneTasks.length * 100 / totalTaskCount) : 0;
-        const tasksPercentageEl = document.getElementById('stats-tasks-percentage');
-        if (tasksPercentageEl) tasksPercentageEl.textContent = `${tasksPercentage}%`;
-        const tasksProgressBarEl = document.getElementById('stats-tasks-progress-bar');
-        if (tasksProgressBarEl) tasksProgressBarEl.style.width = `${tasksPercentage}%`;
     }
 
 
 
-    openPlannerMovieSelector(day) {
-        if (!this.plannerModal || !this.plannerMoviesList) return;
-        
-        const pendingMovies = this.items.filter(i => i.type === 'movie' && !i.completed);
-        const watchedMovies = this.items.filter(i => i.type === 'movie' && i.completed);
-        const container = this.plannerMoviesList;
-        container.innerHTML = '';
-
-        if (this.plannerModalTitle) {
-            this.plannerModalTitle.textContent = `Schedule Movie for ${day}`;
-        }
-
-        if (pendingMovies.length === 0 && watchedMovies.length === 0) {
-            container.innerHTML = `
-                <div class="shelf-empty" style="padding: 1rem 0; text-align: center;">
-                    <i class="fas fa-clapperboard" style="font-size: 2rem; color: var(--text3); margin-bottom: 8px; display: block;"></i>
-                    No movies in your library.<br/>Search and add movies first!
-                </div>
-            `;
-            this.showModal(this.plannerModal);
-            return;
-        }
-
-        // Render Pending Movies Header
-        if (pendingMovies.length > 0) {
-            if (watchedMovies.length > 0) {
-                const pendingHeader = document.createElement('div');
-                pendingHeader.style.cssText = 'padding: 6px 4px; font-size: 0.65rem; font-weight: 800; text-transform: uppercase; color: var(--accent); border-bottom: 1px solid var(--border); margin-bottom: 8px;';
-                pendingHeader.textContent = 'Pending Watchlist';
-                container.appendChild(pendingHeader);
-            }
-            
-            pendingMovies.forEach(movie => {
-                const opt = document.createElement('div');
-                opt.className = 'planner-movie-option';
-                const thumbUrl = movie.thumb || '';
-                const thumbHtml = thumbUrl ? `<img src="${thumbUrl}" class="planner-movie-option-thumb" />` : `<div class="planner-movie-option-thumb" style="display:flex; align-items:center; justify-content:center; background:var(--surface2);"><i class="fas fa-film" style="color:var(--text3);"></i></div>`;
-                
-                opt.innerHTML = `
-                    ${thumbHtml}
-                    <div style="flex: 1; min-width: 0;">
-                        <h4 style="font-size: 0.85rem; font-weight: 700; margin:0; white-space:normal;">${movie.title}</h4>
-                        <p style="font-size: 0.72rem; color: var(--text2); margin: 0; white-space:normal;">${movie.year} ${movie.genre ? '• ' + movie.genre : ''}</p>
-                    </div>
-                `;
-                
-                opt.onclick = () => {
-                    if (!this.planner) this.planner = {};
-                    const key = day + '_w' + this.plannerWeek;
-                    this.planner[key] = movie.id;
-                    localStorage.setItem('sach_weekly_planner', JSON.stringify(this.planner));
-                    this.hideModal(this.plannerModal);
-                    this.dirtyShelves = true;
-                    this.renderShelves();
-                    this.render();
-                    this.showToast(`Scheduled "${movie.title}" for ${day}!`, "success");
-                };
-                container.appendChild(opt);
-            });
-        }
-
-        // Render Completed/Watched Movies (Recover/Re-watch Section)
-        if (watchedMovies.length > 0) {
-            const watchedHeader = document.createElement('div');
-            watchedHeader.style.cssText = 'padding: 6px 4px; font-size: 0.65rem; font-weight: 800; text-transform: uppercase; color: var(--green); border-bottom: 1px solid var(--border); margin-top: 12px; margin-bottom: 8px;';
-            watchedHeader.textContent = 'Watched Movies (Re-watch / Recover)';
-            container.appendChild(watchedHeader);
-            
-            watchedMovies.forEach(movie => {
-                const opt = document.createElement('div');
-                opt.className = 'planner-movie-option';
-                opt.style.borderColor = 'var(--green)';
-                const thumbUrl = movie.thumb || '';
-                const thumbHtml = thumbUrl ? `<img src="${thumbUrl}" class="planner-movie-option-thumb" />` : `<div class="planner-movie-option-thumb" style="display:flex; align-items:center; justify-content:center; background:var(--surface2);"><i class="fas fa-film" style="color:var(--text3);"></i></div>`;
-                
-                opt.innerHTML = `
-                    ${thumbHtml}
-                    <div style="flex: 1; min-width: 0;">
-                        <h4 style="font-size: 0.85rem; font-weight: 700; margin:0; white-space:normal;">${movie.title}</h4>
-                        <p style="font-size: 0.72rem; color: var(--text2); margin: 0; white-space:normal;">${movie.year} • <span style="color:var(--green); font-weight:700;"><i class="fas fa-check"></i> Watched</span></p>
-                    </div>
-                `;
-                
-                opt.onclick = () => {
-                    if (!this.planner) this.planner = {};
-                    const key = day + '_w' + this.plannerWeek;
-                    this.planner[key] = movie.id;
-                    
-                    // Recover completion state so it goes back to pending watchlist for planning
-                    movie.completed = false;
-                    this.saveItems();
-                    localStorage.setItem('sach_weekly_planner', JSON.stringify(this.planner));
-                    
-                    this.hideModal(this.plannerModal);
-                    this.dirtyShelves = true;
-                    this.renderShelves();
-                    this.render();
-                    this.showToast(`Recovered & scheduled "${movie.title}" for ${day}!`, "success");
-                };
-                container.appendChild(opt);
-            });
-        }
-
-        this.showModal(this.plannerModal);
-    }
-
-    removeScheduledMovie(day) {
-        const key = day + '_w' + this.plannerWeek;
-        if (this.planner && this.planner[key]) {
-            delete this.planner[key];
-            localStorage.setItem('sach_weekly_planner', JSON.stringify(this.planner));
-            this.dirtyShelves = true;
-            this.renderShelves();
-            this.render();
-            this.showToast(`Removed scheduled movie for ${day}.`);
-        }
-    }
 
 
 
-    navigateToSchedule(text) {
-        const parts = text.split(' (W');
-        const day = parts[0];
-        const week = parseInt(parts[1]) || 1;
-        
-        this.plannerWeek = week;
-        this.dirtyShelves = true;
-        this.switchTab('home');
-        this.renderShelves();
-        
-        // Scroll to the day card and flash highlight
-        setTimeout(() => {
-            const plannerCards = document.querySelectorAll('.planner-card, .planner-empty-card');
-            plannerCards.forEach(card => {
-                const badgeEl = card.querySelector('.planner-day-badge');
-                if (badgeEl && badgeEl.textContent.trim().toUpperCase() === day.substring(0, 3).toUpperCase()) {
-                    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    card.style.outline = '3px solid var(--accent)';
-                    card.style.outlineOffset = '3px';
-                    card.style.transition = 'outline 0.3s ease';
-                    setTimeout(() => {
-                        card.style.outline = '';
-                        card.style.outlineOffset = '';
-                    }, 1800);
-                }
-            });
-        }, 150);
-    }
-
-    markScheduledMovieCompleted(movieId, day) {
-        const movie = this.items.find(i => String(i.id) === String(movieId));
-        if (movie) {
-            movie.completed = true;
-            this.saveItems();
-            // Remove from all planner slots automatically
-            this.removePlannerEntry(movieId);
-            this.dirtyShelves = true;
-            this.renderShelves();
-            this.render();
-            this.showToast(`Congratulations! "${movie.title}" marked as watched 🎉`, "success");
-        }
-    }
 
     updateCardDOM(item, cardEl) {
         if (!cardEl) return;
