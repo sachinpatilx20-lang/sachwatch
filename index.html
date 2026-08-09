@@ -1,625 +1,184 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>Sach — Watchlist &amp; Bookmarks</title>
-    <meta name="description" content="Your minimal watchlist and link collection. Save movies, TV shows, and bookmarks. Sync peer-to-peer.">
-    <meta name="theme-color" content="#111113">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+    <title>Sach.in — Links &amp; Movies</title>
+    <meta name="description" content="Your personal space to save links, bookmark movies, and watch trailers.">
+    <!-- Clean sans-serif fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link rel="stylesheet" href="style.css">
-    <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js" defer></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" defer></script>
 </head>
 
-<body class="dark-theme">
+<body class="light-theme">
 
-<!-- Ambient Background Glows -->
-<div class="ambient-glow" aria-hidden="true">
-    <div class="glow-sphere glow-sphere-1"></div>
-    <div class="glow-sphere glow-sphere-2"></div>
-    <div class="glow-sphere glow-sphere-3"></div>
-</div>
-
-
-<!-- ═══════════════════════════════════════════
-     LOADER OVERLAY
-     ═══════════════════════════════════════════ -->
-<div id="loader" class="loader-overlay hidden">
-    <div class="loader-box">
-        <div class="loader-ring"></div>
-        <p id="loader-text" class="loader-label">Fetching metadata…</p>
-    </div>
-</div>
-
-<!-- ═══════════════════════════════════════════
-     TOAST STACK
-     ═══════════════════════════════════════════ -->
-<div id="toast-container" class="toast-stack" aria-live="polite"></div>
-
-<!-- ═══════════════════════════════════════════
-     TOP BAR
-     ═══════════════════════════════════════════ -->
-<header class="topbar" id="top-bar">
-    <!-- Logo -->
-    <button class="logo-btn" id="logoHome" aria-label="Go home">
-        <span class="logo-icon">
-            <img src="logo.png" alt="Logo" class="logo-img">
-        </span>
-    </button>
-
-    <nav class="desktop-nav" aria-label="Primary header navigation">
-        <button class="header-nav-link active" data-nav="home">Home</button>
-        <button class="header-nav-link" data-nav="search" onclick="document.getElementById('searchInput').focus(); document.getElementById('searchInput').select();">Search</button>
-        <button class="header-nav-link" data-nav="sync">Sync</button>
-    </nav>
-
-    <!-- Unified search bar -->
-    <div class="topbar-search header-search" id="topbar-search-wrap">
-        <div class="search-input-wrapper topbar-search-inner">
-            <i class="fas fa-magnifying-glass search-icon-inside"></i>
-            <input
-                id="searchInput"
-                type="search"
-                placeholder="Search your library…"
-                autocomplete="off"
-                spellcheck="false"
-            >
-            <button id="searchClearBtn" class="search-clear-btn hidden" aria-label="Clear">
-                <i class="fas fa-xmark"></i>
-            </button>
-        </div>
-        <div id="search-dropdown" class="topbar-dropdown hidden"></div>
+    <div id="loader" class="loader-overlay hidden">
+        <div class="loader-spinner"></div>
+        <p class="loader-text">Loading...</p>
     </div>
 
-</header>
+    <!-- Toast Container -->
+    <div id="toast-container" class="toast-container"></div>
 
-<!-- ═══════════════════════════════════════════
-     PAGE BODY
-     ═══════════════════════════════════════════ -->
-<div class="page-body">
-
-    <!-- ── HOME (MY LIBRARY) ──────────────────── -->
-    <section id="home-section" class="view-section">
-        
-
-
-        <!-- Netflix-style Shelves Rail Container -->
-        <div id="shelves-container"></div>
-
-        <div class="lib-wrap">
-            <div style="display: flex; gap: 12px; align-items: center; margin-bottom: 1rem; flex-wrap: wrap;">
-                <button id="lib-clear-all-btn" class="btn danger tiny" title="Clear entire library" style="border-radius: var(--r-xl); padding: 6px 14px; font-weight: 700; font-size: 0.74rem; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; height: 32px; margin-bottom: 12px;"><i class="fas fa-trash-can"></i> Clear All</button>
-                <div id="tagFilter" class="pill-bar category-bar" style="flex: 1; margin-bottom: 12px; padding-bottom: 2px;"></div>
-            </div>
-            <div id="linkGrid" class="card-grid link-grid"></div>
-
-            <!-- Create Custom Shelf Form -->
-            <div class="create-section-wrap">
-                <button class="create-section-btn" id="create-shelf-btn"><i class="fas fa-plus"></i> Create Custom Shelf</button>
-                <form class="create-section-form" id="create-shelf-form">
-                    <input type="text" id="new-shelf-input" class="new-section-input" placeholder="Shelf Name" required autocomplete="off">
-                    <button type="submit" class="btn primary tiny">Create</button>
-                </form>
-            </div>
-        </div>
-    </section>
-
-    <!-- ── SYNC ───────────────────────────────── -->
-    <section id="sync-section" class="view-section hidden">
-        <div class="sync-wrap">
-            <h2 class="sync-heading">Sync Hub</h2>
-            <p class="sync-sub">Share your library instantly between devices using peer-to-peer technology. No account needed.</p>
-            
-            <div class="status-indicator-row" style="margin-top: -0.75rem; margin-bottom: 1.25rem;">
-                <span class="status-pulse ready" id="sync-status-indicator"></span>
-                <span id="sync-status-text">Ready — click Generate to broadcast</span>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <div class="logo" id="logoHome" style="cursor: pointer;">
+                <svg class="logo-play-icon" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M8 5v14l11-7z"></path>
+                </svg>
+                <h1>Sach.in</h1>
             </div>
 
-            <div class="sync-grid">
-                <!-- Generate code card -->
-                <div class="sync-panel">
-                    <div class="sync-panel-icon"><i class="fas fa-broadcast-tower"></i></div>
-                    <h3 class="sync-panel-title">Broadcast Library</h3>
-                    <p class="sync-hint">Generate a 6-digit pairing code. Share it with another device.</p>
-                    <div id="sync-code-display" class="sync-code">——</div>
-                    <div id="p2p-qr" class="qr-wrap hidden"></div>
-                    <button id="copy-sync-link" class="btn secondary wide hidden" style="margin-bottom: 8px;">
-                        <i class="fas fa-copy"></i> Copy Pairing Link
-                    </button>
-                    <button id="generate-sync" class="btn primary wide">
-                        <i class="fas fa-satellite-dish"></i> Generate Code
-                    </button>
+            <!-- Live Search Bar -->
+            <div class="header-search" style="position: relative;">
+                <div class="search-input-wrapper">
+                    <input type="text" id="searchInput" placeholder="Search links, movies &amp; shows…" autocomplete="off">
+                    <button id="searchClearBtn" class="search-clear-btn hidden" title="Clear">×</button>
                 </div>
-
-                <!-- Join with code card -->
-                <div class="sync-panel">
-                    <div class="sync-panel-icon dim"><i class="fas fa-link"></i></div>
-                    <h3 class="sync-panel-title">Join a Device</h3>
-                    <p class="sync-hint">Enter the 6-digit code shown on the primary device.</p>
-                    <input
-                        type="tel"
-                        id="sync-input"
-                        class="sync-input-field sync-input"
-                        placeholder="000000"
-                        maxlength="6"
-                        inputmode="numeric"
-                    >
-                    <button id="load-sync" class="btn secondary wide">
-                        <i class="fas fa-plug"></i> Connect Device
-                    </button>
-                </div>
-
-                <!-- Backup & Restore card -->
-                <div class="sync-panel">
-                    <div class="sync-panel-icon"><i class="fas fa-database"></i></div>
-                    <h3 class="sync-panel-title">Backup &amp; Restore</h3>
-                    <p class="sync-hint">Export your library as a local JSON file or restore/merge it from a previously saved JSON file.</p>
-                    <div class="backup-btn-group" style="display: flex; flex-direction: column; gap: 8px; width: 100%;">
-                        <button id="export-library" class="btn secondary wide">
-                            <i class="fas fa-download"></i> Export JSON Backup
-                        </button>
-                        <button id="import-library-trigger" class="btn secondary wide">
-                            <i class="fas fa-upload"></i> Import Backup File
-                        </button>
-                        <input type="file" id="import-library-file" accept=".json" style="display: none;">
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- ── DASHBOARD (STATS) ─────────────────── -->
-    <section id="stats-section" class="view-section hidden">
-        <div class="stats-wrap" style="max-width: 1200px; margin: 0 auto; padding: 2rem 1.5rem 5rem;">
-            <div class="stats-header-row" style="margin-bottom: 2rem;">
-                <h2 class="stats-heading" style="font-size: 1.75rem; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 4px;">Personal Dashboard</h2>
-                <p class="stats-sub" style="color: var(--text2); font-size: 0.88rem;">Insights and metrics from your library collection.</p>
-            </div>
-            
-            <!-- Rank & Quote card -->
-            <div class="stats-quote-card" style="margin-bottom: 2rem; display: flex; justify-content: space-between; align-items: center; gap: 20px; flex-wrap: wrap; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md); padding: 1.5rem; position: relative; overflow: hidden;">
-                <div class="quote-content" style="flex: 1; min-width: 280px;">
-                    <p id="stats-quote-text" class="quote-text" style="font-style: italic; font-size: 0.95rem; margin-bottom: 6px; font-weight: 500; color: var(--text);">"The way to get started is to quit talking and begin doing."</p>
-                    <p id="stats-quote-author" class="quote-author" style="font-size: 0.76rem; color: var(--text3); font-weight: 600;">— Walt Disney</p>
-                </div>
-                <div class="rank-badge-wrap" style="text-align: right; min-width: 150px; display: flex; flex-direction: column; gap: 4px;">
-                    <div id="stat-workspace-rank" class="rank-value" style="font-size: 1.15rem; font-weight: 800; color: var(--accent);">Fresh Slate 🌟</div>
-                    <div id="stat-workspace-rank-sub" class="rank-label" style="font-size: 0.72rem; color: var(--text2); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Logged: 0 items</div>
-                </div>
-            </div>
-
-            <!-- Stats grid -->
-            <div class="stats-grid">
-                <!-- Movies -->
-                <div class="stat-card">
-                    <div class="stat-card-icon cinema-icon"><i class="fas fa-film"></i></div>
-                    <div id="stat-movies-count" class="stat-card-val">0</div>
-                    <div class="stat-card-label">Movies Watched</div>
-                </div>
-                <!-- Movies Avg Rating -->
-                <div class="stat-card">
-                    <div class="stat-card-icon cinema-icon"><i class="fas fa-star" style="color:#f5c518"></i></div>
-                    <div id="stat-movies-rating" class="stat-card-val">0.0</div>
-                    <div class="stat-card-label">Avg Rating</div>
-                </div>
-                <!-- Movies Hours -->
-                <div class="stat-card">
-                    <div class="stat-card-icon cinema-icon"><i class="fas fa-hourglass-half"></i></div>
-                    <div id="stat-movies-hours" class="stat-card-val">0</div>
-                    <div class="stat-card-label">Hours Logged</div>
-                </div>
-                <!-- Books -->
-                <div class="stat-card">
-                    <div class="stat-card-icon book-icon"><i class="fas fa-book"></i></div>
-                    <div id="stat-books-count" class="stat-card-val">0</div>
-                    <div class="stat-card-label">Books Read</div>
-                </div>
-
-            </div>
-
-            <!-- Analytics panels grid -->
-            <div class="analytics-grid" style="margin-top: 1.5rem;">
-                <!-- Top Genres -->
-                <div class="analytics-panel">
-                    <h3 class="panel-title">Top Movie Genres</h3>
-                    <div id="stats-genres-list" class="genre-chart-list">
-                        <div class="shelf-empty" style="padding:0;">No genre data logged yet. Add genres in Movie details.</div>
-                    </div>
-                </div>
-                <!-- Reading & Task Progress -->
-                <div class="analytics-panel" style="display: flex; flex-direction: column; gap: 24px;">
-                    <!-- Reading Progress -->
-                    <div>
-                        <h3 class="panel-title" style="margin-bottom: 12px; border: none; padding: 0;">Reading Progress</h3>
-                        <div class="progress-info-row" style="display: flex; justify-content: space-between; font-size: 0.8rem; font-weight: 700; margin-bottom: 6px;">
-                            <span style="color: var(--text2);">Total Pages Logged</span>
-                            <span id="stats-reading-percentage" style="color: #facc15;">0%</span>
-                        </div>
-                        <div class="genre-progress-bg">
-                            <div id="stats-reading-progress-bar" class="genre-progress-bar" style="width: 0%; background: linear-gradient(135deg, #facc15 0%, #ca8a04 100%); border-radius: var(--r-xl);"></div>
-                        </div>
-                    </div>
-
-                </div>
-            </div>
-        </div>
-    </section>
-
-</div>
-<!-- end .page-body -->
-
-<!-- ═══════════════════════════════════════════
-     BOTTOM NAVIGATION
-     ═══════════════════════════════════════════ -->
-<nav class="bottom-nav tab-bar" role="navigation" aria-label="Main navigation">
-    <button class="nav-tab tab-item active" data-tab="home" aria-label="Home">
-        <i class="fas fa-house"></i>
-        <span>Home</span>
-    </button>
-    <button class="nav-tab tab-item" data-tab="search" aria-label="Search"
-        onclick="document.getElementById('searchInput').focus(); document.getElementById('searchInput').select();">
-        <i class="fas fa-magnifying-glass"></i>
-        <span>Search</span>
-    </button>
-    <button class="nav-tab tab-item" data-tab="sync" aria-label="Sync">
-        <i class="fas fa-rotate"></i>
-        <span>Sync</span>
-    </button>
-</nav>
-
-
-
-<!-- ═══════════════════════════════════════════
-     HIDDEN FORM INPUTS (for JS ingestion)
-     ═══════════════════════════════════════════ -->
-<input type="url" id="urlInput" style="display:none" tabindex="-1">
-<input type="text" id="addTagsInput" style="display:none" tabindex="-1">
-<button id="addBtn" style="display:none" tabindex="-1"></button>
-
-<!-- ═══════════════════════════════════════════
-     DETAILS MODAL — BOTTOM SHEET
-     ═══════════════════════════════════════════ -->
-<div class="modal-overlay hidden" id="main-modal" role="dialog" aria-modal="true" aria-label="Item details">
-
-    <div class="modal-content">
-        <!-- Ambient Backdrop Glow -->
-        <div class="modal-backdrop-glow" id="modal-backdrop-glow"></div>
-
-        <!-- Drag handle -->
-        <div class="modal-drag-handle" id="modal-drag-handle"></div>
-
-        <!-- Poster + info row -->
-        <div class="modal-top-row">
-            <div class="modal-poster-side">
-                <img id="modal-img" src="" alt="Poster" class="modal-poster-img" loading="lazy">
-                <!-- Trailer Overlay Inside Banner -->
-                <div id="modal-trailer-container" class="modal-trailer-wrap hidden">
-                    <iframe id="modal-trailer-iframe" src="" style="position: absolute; top:0; left:0; width:100%; height:100%; border:none;" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
-                </div>
-                <div class="modal-banner-scrim"></div>
-            </div>
-            <div class="modal-info-side">
-                <h2 id="modal-title" class="modal-item-title"></h2>
-                <div id="modal-desc" class="modal-item-meta"></div>
-            </div>
-        </div>
-
-        <!-- Tabbed Navigation Inside Modal -->
-        <div class="segment-control tab-style-segment" id="detailsModalTabs" style="display: flex; background: rgba(255, 255, 255, 0.04); border-radius: var(--r-xs); padding: 2px; border: 1px solid var(--border); margin: 12px 16px 0;">
-            <button class="segment-btn active" data-tab="overview" style="flex: 1; font-size: 0.68rem; padding: 6px; font-weight:700;">🔍 Overview</button>
-            <button class="segment-btn" data-tab="notes" style="flex: 1; font-size: 0.68rem; padding: 6px; font-weight:700;">📝 Notes &amp; Tags</button>
-            <button class="segment-btn" data-tab="edit" style="flex: 1; font-size: 0.68rem; padding: 6px; font-weight:700;">⚙️ Edit</button>
-        </div>
-
-        <!-- Action body -->
-        <div class="modal-body modal-actions">
-
-            <!-- 1️⃣ OVERVIEW TAB -->
-            <div id="details-tab-overview" class="details-tab-panel">
-                <!-- Link-specific actions -->
-                <div id="modal-link-actions" class="modal-btn-row hidden">
-                    <button id="modal-open-url" class="btn secondary">
-                        <i class="fas fa-arrow-up-right-from-square"></i> Open Link
-                    </button>
-                    <button id="modal-copy-url" class="btn secondary">
-                        <i class="fas fa-copy"></i> Copy URL
-                    </button>
-                </div>
-
-                <!-- Saved Item Quick-States Row (Favorite & Watch Status) -->
-                <div id="modal-state-actions" class="modal-btn-row hidden" style="margin-top: 4px;">
-                    <button id="modal-fav-btn" class="btn secondary">
-                        <i class="far fa-star"></i> Favorite
-                    </button>
-                    <button id="modal-status-btn" class="btn secondary">
-                        <i class="far fa-circle-check"></i> Mark Completed
-                    </button>
-                </div>
-
-                <!-- Primary CTA buttons -->
-                <div class="modal-cta-group" style="margin-top: 12px;">
-                    <button id="add-to-library" class="btn primary wide">
-                        <i class="fas fa-circle-plus"></i> Add to Library
-                    </button>
-                </div>
-            </div>
-
-            <!-- 2️⃣ NOTES & TAGS TAB -->
-            <div id="details-tab-notes" class="details-tab-panel hidden">
-                <div class="edit-row">
-                    <label class="edit-label">Personal Notes / Comments</label>
-                    <textarea id="modal-edit-notes" class="edit-input" placeholder="Type your review, key quotes, or thoughts here..." style="min-height: 80px; resize: vertical; padding: 8px; font-family: var(--font); font-size: 0.8rem;"></textarea>
-                    <button id="modal-save-notes-btn" class="btn secondary tiny" style="margin-top: 6px; width: fit-content; align-self: flex-end;">Save Notes</button>
-                </div>
-
-                <!-- Tags & Actors section -->
-                <div id="modal-actors-section" class="modal-tags-block" style="border: none; padding: 0; margin-top: 12px;">
-                    <div class="section-label" id="modal-tags-label">Tags &amp; Actors</div>
-                    <div id="modal-actor-tags" class="actor-tags-wrap"></div>
-                    <div id="modal-tag-suggestions" class="actor-tags-wrap" style="margin-top: 4px; margin-bottom: 6px; gap: 4px;"></div>
-                    <div class="modal-actor-input-wrap">
-                        <input
-                            type="text"
-                            id="modal-actor-input"
-                            class="tag-input"
-                            placeholder="Add tag or actor name…"
-                        >
-                        <button id="modal-add-actor" class="add-tag-btn" aria-label="Add tag">
-                            <i class="fas fa-plus"></i>
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 3️⃣ EDIT TAB -->
-            <div id="details-tab-edit" class="details-tab-panel hidden">
-                <!-- Inline edit form -->
-                <div id="modal-edit-section" class="modal-edit-block" style="padding: 0; background: none; border: none; box-shadow: none; margin: 0;">
-                    <!-- Hidden fields kept for JS compatibility -->
-                    <div class="edit-row" style="display:none">
-                        <select id="modal-edit-type" class="edit-input">
-                            <option value="movie">Movie / TV Show</option>
-                            <option value="link">Web Link / Bookmark</option>
-                            <option value="book">Book</option>
-                        </select>
-                    </div>
-                    <div class="edit-row" style="display:none">
-                        <input type="text" id="modal-edit-title" class="edit-input" placeholder="Title">
-                    </div>
-                    <div id="edit-cinema-fields" class="type-fields-group" style="display:none">
-                        <input type="text" id="modal-edit-director" class="edit-input">
-                        <input type="text" id="modal-edit-genre" class="edit-input">
-                        <input type="number" id="modal-edit-runtime" class="edit-input">
-                        <div class="star-picker" id="modal-edit-star-picker" style="display:none">
-                            <i class="far fa-star" data-rating="1"></i>
-                            <i class="far fa-star" data-rating="2"></i>
-                            <i class="far fa-star" data-rating="3"></i>
-                            <i class="far fa-star" data-rating="4"></i>
-                            <i class="far fa-star" data-rating="5"></i>
-                        </div>
-                    </div>
-                    <div id="edit-book-fields" class="type-fields-group hidden" style="display:none">
-                        <input type="text" id="modal-edit-author" class="edit-input">
-                        <input type="number" id="modal-edit-current-page" class="edit-input">
-                        <input type="number" id="modal-edit-total-pages" class="edit-input">
-                    </div>
-                    <div class="edit-row" style="display:none">
-                        <input type="text" id="modal-edit-desc" class="edit-input">
-                    </div>
-                    <!-- Tag / actor chip builder -->
-                    <div id="tag-chip-container" style="
-                        display: flex; flex-wrap: wrap; gap: 6px;
-                        min-height: 38px; padding: 6px 8px;
-                        border: 1px solid var(--border3);
-                        border-radius: var(--r-md);
-                        background: var(--surface2);
-                        cursor: text;
-                        margin-bottom: 10px;
-                        align-items: center;
-                    " onclick="document.getElementById('tag-chip-input').focus()">
-                        <!-- chips injected here by JS -->
-                        <input id="tag-chip-input" type="text"
-                            placeholder="Type name &amp; press Enter…"
-                            style="border:none; outline:none; background:transparent;
-                                   color:var(--text); font-size:0.82rem; flex:1; min-width:120px; padding:2px 4px;">
-                    </div>
-                    <!-- Hidden field keeps existing JS save logic working -->
-                    <input type="text" id="modal-edit-tags" style="display:none">
-                    <button id="modal-edit-save" class="btn primary wide">
-                        <i class="fas fa-floppy-disk"></i> Save
-                    </button>
-                </div>
-            </div>
-
-            <!-- Global Footer Actions inside modal body -->
-            <div class="modal-cta-group" style="margin-top: 1.5rem; border-top: 1px solid var(--border); padding-top: 1rem;">
-                <button id="close-modal" class="btn ghost wide">
-                    Close Details
+                <button id="searchBtn" class="search-btn" title="Search">
+                    <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                    </svg>
                 </button>
+
+                <!-- Floating IMDb Search Dropdown -->
+                <div id="search-dropdown" class="topbar-dropdown hidden"></div>
             </div>
 
-        </div>
-        <!-- end .modal-body -->
+            <nav class="header-actions">
+                <button id="themeToggle" class="btn icon-btn" title="Toggle Theme">
+                    <svg id="themeIcon" viewBox="0 0 24 24" width="18" height="18" stroke="currentColor"
+                        stroke-width="2" fill="none">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                </button>
+                <button id="exportBtn" class="btn secondary">Export</button>
+                <button id="importBtn" class="btn secondary">Import</button>
+                <input type="file" id="importFileInput" accept=".json" style="display: none;">
+            </nav>
+        </header>
 
+        <!-- Main Content -->
+        <main>
+            <section class="add-section border-panel">
+                <div class="input-group">
+                    <input type="url" id="urlInput" placeholder="Paste link here..." autocomplete="off">
+                    <div class="tag-input-wrapper">
+                        <input type="text" id="addTagsInput" placeholder="Add a tag (e.g. cool, video)">
+                        <button id="addTagBtn" class="btn icon-btn" type="button" title="Add Tag">+</button>
+                    </div>
+                    <button id="addBtn" class="btn primary">Save Link</button>
+                </div>
+                <div id="addTagsList" class="form-tag-list"></div>
+            </section>
+
+            <div id="tagFilter" class="category-bar">
+                <button class="cat-pill active" data-tag="all">All Stuff</button>
+                <button class="cat-pill" data-tag="movie"><i class="fas fa-film"></i> Movies</button>
+            </div>
+
+            <div id="linkGrid" class="link-grid">
+                <div class="empty-state">
+                    <div class="empty-title">Your collection is empty right now</div>
+                    <div class="empty-sub">Paste a link above or search for a movie to get started!</div>
+                </div>
+            </div>
+        </main>
     </div>
-    <!-- end .modal-content -->
 
-</div>
-<!-- end #main-modal -->
-
-<!-- Thumbnail Picker Modal -->
-<div class="modal-overlay hidden" id="thumbModal" role="dialog" aria-modal="true" aria-label="Select thumbnail">
-    <div class="modal-content">
-        <!-- Drag handle -->
-        <div class="modal-drag-handle"></div>
-        <div class="modal-body" style="padding-top: 0.5rem;">
-            <h2 style="font-size: 1.15rem; font-weight: 800; line-height: 1.25; margin-bottom: 6px; border: none; padding: 0;">Select Thumbnail</h2>
-            <p id="thumbStatus" class="modal-item-meta" style="font-size: 0.8rem; color: var(--text2); margin-bottom: 12px;"></p>
+    <!-- Thumbnail Picker Modal -->
+    <div id="thumbModal" class="modal-overlay hidden">
+        <div class="modal-content border-panel">
+            <h2>Pick a Cover Image</h2>
+            <p id="thumbStatus" class="modal-subtitle"></p>
             <div id="thumbPicker" class="thumb-picker"></div>
-            <div class="modal-cta-group" style="margin-top: 1rem;">
-                <button id="confirmThumb" class="btn primary wide">
-                    <i class="fas fa-circle-check"></i> Confirm Thumbnail
-                </button>
-                <div style="display: flex; gap: 8px; width: 100%;">
-                    <button id="retryFetchBtn" class="btn secondary" style="flex: 1;">
-                        <i class="fas fa-rotate"></i> Try Again
-                    </button>
-                    <button id="closeModal" class="btn ghost" style="flex: 1;">
-                        Cancel
-                    </button>
-                </div>
+            <div class="modal-actions">
+                <button id="retryFetchBtn" class="btn secondary">Try Again</button>
+                <button id="closeModal" class="btn secondary">Cancel</button>
+                <button id="confirmThumb" class="btn primary">Looks Good</button>
             </div>
         </div>
     </div>
-</div>
 
-<!-- Planner Movie Selection Modal -->
-<div class="modal-overlay hidden" id="plannerModal" role="dialog" aria-modal="true" aria-label="Schedule Movie">
-    <div class="modal-content" style="max-height: 85vh; overflow-y: auto;">
-        <div class="modal-drag-handle"></div>
-        <div class="modal-body" style="padding-top: 0.5rem;">
-            <h2 id="plannerModalTitle" style="font-size: 1.15rem; font-weight: 800; line-height: 1.25; margin-bottom: 6px; border: none; padding: 0;">Schedule Movie</h2>
-            <p class="modal-item-meta" style="font-size: 0.8rem; color: var(--text2); margin-bottom: 12px;">Choose a movie from your library to schedule:</p>
-            <div id="plannerMoviesList" style="display: flex; flex-direction: column; gap: 8px; max-height: 50vh; overflow-y: auto; padding: 4px;">
-                <!-- Watchlist options -->
+    <!-- Edit Link Modal -->
+    <div id="editModal" class="modal-overlay hidden">
+        <div class="modal-content border-panel">
+            <h2>Edit Details</h2>
+            <div class="edit-fields">
+                <div class="field">
+                    <label>Title / Name</label>
+                    <input type="text" id="editTitle" placeholder="Title">
+                </div>
+                <div class="field">
+                    <label>Notes / Details</label>
+                    <textarea id="editDesc" placeholder="Add your notes or description here..."></textarea>
+                </div>
+                <div class="field">
+                    <label>Tags / Categories</label>
+                    <div class="tag-input-wrapper">
+                        <input type="text" id="editTags" placeholder="Add a tag">
+                        <button id="editTagBtn" class="btn icon-btn" type="button">+</button>
+                    </div>
+                    <div id="editTagsList" class="form-tag-list"></div>
+                </div>
+                <div class="thumbnail-section">
+                    <label>Cover Image</label>
+                    <div id="editThumbPicker" class="thumb-picker"></div>
+                    <div class="screenshot-tools">
+                        <h3>Refresh Screenshot</h3>
+                        <div class="crop-presets">
+                            <button class="btn tiny active" data-crop="1200">Full</button>
+                            <button class="btn tiny" data-crop="800">Wide</button>
+                            <button class="btn tiny" data-crop="400">Square</button>
+                        </div>
+                        <button id="genScreenshotBtn" class="btn secondary small">Snap new cover</button>
+                    </div>
+                </div>
             </div>
-            <div class="modal-cta-group" style="margin-top: 1rem;">
-                <button id="closePlannerModalBtn" class="btn ghost wide">Cancel</button>
-            </div>
-        </div>
-    </div>
-</div>
-<!-- end #plannerModal -->
-
-<!-- Quick Add Modal -->
-<div class="modal-overlay hidden" id="quickAddModal" role="dialog" aria-modal="true" aria-label="Quick Add Item">
-    <div class="modal-content" style="max-height: 90vh; overflow-y: auto;">
-        <!-- Drag handle -->
-        <div class="modal-drag-handle"></div>
-        <div class="modal-body" style="padding-top: 0.5rem;">
-            <h2 style="font-size: 1.15rem; font-weight: 800; line-height: 1.25; margin-bottom: 12px; border: none; padding: 0;">Quick Add Item</h2>
-            
-            <!-- Type segment selector inside modal -->
-            <div class="segment-control tab-style-segment" id="quickAddTypeSegment" style="display: flex; background: rgba(255, 255, 255, 0.04); border-radius: var(--r-xs); padding: 2px; border: 1px solid var(--border); margin-bottom: 1rem;">
-                <button class="segment-btn active" data-type="movie" style="flex: 1; font-size: 0.68rem; padding: 6px; font-weight:700;">🎬 Movie</button>
-                <button class="segment-btn" data-type="book" style="flex: 1; font-size: 0.68rem; padding: 6px; font-weight:700;">📖 Book</button>
-                <button class="segment-btn" data-type="link" style="flex: 1; font-size: 0.68rem; padding: 6px; font-weight:700;">🔗 Link</button>
-
-            </div>
-
-            <!-- Form Container -->
-            <div id="quickAddForm" class="modal-edit-block" style="padding: 0; background: none; border: none; box-shadow: none;">
-                <!-- Common Field: Title -->
-                <div class="edit-row">
-                    <label class="edit-label">Title / Name</label>
-                    <input type="text" id="qa-title" class="edit-input" placeholder="Title" required autocomplete="off">
-                </div>
-
-                <!-- 🎬 Movie Specific Fields -->
-                <div id="qa-fields-movie" class="type-fields-group">
-                    <div class="edit-row">
-                        <label class="edit-label">Director</label>
-                        <input type="text" id="qa-movie-director" class="edit-input" placeholder="Director's Name">
-                    </div>
-                    <div class="edit-row flex-row" style="display:flex; gap:10px; flex-wrap: wrap;">
-                        <div style="flex:1; min-width: 140px;">
-                            <label class="edit-label">Genre</label>
-                            <input type="text" id="qa-movie-genre" class="edit-input" placeholder="e.g. Sci-Fi, Drama">
-                        </div>
-                        <div style="flex:1; min-width: 140px;">
-                            <label class="edit-label">Runtime (minutes)</label>
-                            <input type="number" id="qa-movie-runtime" class="edit-input" placeholder="e.g. 120" min="0">
-                        </div>
-                    </div>
-                    <div class="edit-row">
-                        <label class="edit-label">Star Rating (1-5)</label>
-                        <div class="star-picker" id="qa-movie-star-picker">
-                            <i class="far fa-star" data-rating="1"></i>
-                            <i class="far fa-star" data-rating="2"></i>
-                            <i class="far fa-star" data-rating="3"></i>
-                            <i class="far fa-star" data-rating="4"></i>
-                            <i class="far fa-star" data-rating="5"></i>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 📖 Book Specific Fields -->
-                <div id="qa-fields-book" class="type-fields-group hidden">
-                    <div class="edit-row">
-                        <label class="edit-label">Author</label>
-                        <input type="text" id="qa-book-author" class="edit-input" placeholder="Author's Name">
-                    </div>
-                    <div class="edit-row flex-row" style="display:flex; gap:10px;">
-                        <div style="flex:1;">
-                            <label class="edit-label">Current Page</label>
-                            <input type="number" id="qa-book-current-page" class="edit-input" placeholder="0" min="0" value="0">
-                        </div>
-                        <div style="flex:1;">
-                            <label class="edit-label">Total Pages</label>
-                            <input type="number" id="qa-book-total-pages" class="edit-input" placeholder="100" min="1" value="100">
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 🔗 Link Specific Fields -->
-                <div id="qa-fields-link" class="type-fields-group hidden">
-                    <div class="edit-row">
-                        <label class="edit-label">URL / Address</label>
-                        <div style="display: flex; gap: 8px;">
-                            <input type="url" id="qa-link-url" class="edit-input" placeholder="https://example.com" style="flex: 1;">
-                            <button type="button" id="qa-link-fetch-btn" class="btn secondary" style="font-size: 0.72rem; padding: 0 12px; height: auto;"><i class="fas fa-satellite-dish"></i> Fetch</button>
-                        </div>
-                    </div>
-                    <div id="qa-link-thumb-section" class="hidden" style="margin-top: 10px; margin-bottom: 10px;">
-                        <label class="edit-label">Select Thumbnail</label>
-                        <div id="qa-link-thumb-picker" class="thumb-picker"></div>
-                    </div>
-                </div>
-
-
-
-                <!-- Common Fields -->
-                <div class="edit-row">
-                    <label class="edit-label">Details / Description</label>
-                    <input type="text" id="qa-desc" class="edit-input" placeholder="Details">
-                </div>
-                <div class="edit-row">
-                    <label class="edit-label">Tags (comma-separated)</label>
-                    <input type="text" id="qa-tags" class="edit-input" placeholder="e.g. movies, personal, urgent">
-                </div>
-                <div class="edit-row" id="qa-thumb-row">
-                    <label class="edit-label">Image / Poster URL</label>
-                    <input type="url" id="qa-thumb" class="edit-input" placeholder="https://example.com/image.jpg">
-                </div>
-                <div class="edit-row">
-                    <label class="edit-label">Assign to Shelf</label>
-                    <select id="qa-shelf" class="edit-input">
-                        <option value="">None (General Library)</option>
-                    </select>
-                </div>
-
-                <div class="modal-cta-group" style="margin-top: 1.5rem;">
-                    <button id="qa-save-btn" class="btn primary wide">
-                        <i class="fas fa-circle-plus"></i> Add Item
-                    </button>
-                    <button id="qa-cancel-btn" class="btn ghost wide">
-                        Cancel
-                    </button>
-                </div>
+            <div class="modal-actions">
+                <button id="closeEditModal" class="btn secondary">Cancel</button>
+                <button id="saveEditBtn" class="btn primary">Save Changes</button>
             </div>
         </div>
     </div>
-</div>
 
-<!-- Quick Add FAB -->
-<button id="quickAddFab" class="quick-add-fab" aria-label="Quick Add Item" title="Quick Add Item">
-    <i class="fas fa-plus"></i>
-</button>
+    <!-- IMDb Movie Details & Trailer Modal -->
+    <div id="movieModal" class="modal-overlay hidden">
+        <div class="modal-content border-panel" style="max-width: 600px;">
+            <div style="display: flex; gap: 16px; margin-bottom: 16px;">
+                <img id="movieModalPoster" src="" alt="Poster" style="width: 110px; height: 160px; object-fit: cover; border-radius: 8px; flex-shrink: 0; background: #000;">
+                <div style="flex: 1; min-width: 0;">
+                    <div style="display: inline-flex; align-items: center; gap: 6px; background: #f5c518; color: #000; font-size: 0.7rem; font-weight: 800; padding: 2px 8px; border-radius: 4px; margin-bottom: 6px;">
+                        <i class="fab fa-imdb"></i> <span id="movieModalType">Movie</span>
+                    </div>
+                    <h2 id="movieModalTitle" style="font-size: 1.25rem; font-weight: 800; line-height: 1.2; margin-bottom: 4px;"></h2>
+                    <p id="movieModalYear" style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 8px;"></p>
+                    <p id="movieModalCast" style="font-size: 0.82rem; line-height: 1.4; color: var(--text-color);"></p>
+                </div>
+            </div>
 
-<script src="app.js"></script>
+            <!-- Trailer Video Container -->
+            <div id="movieTrailerWrap" class="hidden" style="position: relative; width: 100%; padding-top: 56.25%; border-radius: 8px; overflow: hidden; background: #000; margin-bottom: 16px;">
+                <iframe id="movieTrailerIframe" src="" style="position: absolute; top:0; left:0; width:100%; height:100%; border:none;" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+            </div>
+
+            <div class="modal-actions" style="display: flex; gap: 8px; flex-wrap: wrap;">
+                <button id="saveMovieToVaultBtn" class="btn primary" style="flex: 1;"><i class="fas fa-bookmark"></i> Bookmark Movie</button>
+                <a id="openImdbPageBtn" href="#" target="_blank" rel="noopener noreferrer" class="btn secondary" style="flex: 1; text-align: center; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; gap: 6px; background: rgba(245, 197, 24, 0.15); color: #f5c518; border: 1px solid rgba(245, 197, 24, 0.3);">
+                    <i class="fab fa-imdb"></i> View on IMDb
+                </a>
+                <button id="closeMovieModal" class="btn secondary">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
 </body>
+
 </html>
