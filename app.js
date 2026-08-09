@@ -78,28 +78,11 @@ class VidLinkApp {
         this.openImdbPageBtn = document.getElementById('openImdbPageBtn');
         this.closeMovieModalBtn = document.getElementById('closeMovieModal');
 
-        // Screen Grabber & Screen Fit Elements
-        this.grabScreenBtn = document.getElementById('grabScreenBtn');
-        this.screenFitToggle = document.getElementById('screenFitToggle');
-        this.grabLiveThumbBtn = document.getElementById('grabLiveThumbBtn');
-        this.editGrabScreenBtn = document.getElementById('editGrabScreenBtn');
-
-        this.screenCaptureModal = document.getElementById('screenCaptureModal');
-        this.screenCapVideo = document.getElementById('screenCapVideo');
-        this.screenCapCanvas = document.getElementById('screenCapCanvas');
-        this.closeScreenCapBtn = document.getElementById('closeScreenCapBtn');
-        this.cancelScreenCapBtn = document.getElementById('cancelScreenCapBtn');
-        this.snapScreenCapBtn = document.getElementById('snapScreenCapBtn');
-
         this.lightboxModal = document.getElementById('lightboxModal');
         this.lightboxImg = document.getElementById('lightboxImg');
         this.lightboxTitle = document.getElementById('lightboxTitle');
         this.lightboxFitToggleBtn = document.getElementById('lightboxFitToggleBtn');
         this.closeLightboxBtn = document.getElementById('closeLightboxBtn');
-
-        this.screenStream = null;
-        this.grabContext = 'general';
-        this.screenFitMode = localStorage.getItem('sachin_screen_fit') === 'true';
 
         this.searchCache = new Map();
         this.searchTimeout = null;
@@ -237,20 +220,8 @@ class VidLinkApp {
             }
         });
 
-        // Screen Grabber & Screen Fit Event Listeners
-        if (this.grabScreenBtn) this.grabScreenBtn.addEventListener('click', () => this.openScreenGrabber('general'));
-        if (this.grabLiveThumbBtn) this.grabLiveThumbBtn.addEventListener('click', () => this.openScreenGrabber('thumb'));
-        if (this.editGrabScreenBtn) this.editGrabScreenBtn.addEventListener('click', () => this.openScreenGrabber('edit'));
-
-        if (this.screenFitToggle) this.screenFitToggle.addEventListener('click', () => this.toggleScreenFit());
-        if (this.closeScreenCapBtn) this.closeScreenCapBtn.addEventListener('click', () => this.closeScreenGrabber());
-        if (this.cancelScreenCapBtn) this.cancelScreenCapBtn.addEventListener('click', () => this.closeScreenGrabber());
-        if (this.snapScreenCapBtn) this.snapScreenCapBtn.addEventListener('click', () => this.snapScreenCapture());
-
         if (this.lightboxFitToggleBtn) this.lightboxFitToggleBtn.addEventListener('click', () => this.toggleLightboxFit());
         if (this.closeLightboxBtn) this.closeLightboxBtn.addEventListener('click', () => this.closeLightbox());
-
-        this.applyScreenFit(this.screenFitMode);
     }
 
     showLoader(show) {
@@ -272,118 +243,6 @@ class VidLinkApp {
 
     toggleTheme() {
         this.setTheme(this.theme === 'light' ? 'dark' : 'light');
-    }
-
-    applyScreenFit(fit) {
-        this.screenFitMode = !!fit;
-        localStorage.setItem('sachin_screen_fit', this.screenFitMode);
-        const container = document.querySelector('.app-container');
-        if (container) {
-            if (this.screenFitMode) container.classList.add('full-width-layout');
-            else container.classList.remove('full-width-layout');
-        }
-        if (this.screenFitToggle) {
-            this.screenFitToggle.innerHTML = this.screenFitMode 
-                ? '<i class="fas fa-compress-alt"></i> Center Grid' 
-                : '<i class="fas fa-expand-alt"></i> Fit Screen';
-            this.screenFitToggle.title = this.screenFitMode ? "Switch to Centered Layout" : "Fit App Grid to Full Screen Width";
-        }
-    }
-
-    toggleScreenFit() {
-        this.applyScreenFit(!this.screenFitMode);
-        this.showToast(this.screenFitMode ? 'App grid expanded to fit screen width!' : 'App grid reset to centered container.');
-    }
-
-    async openScreenGrabber(context = 'general') {
-        this.grabContext = context;
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
-            return this.showToast('Screen capture is not supported by your browser.', 'error');
-        }
-
-        try {
-            this.screenStream = await navigator.mediaDevices.getDisplayMedia({
-                video: { cursor: "always" },
-                audio: false
-            });
-
-            this.screenCapVideo.srcObject = this.screenStream;
-            this.showModal(this.screenCaptureModal);
-
-            const videoTrack = this.screenStream.getVideoTracks()[0];
-            if (videoTrack) {
-                videoTrack.onended = () => {
-                    this.closeScreenGrabber();
-                };
-            }
-        } catch (err) {
-            console.warn('Display Media capture cancelled or failed:', err);
-            if (err.name !== 'NotAllowedError') {
-                this.showToast('Could not grab screen: ' + err.message, 'error');
-            }
-        }
-    }
-
-    snapScreenCapture() {
-        if (!this.screenCapVideo || !this.screenCapVideo.videoWidth) {
-            return this.showToast('No active screen feed to capture.', 'error');
-        }
-
-        const video = this.screenCapVideo;
-        const canvas = this.screenCapCanvas;
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-        const dataUrl = canvas.toDataURL('image/png');
-        this.stopScreenStream();
-        this.hideModal(this.screenCaptureModal);
-
-        if (this.grabContext === 'general') {
-            const timestampStr = new Date().toLocaleString();
-            const newLink = {
-                id: 'l_' + Date.now(),
-                url: dataUrl,
-                thumb: dataUrl,
-                title: `Screen Capture (${timestampStr})`,
-                desc: `High-res screen snip captured directly from screen display (${canvas.width}x${canvas.height}).`,
-                tags: ['screenshot'],
-                date: Date.now()
-            };
-            this.links.unshift(newLink);
-            this.updateStorage();
-            this.render();
-            this.showToast('Screen grabbed and saved to your vault!', 'success');
-        } else if (this.grabContext === 'thumb') {
-            this.selectedThumb = dataUrl;
-            this.confirmThumbnail();
-            this.showToast('Screen captured and saved as cover!');
-        } else if (this.grabContext === 'edit') {
-            this.selectEditThumb(dataUrl);
-            const div = document.createElement('div');
-            div.className = 'thumb-option selected';
-            div.innerHTML = `<img src="${dataUrl}">`;
-            div.onclick = () => this.selectEditThumb(dataUrl);
-            if (this.editThumbPicker) this.editThumbPicker.prepend(div);
-            this.showToast('Screen frame added as cover image!');
-        }
-    }
-
-    closeScreenGrabber() {
-        this.stopScreenStream();
-        this.hideModal(this.screenCaptureModal);
-    }
-
-    stopScreenStream() {
-        if (this.screenStream) {
-            this.screenStream.getTracks().forEach(track => track.stop());
-            this.screenStream = null;
-        }
-        if (this.screenCapVideo) {
-            this.screenCapVideo.srcObject = null;
-        }
     }
 
     openLightbox(imgSrc, title = 'Screen View') {
@@ -419,13 +278,12 @@ class VidLinkApp {
     }
 
     closeAllModals() {
-        [this.thumbModal, this.editModal, this.movieModal, this.screenCaptureModal, this.lightboxModal].forEach(m => {
+        [this.thumbModal, this.editModal, this.movieModal, this.lightboxModal].forEach(m => {
             if (m && !m.classList.contains('hidden')) {
                 this.hideModal(m);
                 if (m === this.thumbModal && this.links.length === 0) this.render();
             }
         });
-        this.stopScreenStream();
     }
 
     async handleAddLink() {
