@@ -23,15 +23,14 @@ class VidLinkApp {
     }
 
     initElements() {
-        this.urlInput = document.getElementById('urlInput');
+        this.searchInput = document.getElementById('searchInput');
+        this.urlInput = this.searchInput; // Unified Smart Input
         this.addBtn = document.getElementById('addBtn');
         this.linkGrid = document.getElementById('linkGrid');
         this.loader = document.getElementById('loader');
         
         // Search Bar
-        this.searchInput = document.getElementById('searchInput');
         this.searchClearBtn = document.getElementById('searchClearBtn');
-        this.searchBtn = document.getElementById('searchBtn');
 
         // Modals
         this.thumbModal = document.getElementById('thumbModal');
@@ -79,32 +78,89 @@ class VidLinkApp {
         this.openImdbPageBtn = document.getElementById('openImdbPageBtn');
         this.closeMovieModalBtn = document.getElementById('closeMovieModal');
 
+        // Screen Grabber & Screen Fit Elements
+        this.grabScreenBtn = document.getElementById('grabScreenBtn');
+        this.screenFitToggle = document.getElementById('screenFitToggle');
+        this.grabLiveThumbBtn = document.getElementById('grabLiveThumbBtn');
+        this.editGrabScreenBtn = document.getElementById('editGrabScreenBtn');
+
+        this.screenCaptureModal = document.getElementById('screenCaptureModal');
+        this.screenCapVideo = document.getElementById('screenCapVideo');
+        this.screenCapCanvas = document.getElementById('screenCapCanvas');
+        this.closeScreenCapBtn = document.getElementById('closeScreenCapBtn');
+        this.cancelScreenCapBtn = document.getElementById('cancelScreenCapBtn');
+        this.snapScreenCapBtn = document.getElementById('snapScreenCapBtn');
+
+        this.lightboxModal = document.getElementById('lightboxModal');
+        this.lightboxImg = document.getElementById('lightboxImg');
+        this.lightboxTitle = document.getElementById('lightboxTitle');
+        this.lightboxFitToggleBtn = document.getElementById('lightboxFitToggleBtn');
+        this.closeLightboxBtn = document.getElementById('closeLightboxBtn');
+
+        this.screenStream = null;
+        this.grabContext = 'general';
+        this.screenFitMode = localStorage.getItem('sachin_screen_fit') === 'true';
+
         this.searchCache = new Map();
         this.searchTimeout = null;
         this.suggestionAbortController = null;
     }
 
+    isUrl(str) {
+        if (!str) return false;
+        const s = str.trim();
+        return /^https?:\/\//i.test(s) || 
+               /^www\./i.test(s) || 
+               /^[a-z0-9-]+(\.[a-z0-9-]+)*\.(com|org|net|io|co|in|app|dev|tv|me|cc|info|xyz|gov|edu|uk|ca|de|fr|jp|au)(\/[^\s]*)?$/i.test(s);
+    }
+
+    handleSmartAction() {
+        const val = this.searchInput ? this.searchInput.value.trim() : '';
+        if (!val) return;
+        if (this.isUrl(val)) {
+            if (this.searchDropdown) this.searchDropdown.classList.add('hidden');
+            this.handleAddLink();
+        } else {
+            if (this.searchDropdown) this.searchDropdown.classList.add('hidden');
+            this.searchQuery = val;
+            this.render();
+        }
+    }
+
     initEvents() {
-        this.addBtn.addEventListener('click', () => this.handleAddLink());
-        this.urlInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') this.handleAddLink();
+        this.addBtn.addEventListener('click', () => this.handleSmartAction());
+        this.searchInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                this.handleSmartAction();
+            }
         });
 
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') this.closeAllModals();
         });
 
-        // Search Handlers & IMDb Live Movie Suggestions
+        // Unified Smart Input Event
         this.searchInput.addEventListener('input', (e) => {
-            this.searchQuery = e.target.value;
-            if (this.searchQuery.trim()) {
+            const val = e.target.value.trim();
+            if (val) {
                 this.searchClearBtn.classList.remove('hidden');
             } else {
                 this.searchClearBtn.classList.add('hidden');
                 if (this.searchDropdown) this.searchDropdown.classList.add('hidden');
             }
-            this.render();
-            this.triggerMovieSearch(this.searchQuery);
+
+            if (this.isUrl(val)) {
+                this.addBtn.innerHTML = '<i class="fas fa-plus"></i> Save Link';
+                if (this.searchDropdown) this.searchDropdown.classList.add('hidden');
+                this.searchQuery = '';
+                this.render();
+            } else {
+                this.addBtn.innerHTML = val ? '<i class="fas fa-search"></i> Search' : '<i class="fas fa-plus"></i> Save Link';
+                this.searchQuery = val;
+                this.render();
+                this.triggerMovieSearch(val);
+            }
         });
 
         this.searchClearBtn.addEventListener('click', () => {
@@ -112,13 +168,14 @@ class VidLinkApp {
             this.searchQuery = '';
             this.searchClearBtn.classList.add('hidden');
             if (this.searchDropdown) this.searchDropdown.classList.add('hidden');
+            this.addBtn.innerHTML = '<i class="fas fa-plus"></i> Save Link';
             this.render();
             this.searchInput.focus();
         });
 
         // Close dropdown when clicking outside
         document.addEventListener('click', (e) => {
-            if (this.searchDropdown && !e.target.closest('.header-search')) {
+            if (this.searchDropdown && !e.target.closest('.add-section')) {
                 this.searchDropdown.classList.add('hidden');
             }
         });
@@ -179,6 +236,21 @@ class VidLinkApp {
                 this.handleAddFormTag('edit');
             }
         });
+
+        // Screen Grabber & Screen Fit Event Listeners
+        if (this.grabScreenBtn) this.grabScreenBtn.addEventListener('click', () => this.openScreenGrabber('general'));
+        if (this.grabLiveThumbBtn) this.grabLiveThumbBtn.addEventListener('click', () => this.openScreenGrabber('thumb'));
+        if (this.editGrabScreenBtn) this.editGrabScreenBtn.addEventListener('click', () => this.openScreenGrabber('edit'));
+
+        if (this.screenFitToggle) this.screenFitToggle.addEventListener('click', () => this.toggleScreenFit());
+        if (this.closeScreenCapBtn) this.closeScreenCapBtn.addEventListener('click', () => this.closeScreenGrabber());
+        if (this.cancelScreenCapBtn) this.cancelScreenCapBtn.addEventListener('click', () => this.closeScreenGrabber());
+        if (this.snapScreenCapBtn) this.snapScreenCapBtn.addEventListener('click', () => this.snapScreenCapture());
+
+        if (this.lightboxFitToggleBtn) this.lightboxFitToggleBtn.addEventListener('click', () => this.toggleLightboxFit());
+        if (this.closeLightboxBtn) this.closeLightboxBtn.addEventListener('click', () => this.closeLightbox());
+
+        this.applyScreenFit(this.screenFitMode);
     }
 
     showLoader(show) {
@@ -202,13 +274,158 @@ class VidLinkApp {
         this.setTheme(this.theme === 'light' ? 'dark' : 'light');
     }
 
+    applyScreenFit(fit) {
+        this.screenFitMode = !!fit;
+        localStorage.setItem('sachin_screen_fit', this.screenFitMode);
+        const container = document.querySelector('.app-container');
+        if (container) {
+            if (this.screenFitMode) container.classList.add('full-width-layout');
+            else container.classList.remove('full-width-layout');
+        }
+        if (this.screenFitToggle) {
+            this.screenFitToggle.innerHTML = this.screenFitMode 
+                ? '<i class="fas fa-compress-alt"></i> Center Grid' 
+                : '<i class="fas fa-expand-alt"></i> Fit Screen';
+            this.screenFitToggle.title = this.screenFitMode ? "Switch to Centered Layout" : "Fit App Grid to Full Screen Width";
+        }
+    }
+
+    toggleScreenFit() {
+        this.applyScreenFit(!this.screenFitMode);
+        this.showToast(this.screenFitMode ? 'App grid expanded to fit screen width!' : 'App grid reset to centered container.');
+    }
+
+    async openScreenGrabber(context = 'general') {
+        this.grabContext = context;
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+            return this.showToast('Screen capture is not supported by your browser.', 'error');
+        }
+
+        try {
+            this.screenStream = await navigator.mediaDevices.getDisplayMedia({
+                video: { cursor: "always" },
+                audio: false
+            });
+
+            this.screenCapVideo.srcObject = this.screenStream;
+            this.showModal(this.screenCaptureModal);
+
+            const videoTrack = this.screenStream.getVideoTracks()[0];
+            if (videoTrack) {
+                videoTrack.onended = () => {
+                    this.closeScreenGrabber();
+                };
+            }
+        } catch (err) {
+            console.warn('Display Media capture cancelled or failed:', err);
+            if (err.name !== 'NotAllowedError') {
+                this.showToast('Could not grab screen: ' + err.message, 'error');
+            }
+        }
+    }
+
+    snapScreenCapture() {
+        if (!this.screenCapVideo || !this.screenCapVideo.videoWidth) {
+            return this.showToast('No active screen feed to capture.', 'error');
+        }
+
+        const video = this.screenCapVideo;
+        const canvas = this.screenCapCanvas;
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        const dataUrl = canvas.toDataURL('image/png');
+        this.stopScreenStream();
+        this.hideModal(this.screenCaptureModal);
+
+        if (this.grabContext === 'general') {
+            const timestampStr = new Date().toLocaleString();
+            const newLink = {
+                id: 'l_' + Date.now(),
+                url: dataUrl,
+                thumb: dataUrl,
+                title: `Screen Capture (${timestampStr})`,
+                desc: `High-res screen snip captured directly from screen display (${canvas.width}x${canvas.height}).`,
+                tags: ['screenshot'],
+                date: Date.now()
+            };
+            this.links.unshift(newLink);
+            this.updateStorage();
+            this.render();
+            this.showToast('Screen grabbed and saved to your vault!', 'success');
+        } else if (this.grabContext === 'thumb') {
+            this.selectedThumb = dataUrl;
+            this.confirmThumbnail();
+            this.showToast('Screen captured and saved as cover!');
+        } else if (this.grabContext === 'edit') {
+            this.selectEditThumb(dataUrl);
+            const div = document.createElement('div');
+            div.className = 'thumb-option selected';
+            div.innerHTML = `<img src="${dataUrl}">`;
+            div.onclick = () => this.selectEditThumb(dataUrl);
+            if (this.editThumbPicker) this.editThumbPicker.prepend(div);
+            this.showToast('Screen frame added as cover image!');
+        }
+    }
+
+    closeScreenGrabber() {
+        this.stopScreenStream();
+        this.hideModal(this.screenCaptureModal);
+    }
+
+    stopScreenStream() {
+        if (this.screenStream) {
+            this.screenStream.getTracks().forEach(track => track.stop());
+            this.screenStream = null;
+        }
+        if (this.screenCapVideo) {
+            this.screenCapVideo.srcObject = null;
+        }
+    }
+
+    openLightbox(imgSrc, title = 'Screen View') {
+        if (!this.lightboxModal || !this.lightboxImg) return;
+        this.lightboxImg.src = imgSrc;
+        if (this.lightboxTitle) this.lightboxTitle.textContent = title;
+        this.lightboxImg.className = 'fit-contain';
+        if (this.lightboxFitToggleBtn) {
+            this.lightboxFitToggleBtn.innerHTML = '<i class="fas fa-compress-alt"></i> Fit: Contain';
+        }
+        this.showModal(this.lightboxModal);
+    }
+
+    toggleLightboxFit() {
+        if (!this.lightboxImg) return;
+        if (this.lightboxImg.classList.contains('fit-contain')) {
+            this.lightboxImg.classList.remove('fit-contain');
+            this.lightboxImg.classList.add('fit-cover');
+            if (this.lightboxFitToggleBtn) {
+                this.lightboxFitToggleBtn.innerHTML = '<i class="fas fa-expand-alt"></i> Fit: Cover';
+            }
+        } else {
+            this.lightboxImg.classList.remove('fit-cover');
+            this.lightboxImg.classList.add('fit-contain');
+            if (this.lightboxFitToggleBtn) {
+                this.lightboxFitToggleBtn.innerHTML = '<i class="fas fa-compress-alt"></i> Fit: Contain';
+            }
+        }
+    }
+
+    closeLightbox() {
+        this.hideModal(this.lightboxModal);
+    }
+
     closeAllModals() {
-        [this.thumbModal, this.editModal].forEach(m => {
+        [this.thumbModal, this.editModal, this.movieModal, this.screenCaptureModal, this.lightboxModal].forEach(m => {
             if (m && !m.classList.contains('hidden')) {
-                m.classList.add('hidden');
+                this.hideModal(m);
                 if (m === this.thumbModal && this.links.length === 0) this.render();
             }
         });
+        this.stopScreenStream();
     }
 
     async handleAddLink() {
@@ -661,12 +878,17 @@ class VidLinkApp {
             const favicon = this.getFaviconUrl(l.url);
             const relativeTime = this.getRelativeTime(l.date);
             const isMovie = tags.includes('movie') || (l.url && l.url.includes('imdb.com/title/'));
+            const escapedTitle = (l.title || 'Screen View').replace(/'/g, "\\'");
+            const escapedThumb = (l.thumb || '').replace(/'/g, "\\'");
 
             return `
             <div class="card ${isMovie ? 'card-movie-vertical' : ''}" data-id="${l.id}">
-                <div class="card-img-wrapper" onclick="window.open('${l.url}', '_blank')">
+                <div class="card-img-wrapper" onclick="if (event.target.closest('.zoom-btn')) return; window.open('${l.url}', '_blank')">
                     <img src="${l.thumb}" class="card-img" loading="lazy" onerror="this.src='https://via.placeholder.com/400?text=Image+Unavailable'">
                     ${isMovie ? `<span style="position: absolute; top: 8px; left: 8px; background: rgba(0,0,0,0.75); color: #f5c518; padding: 2px 8px; border-radius: 6px; font-size: 0.68rem; font-weight: 800; backdrop-filter: blur(4px);"><i class="fab fa-imdb"></i> MOVIE</span>` : ''}
+                    <button class="btn icon-btn zoom-btn" onclick="event.stopPropagation(); window.vidLinkApp.openLightbox('${escapedThumb}', '${escapedTitle}')" title="Fit to Screen (Lightbox)" style="position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,0.65); color: #fff; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(4px);">
+                        <i class="fas fa-search-plus" style="font-size: 0.75rem;"></i>
+                    </button>
                 </div>
                 <div class="card-content">
                     <div class="card-header-row">
@@ -685,6 +907,9 @@ class VidLinkApp {
                             <div class="card-actions">
                                 <button class="btn open-btn" onclick="window.open('${l.url}', '_blank')" title="Open">
                                     Open
+                                </button>
+                                <button class="btn default-btn icon-only" onclick="window.vidLinkApp.openLightbox('${escapedThumb}', '${escapedTitle}')" title="Fit to Screen Lightbox">
+                                    <i class="fas fa-expand"></i>
                                 </button>
                                 <button class="btn default-btn icon-only" onclick="window.vidLinkApp.copyLink('${l.url}')" title="Copy URL">
                                     <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="2" fill="none"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>

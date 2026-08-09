@@ -34,24 +34,9 @@
                 <h1>Sach.in</h1>
             </div>
 
-            <!-- Live Search Bar -->
-            <div class="header-search" style="position: relative;">
-                <div class="search-input-wrapper">
-                    <input type="text" id="searchInput" placeholder="Search links, movies &amp; shows…" autocomplete="off">
-                    <button id="searchClearBtn" class="search-clear-btn hidden" title="Clear">×</button>
-                </div>
-                <button id="searchBtn" class="search-btn" title="Search">
-                    <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none">
-                        <circle cx="11" cy="11" r="8"></circle>
-                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                    </svg>
-                </button>
-
-                <!-- Floating IMDb Search Dropdown -->
-                <div id="search-dropdown" class="topbar-dropdown hidden"></div>
-            </div>
-
             <nav class="header-actions">
+                <button id="grabScreenBtn" class="btn primary" title="Grab Screen Capture"><i class="fas fa-desktop"></i> Grab Screen</button>
+                <button id="screenFitToggle" class="btn secondary" title="Toggle Full Screen Fit Mode"><i class="fas fa-expand-alt"></i> Fit Screen</button>
                 <button id="themeToggle" class="btn icon-btn" title="Toggle Theme">
                     <svg id="themeIcon" viewBox="0 0 24 24" width="18" height="18" stroke="currentColor"
                         stroke-width="2" fill="none">
@@ -66,14 +51,21 @@
 
         <!-- Main Content -->
         <main>
+            <!-- 🌟 UNIFIED SMART OMNIBOX INPUT -->
             <section class="add-section border-panel">
-                <div class="input-group">
-                    <input type="url" id="urlInput" placeholder="Paste link here..." autocomplete="off">
-                    <div class="tag-input-wrapper">
-                        <input type="text" id="addTagsInput" placeholder="Add a tag (e.g. cool, video)">
+                <div class="input-group" style="position: relative;">
+                    <div class="search-input-wrapper" style="flex: 1; display: flex; align-items: center;">
+                        <input type="text" id="searchInput" placeholder="Paste link or search movies, links &amp; shows…" autocomplete="off" style="flex: 1;">
+                        <button id="searchClearBtn" class="search-clear-btn hidden" title="Clear">×</button>
+                    </div>
+                    <div class="tag-input-wrapper" style="max-width: 200px;">
+                        <input type="text" id="addTagsInput" placeholder="Tag (optional)">
                         <button id="addTagBtn" class="btn icon-btn" type="button" title="Add Tag">+</button>
                     </div>
-                    <button id="addBtn" class="btn primary">Save Link</button>
+                    <button id="addBtn" class="btn primary" style="min-width: 110px;">Save Link</button>
+
+                    <!-- Floating IMDb Search Dropdown -->
+                    <div id="search-dropdown" class="topbar-dropdown hidden"></div>
                 </div>
                 <div id="addTagsList" class="form-tag-list"></div>
             </section>
@@ -86,7 +78,7 @@
             <div id="linkGrid" class="link-grid">
                 <div class="empty-state">
                     <div class="empty-title">Your collection is empty right now</div>
-                    <div class="empty-sub">Paste a link above or search for a movie to get started!</div>
+                    <div class="empty-sub">Paste a link above, search for a movie, or click Grab Screen to capture!</div>
                 </div>
             </div>
         </main>
@@ -99,6 +91,7 @@
             <p id="thumbStatus" class="modal-subtitle"></p>
             <div id="thumbPicker" class="thumb-picker"></div>
             <div class="modal-actions">
+                <button id="grabLiveThumbBtn" class="btn secondary"><i class="fas fa-desktop"></i> Grab Screen</button>
                 <button id="retryFetchBtn" class="btn secondary">Try Again</button>
                 <button id="closeModal" class="btn secondary">Cancel</button>
                 <button id="confirmThumb" class="btn primary">Looks Good</button>
@@ -137,7 +130,10 @@
                             <button class="btn tiny" data-crop="800">Wide</button>
                             <button class="btn tiny" data-crop="400">Square</button>
                         </div>
-                        <button id="genScreenshotBtn" class="btn secondary small">Snap new cover</button>
+                        <div style="display: flex; gap: 8px; margin-top: 8px;">
+                            <button id="genScreenshotBtn" class="btn secondary small">Snap web cover</button>
+                            <button id="editGrabScreenBtn" class="btn primary small"><i class="fas fa-desktop"></i> Grab Screen</button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -175,6 +171,45 @@
                 </a>
                 <button id="closeMovieModal" class="btn secondary">Close</button>
             </div>
+        </div>
+    </div>
+
+    <!-- Live Screen Grabber Modal -->
+    <div id="screenCaptureModal" class="modal-overlay hidden">
+        <div class="modal-content border-panel screen-capture-modal-content">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <h2 style="font-size: 1.2rem; display: flex; align-items: center; gap: 8px;">
+                    <i class="fas fa-desktop" style="color: var(--accent);"></i> Screen Capture Grabber
+                </h2>
+                <button id="closeScreenCapBtn" class="btn icon-btn" title="Close">×</button>
+            </div>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 12px;">
+                Live display feed. Click <strong>Snap Screen</strong> to take a screenshot and fit to card or save as note.
+            </p>
+            <div class="screen-video-container">
+                <video id="screenCapVideo" autoplay playsinline muted></video>
+                <canvas id="screenCapCanvas" class="hidden"></canvas>
+            </div>
+            <div class="modal-actions" style="margin-top: 16px; display: flex; justify-content: flex-end; gap: 10px;">
+                <button id="cancelScreenCapBtn" class="btn secondary">Cancel</button>
+                <button id="snapScreenCapBtn" class="btn primary"><i class="fas fa-camera"></i> Snap Screen</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Fullscreen Fit Lightbox Modal -->
+    <div id="lightboxModal" class="lightbox-overlay hidden">
+        <div class="lightbox-toolbar">
+            <span class="lightbox-title" id="lightboxTitle">Screen Preview</span>
+            <div class="lightbox-actions">
+                <button id="lightboxFitToggleBtn" class="btn secondary tiny" title="Toggle Aspect Fit Mode">
+                    <i class="fas fa-compress-alt"></i> Fit: Contain
+                </button>
+                <button id="closeLightboxBtn" class="btn icon-btn" style="color: #fff;" title="Close (Esc)">×</button>
+            </div>
+        </div>
+        <div class="lightbox-body">
+            <img id="lightboxImg" src="" alt="Full Screen Fit Preview" class="fit-contain">
         </div>
     </div>
 

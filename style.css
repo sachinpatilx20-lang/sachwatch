@@ -981,4 +981,113 @@ body.dark-theme .loader-overlay {
     border: 1px solid rgba(245, 197, 24, 0.4);
 }
 
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   FULL SCREEN FIT LAYOUT & SCREEN GRABBER MODAL STYLING
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
+/* 100% Viewport Screen Fit Mode */
+.app-container.full-width-layout {
+    max-width: 98vw !important;
+    padding-left: 2rem;
+    padding-right: 2rem;
+    transition: max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.app-container.full-width-layout .link-grid {
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 2.5rem 1.5rem;
+}
+
+/* Screen Capture Grabber Live Modal */
+.screen-capture-modal-content {
+    max-width: 760px !important;
+    width: 90vw;
+}
+
+.screen-video-container {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    background: #000;
+    border-radius: 12px;
+    overflow: hidden;
+    position: relative;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.screen-video-container video {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    background: #000;
+}
+
+/* Lightbox Full Screen Preview */
+.lightbox-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.92);
+    backdrop-filter: blur(12px);
+    z-index: 99999;
+    display: flex;
+    flex-direction: column;
+    animation: fadeIn 0.2s ease-out;
+}
+
+.lightbox-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 24px;
+    background: rgba(15, 15, 15, 0.85);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    color: #ffffff;
+}
+
+.lightbox-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #e5e5e5;
+    letter-spacing: 0.3px;
+}
+
+.lightbox-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.lightbox-body {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    overflow: hidden;
+}
+
+.lightbox-body img {
+    max-width: 100%;
+    max-height: 100%;
+    border-radius: 8px;
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.6);
+    transition: all 0.25s ease;
+}
+
+.lightbox-body img.fit-contain {
+    object-fit: contain;
+}
+
+.lightbox-body img.fit-cover {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+
 
