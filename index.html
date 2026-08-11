@@ -4,80 +4,63 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-    <title>Sach.in — Links &amp; Movies</title>
-    <meta name="description" content="Your personal space to save links, bookmark movies, and watch trailers.">
-    <!-- Clean sans-serif fonts -->
+    <title>Sachflix</title>
+    <meta name="description" content="Sachflix">
+    <!-- Netflix Fonts: Bebas Neue for Brand Title & Inter for Body -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link rel="stylesheet" href="style.css">
 </head>
 
-<body class="light-theme">
+<body class="dark-theme netflix-theme">
 
+    <!-- Global Loader Overlay -->
     <div id="loader" class="loader-overlay hidden">
         <div class="loader-spinner"></div>
-        <p class="loader-text">Loading...</p>
     </div>
 
-    <!-- Toast Container -->
+    <!-- Toast Notification Container -->
     <div id="toast-container" class="toast-container"></div>
 
+
+    <section class="top-bar-section">
+        <div class="search-box-container" style="position: relative;">
+            <div class="search-input-wrapper">
+                <i class="fas fa-search search-icon"></i>
+                <input type="text" id="searchInput" placeholder="Search or paste URL..." autocomplete="off">
+                <button id="searchClearBtn" class="search-clear-btn hidden" title="Clear">×</button>
+                <button id="addBtn" class="btn primary small-save-btn" title="Save Link"><i class="fas fa-plus"></i> Save</button>
+            </div>
+            <!-- Floating IMDb Search Dropdown -->
+            <div id="search-dropdown" class="topbar-dropdown hidden"></div>
+        </div>
+    </section>
+
+    <!-- Main Content Container -->
     <div class="app-container">
-        <!-- Header -->
-        <header class="header">
-            <div class="logo" id="logoHome" style="cursor: pointer;">
-                <svg class="logo-play-icon" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M8 5v14l11-7z"></path>
-                </svg>
-                <h1>Sach.in</h1>
-            </div>
-        </header>
-
-        <!-- Main Content -->
         <main>
-            <!-- 🌟 UNIFIED SMART OMNIBOX INPUT -->
-            <section class="add-section border-panel">
-                <div class="input-group" style="position: relative;">
-                    <div class="search-input-wrapper" style="flex: 1; display: flex; align-items: center;">
-                        <input type="text" id="searchInput" placeholder="Paste link or search movies, links &amp; shows…" autocomplete="off" style="flex: 1;">
-                        <button id="searchClearBtn" class="search-clear-btn hidden" title="Clear">×</button>
-                    </div>
-                    <div class="tag-input-wrapper" style="max-width: 200px;">
-                        <input type="text" id="addTagsInput" placeholder="Tag (optional)">
-                        <button id="addTagBtn" class="btn icon-btn" type="button" title="Add Tag">+</button>
-                    </div>
-                    <button id="addBtn" class="btn primary" style="min-width: 110px;">Save Link</button>
-
-                    <!-- Floating IMDb Search Dropdown -->
-                    <div id="search-dropdown" class="topbar-dropdown hidden"></div>
+            <!-- Category Filter Bar (Pills) -->
+            <div class="section-header-bar">
+                <div id="tagFilter" class="category-bar">
+                    <button class="cat-pill active" data-tag="all">All</button>
+                    <button class="cat-pill" data-tag="movie"><i class="fas fa-film"></i> Movies</button>
                 </div>
-                <div id="addTagsList" class="form-tag-list"></div>
-            </section>
-
-            <div id="tagFilter" class="category-bar">
-                <button class="cat-pill active" data-tag="all">All Stuff</button>
-                <button class="cat-pill" data-tag="movie"><i class="fas fa-film"></i> Movies</button>
             </div>
 
+            <!-- Netflix Movie & Link Grid -->
             <div id="linkGrid" class="link-grid">
                 <div class="empty-state">
-                    <div class="empty-title">Your collection is empty right now</div>
-                    <div class="empty-sub">Paste a link above or search for a movie!</div>
+                    <div class="empty-icon"><i class="fas fa-film"></i></div>
+                    <div class="empty-title">Empty</div>
                 </div>
             </div>
         </main>
 
-        <!-- App Footer -->
+        <!-- Netflix App Footer -->
         <footer class="app-footer">
             <div class="footer-actions">
-                <button id="themeToggle" class="btn icon-btn" title="Toggle Theme">
-                    <svg id="themeIcon" viewBox="0 0 24 24" width="18" height="18" stroke="currentColor"
-                        stroke-width="2" fill="none">
-                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
-                    </svg>
-                </button>
                 <button id="exportBtn" class="btn secondary"><i class="fas fa-file-export"></i> Export</button>
                 <button id="importBtn" class="btn secondary"><i class="fas fa-file-import"></i> Import</button>
                 <input type="file" id="importFileInput" accept=".json" style="display: none;">
@@ -88,13 +71,13 @@
     <!-- Thumbnail Picker Modal -->
     <div id="thumbModal" class="modal-overlay hidden">
         <div class="modal-content border-panel">
-            <h2>Pick a Cover Image</h2>
+            <h2>Cover</h2>
             <p id="thumbStatus" class="modal-subtitle"></p>
             <div id="thumbPicker" class="thumb-picker"></div>
             <div class="modal-actions">
-                <button id="retryFetchBtn" class="btn secondary">Try Again</button>
+                <button id="retryFetchBtn" class="btn secondary">Retry</button>
                 <button id="closeModal" class="btn secondary">Cancel</button>
-                <button id="confirmThumb" class="btn primary">Looks Good</button>
+                <button id="confirmThumb" class="btn primary">Save</button>
             </div>
         </div>
     </div>
@@ -102,71 +85,66 @@
     <!-- Edit Link Modal -->
     <div id="editModal" class="modal-overlay hidden">
         <div class="modal-content border-panel">
-            <h2>Edit Details</h2>
+            <h2>Edit</h2>
             <div class="edit-fields">
                 <div class="field">
-                    <label>Title / Name</label>
                     <input type="text" id="editTitle" placeholder="Title">
                 </div>
                 <div class="field">
-                    <label>Notes / Details</label>
-                    <textarea id="editDesc" placeholder="Add your notes or description here..."></textarea>
+                    <textarea id="editDesc" placeholder="Notes..."></textarea>
                 </div>
                 <div class="field">
-                    <label>Tags / Categories</label>
                     <div class="tag-input-wrapper">
-                        <input type="text" id="editTags" placeholder="Add a tag">
+                        <input type="text" id="editTags" placeholder="Tag">
                         <button id="editTagBtn" class="btn icon-btn" type="button">+</button>
                     </div>
                     <div id="editTagsList" class="form-tag-list"></div>
                 </div>
                 <div class="thumbnail-section">
-                    <label>Cover Image</label>
                     <div id="editThumbPicker" class="thumb-picker"></div>
                     <div class="screenshot-tools">
-                        <h3>Refresh Screenshot</h3>
                         <div class="crop-presets">
                             <button class="btn tiny active" data-crop="1200">Full</button>
                             <button class="btn tiny" data-crop="800">Wide</button>
                             <button class="btn tiny" data-crop="400">Square</button>
                         </div>
                         <div style="display: flex; gap: 8px; margin-top: 8px;">
-                            <button id="genScreenshotBtn" class="btn secondary small">Snap web cover</button>
+                            <button id="genScreenshotBtn" class="btn secondary small"><i class="fas fa-camera"></i> Screenshot</button>
                         </div>
                     </div>
                 </div>
             </div>
             <div class="modal-actions">
                 <button id="closeEditModal" class="btn secondary">Cancel</button>
-                <button id="saveEditBtn" class="btn primary">Save Changes</button>
+                <button id="saveEditBtn" class="btn primary">Save</button>
             </div>
         </div>
     </div>
 
     <!-- IMDb Movie Details & Trailer Modal -->
     <div id="movieModal" class="modal-overlay hidden">
-        <div class="modal-content border-panel" style="max-width: 600px;">
-            <div style="display: flex; gap: 16px; margin-bottom: 16px;">
-                <img id="movieModalPoster" src="" alt="Poster" style="width: 110px; height: 160px; object-fit: cover; border-radius: 8px; flex-shrink: 0; background: #000;">
+        <div class="modal-content border-panel movie-modal-panel" style="max-width: 640px;">
+            <div style="display: flex; gap: 18px; margin-bottom: 18px;">
+                <img id="movieModalPoster" src="" alt="Poster" style="width: 120px; height: 175px; object-fit: cover; border-radius: 8px; flex-shrink: 0; background: #000; box-shadow: 0 10px 25px rgba(0,0,0,0.8);">
                 <div style="flex: 1; min-width: 0;">
-                    <div style="display: inline-flex; align-items: center; gap: 6px; background: #f5c518; color: #000; font-size: 0.7rem; font-weight: 800; padding: 2px 8px; border-radius: 4px; margin-bottom: 6px;">
+                    <div style="display: inline-flex; align-items: center; gap: 6px; background: #f5c518; color: #000; font-size: 0.72rem; font-weight: 900; padding: 3px 8px; border-radius: 4px; margin-bottom: 8px;">
                         <i class="fab fa-imdb"></i> <span id="movieModalType">Movie</span>
                     </div>
-                    <h2 id="movieModalTitle" style="font-size: 1.25rem; font-weight: 800; line-height: 1.2; margin-bottom: 4px;"></h2>
-                    <p id="movieModalYear" style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 8px;"></p>
-                    <p id="movieModalCast" style="font-size: 0.82rem; line-height: 1.4; color: var(--text-color);"></p>
+                    <h2 id="movieModalTitle" style="font-family: 'Bebas Neue', sans-serif; font-size: 2rem; letter-spacing: 0.5px; font-weight: 400; line-height: 1; margin-bottom: 6px; border: none; padding: 0; color: #fff;"></h2>
+                    <p id="movieModalYear" style="font-size: 0.85rem; color: #aaa; margin-bottom: 10px;"></p>
+                    <p id="movieModalCast" style="font-size: 0.85rem; line-height: 1.4; color: #ddd;"></p>
                 </div>
             </div>
 
             <!-- Trailer Video Container -->
-            <div id="movieTrailerWrap" class="hidden" style="position: relative; width: 100%; padding-top: 56.25%; border-radius: 8px; overflow: hidden; background: #000; margin-bottom: 16px;">
+            <div id="movieTrailerWrap" class="hidden" style="position: relative; width: 100%; padding-top: 56.25%; border-radius: 8px; overflow: hidden; background: #000; margin-bottom: 18px; border: 1px solid #333;">
                 <iframe id="movieTrailerIframe" src="" style="position: absolute; top:0; left:0; width:100%; height:100%; border:none;" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
             </div>
 
-            <div class="modal-actions" style="display: flex; gap: 8px; flex-wrap: wrap;">
-                <button id="saveMovieToVaultBtn" class="btn primary" style="flex: 1;"><i class="fas fa-bookmark"></i> Bookmark Movie</button>
+            <div class="modal-actions" style="display: flex; gap: 10px; flex-wrap: wrap;">
+                <button id="saveMovieToVaultBtn" class="btn primary" style="flex: 1;"><i class="fas fa-plus"></i> Add</button>
                 <a id="openImdbPageBtn" href="#" target="_blank" rel="noopener noreferrer" class="btn secondary" style="flex: 1; text-align: center; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; gap: 6px; background: rgba(245, 197, 24, 0.15); color: #f5c518; border: 1px solid rgba(245, 197, 24, 0.3);">
-                    <i class="fab fa-imdb"></i> View on IMDb
+                    <i class="fab fa-imdb"></i> IMDb
                 </a>
                 <button id="closeMovieModal" class="btn secondary">Close</button>
             </div>
@@ -176,16 +154,13 @@
     <!-- Fullscreen Fit Lightbox Modal -->
     <div id="lightboxModal" class="lightbox-overlay hidden">
         <div class="lightbox-toolbar">
-            <span class="lightbox-title" id="lightboxTitle">Screen Preview</span>
+            <span class="lightbox-title" id="lightboxTitle">Preview</span>
             <div class="lightbox-actions">
-                <button id="lightboxFitToggleBtn" class="btn secondary tiny" title="Toggle Aspect Fit Mode">
-                    <i class="fas fa-compress-alt"></i> Fit: Contain
-                </button>
-                <button id="closeLightboxBtn" class="btn icon-btn" style="color: #fff;" title="Close (Esc)">×</button>
+                <button id="closeLightboxBtn" class="btn icon-btn" style="color: #fff;" title="Close">×</button>
             </div>
         </div>
         <div class="lightbox-body">
-            <img id="lightboxImg" src="" alt="Full Screen Fit Preview" class="fit-contain">
+            <img id="lightboxImg" src="" alt="Preview" class="fit-contain">
         </div>
     </div>
 

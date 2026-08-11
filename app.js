@@ -10,7 +10,7 @@ class VidLinkApp {
         this.selectedThumb = '';
         this.editingId = null;
         this.currentCrop = 1200;
-        this.theme = localStorage.getItem('sachin_theme') || 'light';
+        this.theme = localStorage.getItem('sachin_theme') || 'dark';
         this.activeTag = 'all';
         this.tempTags = []; 
         this.currentLinkTags = [];
@@ -111,50 +111,54 @@ class VidLinkApp {
     }
 
     initEvents() {
-        this.addBtn.addEventListener('click', () => this.handleSmartAction());
-        this.searchInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                this.handleSmartAction();
-            }
-        });
+        if (this.addBtn) this.addBtn.addEventListener('click', () => this.handleSmartAction());
+        if (this.searchInput) {
+            this.searchInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    this.handleSmartAction();
+                }
+            });
+
+            // Unified Smart Input Event
+            this.searchInput.addEventListener('input', (e) => {
+                const val = e.target.value.trim();
+                if (val) {
+                    if (this.searchClearBtn) this.searchClearBtn.classList.remove('hidden');
+                } else {
+                    if (this.searchClearBtn) this.searchClearBtn.classList.add('hidden');
+                    if (this.searchDropdown) this.searchDropdown.classList.add('hidden');
+                }
+
+                if (this.isUrl(val)) {
+                    if (this.addBtn) this.addBtn.innerHTML = '<i class="fas fa-plus"></i> Save';
+                    if (this.searchDropdown) this.searchDropdown.classList.add('hidden');
+                    this.searchQuery = '';
+                    this.render();
+                } else {
+                    if (this.addBtn) this.addBtn.innerHTML = val ? '<i class="fas fa-search"></i> Search' : '<i class="fas fa-plus"></i> Save';
+                    this.searchQuery = val;
+                    this.render();
+                    this.triggerMovieSearch(val);
+                }
+            });
+        }
 
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') this.closeAllModals();
         });
 
-        // Unified Smart Input Event
-        this.searchInput.addEventListener('input', (e) => {
-            const val = e.target.value.trim();
-            if (val) {
-                this.searchClearBtn.classList.remove('hidden');
-            } else {
+        if (this.searchClearBtn) {
+            this.searchClearBtn.addEventListener('click', () => {
+                if (this.searchInput) this.searchInput.value = '';
+                this.searchQuery = '';
                 this.searchClearBtn.classList.add('hidden');
                 if (this.searchDropdown) this.searchDropdown.classList.add('hidden');
-            }
-
-            if (this.isUrl(val)) {
-                this.addBtn.innerHTML = '<i class="fas fa-plus"></i> Save Link';
-                if (this.searchDropdown) this.searchDropdown.classList.add('hidden');
-                this.searchQuery = '';
+                if (this.addBtn) this.addBtn.innerHTML = '<i class="fas fa-plus"></i> Save';
                 this.render();
-            } else {
-                this.addBtn.innerHTML = val ? '<i class="fas fa-search"></i> Search' : '<i class="fas fa-plus"></i> Save Link';
-                this.searchQuery = val;
-                this.render();
-                this.triggerMovieSearch(val);
-            }
-        });
-
-        this.searchClearBtn.addEventListener('click', () => {
-            this.searchInput.value = '';
-            this.searchQuery = '';
-            this.searchClearBtn.classList.add('hidden');
-            if (this.searchDropdown) this.searchDropdown.classList.add('hidden');
-            this.addBtn.innerHTML = '<i class="fas fa-plus"></i> Save Link';
-            this.render();
-            this.searchInput.focus();
-        });
+                if (this.searchInput) this.searchInput.focus();
+            });
+        }
 
         // Close dropdown when clicking outside
         document.addEventListener('click', (e) => {
@@ -168,16 +172,18 @@ class VidLinkApp {
             this.closeMovieModalBtn.onclick = () => this.hideModal(this.movieModal);
         }
 
-        this.closeModalBtn.addEventListener('click', () => {
-            this.hideModal(this.thumbModal);
-            if (this.links.length === 0) this.render();
-        });
-        this.confirmThumbBtn.addEventListener('click', () => this.confirmThumbnail());
-        this.retryFetchBtn.addEventListener('click', () => this.handleRetryFetch());
+        if (this.closeModalBtn) {
+            this.closeModalBtn.addEventListener('click', () => {
+                this.hideModal(this.thumbModal);
+                if (this.links.length === 0) this.render();
+            });
+        }
+        if (this.confirmThumbBtn) this.confirmThumbBtn.addEventListener('click', () => this.confirmThumbnail());
+        if (this.retryFetchBtn) this.retryFetchBtn.addEventListener('click', () => this.handleRetryFetch());
 
-        this.saveEditBtn.addEventListener('click', () => this.saveEdit());
-        this.closeEditModalBtn.addEventListener('click', () => this.hideModal(this.editModal));
-        this.genScreenshotBtn.addEventListener('click', () => this.generateScreenshot());
+        if (this.saveEditBtn) this.saveEditBtn.addEventListener('click', () => this.saveEdit());
+        if (this.closeEditModalBtn) this.closeEditModalBtn.addEventListener('click', () => this.hideModal(this.editModal));
+        if (this.genScreenshotBtn) this.genScreenshotBtn.addEventListener('click', () => this.generateScreenshot());
 
         document.querySelectorAll('.crop-presets button').forEach(btn => {
             btn.addEventListener('click', () => {
@@ -187,38 +193,63 @@ class VidLinkApp {
             });
         });
 
-        this.exportBtn.addEventListener('click', () => this.exportVault());
-        this.importBtn.addEventListener('click', () => this.importFileInput.click());
-        this.importFileInput.addEventListener('change', (e) => this.importVault(e));
-
-        this.themeToggle.addEventListener('click', () => this.toggleTheme());
-
-        this.tagFilter.addEventListener('click', (e) => {
-            const pill = e.target.closest('.cat-pill');
-            if (pill) {
-                this.activeTag = pill.dataset.tag;
-                this.tagFilter.querySelectorAll('.cat-pill').forEach(p => p.classList.remove('active'));
-                pill.classList.add('active');
-                this.render();
-            }
+        if (this.exportBtn) this.exportBtn.addEventListener('click', () => this.exportVault());
+        if (this.importBtn) this.importBtn.addEventListener('click', () => {
+            if (this.importFileInput) this.importFileInput.click();
         });
+        if (this.importFileInput) this.importFileInput.addEventListener('change', (e) => this.importVault(e));
 
-        this.addTagBtn.addEventListener('click', () => this.handleAddFormTag('add'));
-        this.editTagBtn.addEventListener('click', () => this.handleAddFormTag('edit'));
+        const handleTagSelect = (tag) => {
+            this.activeTag = tag;
+            if (this.tagFilter) {
+                this.tagFilter.querySelectorAll('.cat-pill').forEach(p => {
+                    if (p.dataset.tag === tag) p.classList.add('active');
+                    else p.classList.remove('active');
+                });
+            }
+            document.querySelectorAll('.netflix-nav .nav-link').forEach(l => {
+                if (l.dataset.tag === tag) l.classList.add('active');
+                else l.classList.remove('active');
+            });
+            this.render();
+        };
 
-        this.addTagsInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
+        if (this.tagFilter) {
+            this.tagFilter.addEventListener('click', (e) => {
+                const pill = e.target.closest('.cat-pill');
+                if (pill && pill.dataset.tag) handleTagSelect(pill.dataset.tag);
+            });
+        }
+
+        document.querySelectorAll('.netflix-nav .nav-link').forEach(link => {
+            link.addEventListener('click', (e) => {
                 e.preventDefault();
-                this.handleAddFormTag('add');
-            }
+                if (link.dataset.tag) handleTagSelect(link.dataset.tag);
+            });
         });
 
-        this.editTagsInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                this.handleAddFormTag('edit');
-            }
-        });
+        if (this.themeToggle) this.themeToggle.addEventListener('click', () => this.toggleTheme());
+
+        if (this.addTagBtn) this.addTagBtn.addEventListener('click', () => this.handleAddFormTag('add'));
+        if (this.editTagBtn) this.editTagBtn.addEventListener('click', () => this.handleAddFormTag('edit'));
+
+        if (this.addTagsInput) {
+            this.addTagsInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    this.handleAddFormTag('add');
+                }
+            });
+        }
+
+        if (this.editTagsInput) {
+            this.editTagsInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    this.handleAddFormTag('edit');
+                }
+            });
+        }
 
         if (this.lightboxFitToggleBtn) this.lightboxFitToggleBtn.addEventListener('click', () => this.toggleLightboxFit());
         if (this.closeLightboxBtn) this.closeLightboxBtn.addEventListener('click', () => this.closeLightbox());
@@ -250,9 +281,6 @@ class VidLinkApp {
         this.lightboxImg.src = imgSrc;
         if (this.lightboxTitle) this.lightboxTitle.textContent = title;
         this.lightboxImg.className = 'fit-contain';
-        if (this.lightboxFitToggleBtn) {
-            this.lightboxFitToggleBtn.innerHTML = '<i class="fas fa-compress-alt"></i> Fit: Contain';
-        }
         this.showModal(this.lightboxModal);
     }
 
@@ -261,15 +289,9 @@ class VidLinkApp {
         if (this.lightboxImg.classList.contains('fit-contain')) {
             this.lightboxImg.classList.remove('fit-contain');
             this.lightboxImg.classList.add('fit-cover');
-            if (this.lightboxFitToggleBtn) {
-                this.lightboxFitToggleBtn.innerHTML = '<i class="fas fa-expand-alt"></i> Fit: Cover';
-            }
         } else {
             this.lightboxImg.classList.remove('fit-cover');
             this.lightboxImg.classList.add('fit-contain');
-            if (this.lightboxFitToggleBtn) {
-                this.lightboxFitToggleBtn.innerHTML = '<i class="fas fa-compress-alt"></i> Fit: Contain';
-            }
         }
     }
 
@@ -287,15 +309,14 @@ class VidLinkApp {
     }
 
     async handleAddLink() {
-        const url = this.urlInput.value.trim();
+        const url = this.urlInput ? this.urlInput.value.trim() : '';
         if (!url) return;
 
-        // Auto-add any tag typed in the input
-        this.handleAddFormTag('add');
+        if (this.addTagsInput) this.handleAddFormTag('add');
         this.currentLinkTags = [...this.tempTags];
 
         this.currentUrl = url;
-        this.addBtn.disabled = true;
+        if (this.addBtn) this.addBtn.disabled = true;
 
         const skeletonHtml = `
             <div class="skeleton-card" id="tempSkeleton">
@@ -314,14 +335,14 @@ class VidLinkApp {
             // Check for duplicates
             const existingLink = this.links.find(l => l.url === url);
             if (existingLink) {
-                this.showToast('Link already in vault!', 'error');
-                this.urlInput.value = '';
-                this.addTagsInput.value = '';
+                this.showToast('Saved already', 'error');
+                if (this.urlInput) this.urlInput.value = '';
+                if (this.addTagsInput) this.addTagsInput.value = '';
                 this.tempTags = [];
                 this.renderFormTags('add');
                 const skel = document.getElementById('tempSkeleton');
                 if (skel) skel.remove();
-                this.addBtn.disabled = false;
+                if (this.addBtn) this.addBtn.disabled = false;
                 
                 // Scroll to existing link
                 const card = document.querySelector(`[data-id="${existingLink.id}"]`);
@@ -341,9 +362,9 @@ class VidLinkApp {
             const fb = `https://s.wordpress.com/mshots/v1/${encodeURIComponent(url)}?w=1200`;
             this.showThumbPicker([], fb);
         } finally {
-            this.addBtn.disabled = false;
-            this.urlInput.value = '';
-            this.addTagsInput.value = '';
+            if (this.addBtn) this.addBtn.disabled = false;
+            if (this.urlInput) this.urlInput.value = '';
+            if (this.addTagsInput) this.addTagsInput.value = '';
             this.tempTags = [];
             this.renderFormTags('add');
             const skel = document.getElementById('tempSkeleton');
@@ -467,10 +488,10 @@ class VidLinkApp {
         const isScreenshotOnly = this.currentMetadata?.isScreenshot || (allImages.length === 1 && allImages[0].includes('mshots'));
 
         if (isScreenshotOnly) {
-            this.thumbStatus.innerText = "OG Image not found. Use this screenshot or try again?";
+            this.thumbStatus.innerText = "Use screenshot?";
             this.thumbStatus.style.color = "#d9534f"; // Alert color
         } else {
-            this.thumbStatus.innerText = "Select your preferred thumbnail:";
+            this.thumbStatus.innerText = "Select cover:";
             this.thumbStatus.style.color = "#666";
         }
 
@@ -569,7 +590,7 @@ class VidLinkApp {
         this.links = this.links.filter(l => l.id !== id);
         this.updateStorage();
         this.render();
-        this.showToast('Link removed from vault', 'success');
+        this.showToast('Deleted', 'success');
     }
 
     updateStorage() { localStorage.setItem('vidlinks', JSON.stringify(this.links)); }
@@ -592,11 +613,11 @@ class VidLinkApp {
     }
 
     copyLink(url) {
-        navigator.clipboard.writeText(url).then(() => this.showToast('Copied to clipboard!'));
+        navigator.clipboard.writeText(url).then(() => this.showToast('Copied'));
     }
 
     exportVault() {
-        if (this.links.length === 0) return this.showToast('No links to export.', 'error');
+        if (this.links.length === 0) return this.showToast('Empty', 'error');
         
         try {
             const dataStr = JSON.stringify(this.links, null, 2);
@@ -605,13 +626,13 @@ class VidLinkApp {
             
             const a = document.createElement('a');
             a.href = url;
-            a.download = `sachlink_vault_${new Date().toISOString().slice(0,10)}.json`;
+            a.download = `sachlink_stash_${new Date().toISOString().slice(0,10)}.json`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
             
-            this.showToast('Vault exported successfully!');
+            this.showToast('Exported');
         } catch (error) {
             console.error('Export error:', error);
             this.showToast('Export failed.', 'error');
@@ -645,7 +666,7 @@ class VidLinkApp {
                 this.updateStorage();
                 this.render();
                 
-                this.showToast(`Imported ${added} new links successfully!`);
+                this.showToast(`+${added} items`);
             } catch (err) {
                 console.error('Import parse error:', err);
                 this.showToast('Failed to parse file.', 'error');
@@ -670,7 +691,7 @@ class VidLinkApp {
             const hostname = new URL(url).hostname;
             return `https://www.google.com/s2/favicons?sz=64&domain=${hostname}`;
         } catch(e) {
-            return 'https://via.placeholder.com/64?text=L';
+            return 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><rect width="64" height="64" rx="32" fill="%23262626"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="%23aaa" font-family="sans-serif" font-size="20">🌐</text></svg>';
         }
     }
 
@@ -723,9 +744,8 @@ class VidLinkApp {
             const isFiltering = this.activeTag !== 'all' || this.searchQuery.trim();
             this.linkGrid.innerHTML = `
                 <div class="empty-state">
-                    <div class="empty-icon">${isFiltering ? '🔍' : '🌐'}</div>
-                    <div class="empty-title">${isFiltering ? 'No results found' : 'Nothing here yet'}</div>
-                    <div class="empty-sub">${isFiltering ? 'Try adjusting your search or filters.' : 'Add a link to begin.'}</div>
+                    <div class="empty-icon">${isFiltering ? '🔍' : '🍿'}</div>
+                    <div class="empty-title">${isFiltering ? 'No results' : 'Empty'}</div>
                 </div>`;
             return;
         }
@@ -741,12 +761,9 @@ class VidLinkApp {
 
             return `
             <div class="card ${isMovie ? 'card-movie-vertical' : ''}" data-id="${l.id}">
-                <div class="card-img-wrapper" onclick="if (event.target.closest('.zoom-btn')) return; window.open('${l.url}', '_blank')">
-                    <img src="${l.thumb}" class="card-img" loading="lazy" onerror="this.src='https://via.placeholder.com/400?text=Image+Unavailable'">
+                <div class="card-img-wrapper" onclick="window.open('${l.url}', '_blank')">
+                    <img src="${l.thumb}" class="card-img" loading="lazy" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=&quot;http://www.w3.org/2000/svg&quot; width=&quot;400&quot; height=&quot;225&quot; viewBox=&quot;0 0 400 225&quot;><rect width=&quot;400&quot; height=&quot;225&quot; fill=&quot;%231a1a1a&quot;/><text x=&quot;50%&quot; y=&quot;50%&quot; dominant-baseline=&quot;middle&quot; text-anchor=&quot;middle&quot; fill=&quot;%23888&quot; font-family=&quot;sans-serif&quot; font-size=&quot;14&quot;>No Image</text></svg>'">
                     ${isMovie ? `<span style="position: absolute; top: 8px; left: 8px; background: rgba(0,0,0,0.75); color: #f5c518; padding: 2px 8px; border-radius: 6px; font-size: 0.68rem; font-weight: 800; backdrop-filter: blur(4px);"><i class="fab fa-imdb"></i> MOVIE</span>` : ''}
-                    <button class="btn icon-btn zoom-btn" onclick="event.stopPropagation(); window.vidLinkApp.openLightbox('${escapedThumb}', '${escapedTitle}')" title="Fit to Screen (Lightbox)" style="position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,0.65); color: #fff; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(4px);">
-                        <i class="fas fa-search-plus" style="font-size: 0.75rem;"></i>
-                    </button>
                 </div>
                 <div class="card-content">
                     <div class="card-header-row">
@@ -821,7 +838,8 @@ class VidLinkApp {
     }
 
     renderFormTags(formType) {
-        const list = formType === 'add' ? this.addTagsInput : this.editTagsInput;
+        const list = formType === 'add' ? this.addTagsList : this.editTagsList;
+        if (!list) return;
         list.innerHTML = this.tempTags.map((t, i) => `
             <div class="form-actor-tag">
                 ${t}
@@ -829,10 +847,6 @@ class VidLinkApp {
             </div>
         `).join('');
     }
-
-    /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-       IMDb LIVE MOVIE SEARCH & TRAILERS INTEGRATION
-       ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
 
     triggerMovieSearch(query) {
         clearTimeout(this.searchTimeout);
@@ -952,7 +966,7 @@ class VidLinkApp {
             </div>
             ${imdbResults.map(movie => `
                 <div class="search-item" onclick="window.vidLinkApp.openMovieDetailsByData('${encodeURIComponent(JSON.stringify(movie))}')">
-                    <img src="${movie.poster || 'https://via.placeholder.com/300x450?text=🎞️'}" width="30" height="45" loading="lazy">
+                    <img src="${movie.poster || 'data:image/svg+xml;utf8,<svg xmlns=&quot;http://www.w3.org/2000/svg&quot; width=&quot;300&quot; height=&quot;450&quot; viewBox=&quot;0 0 300 450&quot;><rect width=&quot;300&quot; height=&quot;450&quot; fill=&quot;%231a1a1a&quot;/><text x=&quot;50%&quot; y=&quot;50%&quot; dominant-baseline=&quot;middle&quot; text-anchor=&quot;middle&quot; fill=&quot;%23888&quot; font-family=&quot;sans-serif&quot; font-size=&quot;16&quot;>No Poster</text></svg>'}" width="30" height="45" loading="lazy">
                     <div style="flex:1; min-width:0;">
                         <h4>${movie.title}</h4>
                         <p>${movie.year} · ${movie.type} · ${movie.actors}</p>
@@ -998,10 +1012,10 @@ class VidLinkApp {
         if (!this.movieModal) return;
 
         this.movieModalTitle.textContent = movie.title;
-        this.movieModalPoster.src = movie.poster || 'https://via.placeholder.com/300x450?text=No+Poster';
+        this.movieModalPoster.src = movie.poster || 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="300" height="450" viewBox="0 0 300 450"><rect width="300" height="450" fill="%231a1a1a"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="%23888" font-family="sans-serif" font-size="16">No Poster</text></svg>';
         this.movieModalYear.textContent = `${movie.year} · ${movie.imdbId}`;
         this.movieModalType.textContent = movie.type;
-        this.movieModalCast.textContent = `Who's in it: ${movie.actors}`;
+        this.movieModalCast.textContent = `Cast: ${movie.actors}`;
         this.openImdbPageBtn.href = `https://www.imdb.com/title/${movie.imdbId}/`;
 
         // Save Movie to Vault Callback
@@ -1009,12 +1023,12 @@ class VidLinkApp {
             const movieUrl = `https://www.imdb.com/title/${movie.imdbId}/`;
             const existing = this.links.find(l => l.url === movieUrl);
             if (existing) {
-                this.showToast('Already saved in your list!', 'error');
+                this.showToast('Saved already', 'error');
             } else {
                 const link = {
                     id: 'l_' + Date.now(),
                     url: movieUrl,
-                    thumb: movie.poster || 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?q=80&w=600&auto=format&fit=crop',
+                    thumb: movie.poster || 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="300" height="450" viewBox="0 0 300 450"><rect width="300" height="450" fill="%231a1a1a"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="%23888" font-family="sans-serif" font-size="16">No Poster</text></svg>',
                     title: `${movie.title} (${movie.year})`,
                     desc: `Starring: ${movie.actors}`,
                     tags: ['movie'],
@@ -1023,7 +1037,7 @@ class VidLinkApp {
                 this.links.unshift(link);
                 this.updateStorage();
                 this.render();
-                this.showToast(`Saved "${movie.title}" to your list!`, 'success');
+                this.showToast(`Saved "${movie.title}"`, 'success');
             }
             this.hideModal(this.movieModal);
         };
