@@ -4,8 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-    <title>Sachflix</title>
-    <meta name="description" content="Sachflix">
+    <title>Sachflix — Minimalist Streaming &amp; Link Vault</title>
+    <meta name="description" content="Minimalist personal streaming links and movie vault">
     <!-- Netflix Fonts: Bebas Neue for Brand Title & Inter for Body -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -15,7 +15,26 @@
 </head>
 
 <body class="dark-theme netflix-theme">
-
+    <!-- Minimalist Brand Header -->
+    <div style="text-align: center; margin-top: 20px;">
+        <span >✦--</span>
+        <span class="brand-title">S💀ch.🖕🏻n --✦</span>
+            </div>
+            <button id="themeToggle" class="theme-toggle-btn" title="Toggle Light/Dark Theme" aria-label="Toggle Theme">
+                <svg id="themeIcon" class="theme-icon" viewBox="0 0 24 24" width="17" height="17" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="5"></circle>
+                    <line x1="12" y1="1" x2="12" y2="3"></line>
+                    <line x1="12" y1="21" x2="12" y2="23"></line>
+                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                    <line x1="1" y1="12" x2="3" y2="12"></line>
+                    <line x1="21" y1="12" x2="23" y2="12"></line>
+                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                </svg>
+            </button>
+        </div>
+    </header>
     <!-- Global Loader Overlay -->
     <div id="loader" class="loader-overlay hidden">
         <div class="loader-spinner"></div>
@@ -23,7 +42,6 @@
 
     <!-- Toast Notification Container -->
     <div id="toast-container" class="toast-container"></div>
-
 
     <section class="top-bar-section">
         <div class="search-box-container" style="position: relative;">
@@ -37,7 +55,23 @@
             <div id="search-dropdown" class="topbar-dropdown hidden"></div>
         </div>
     </section>
-
+<div class="streaming-tiles-container">
+    <a href="https://www.youtube.com" target="_blank" rel="noopener noreferrer" class="tile"><i class="fab fa-youtube"></i> YouTube</a>
+    <a href="https://music.youtube.com" target="_blank" rel="noopener noreferrer" class="tile"><i class="fas fa-music"></i> YT Music</a>
+    <a href="https://www.primevideo.com" target="_blank" rel="noopener noreferrer" class="tile"><i class="fas fa-play"></i> Prime Video</a>
+    <a href="https://netflix.com" target="_blank" rel="noopener noreferrer" class="tile"><i class="fas fa-film"></i> Netflix</a>
+    <a href="https://www.hotstar.com" target="_blank" rel="noopener noreferrer" class="tile"><i class="fas fa-star"></i> JioHotstar</a>
+    <a href="https://www.sonyliv.com" target="_blank" rel="noopener noreferrer" class="tile"><i class="fas fa-tv"></i> SonyLIV</a>
+    <a href="https://www.zee5.com" target="_blank" rel="noopener noreferrer" class="tile"><i class="fas fa-play-circle"></i> ZEE5</a>
+    <a href="https://open.spotify.com" target="_blank" rel="noopener noreferrer" class="tile"><i class="fab fa-spotify"></i> Spotify</a>
+    <a href="https://www.instagram.com/reels" target="_blank" rel="noopener noreferrer" class="tile"><i class="fab fa-instagram"></i> Instagram</a>
+    <a href="https://web.whatsapp.com" target="_blank" rel="noopener noreferrer" class="tile"><i class="fab fa-whatsapp"></i> WhatsApp</a>
+    <a href="https://web.telegram.org" target="_blank" rel="noopener noreferrer" class="tile"><i class="fab fa-telegram"></i> Telegram</a>
+    <a href="https://www.reddit.com" target="_blank" rel="noopener noreferrer" class="tile"><i class="fab fa-reddit-alien"></i> Reddit</a>
+    <a href="https://www.x.com" target="_blank" rel="noopener noreferrer" class="tile"><i class="fab fa-x-twitter"></i> Twitter</a>
+    <a href="https://discord.com" target="_blank" rel="noopener noreferrer" class="tile"><i class="fab fa-discord"></i> Discord</a>
+    <a href="https://www.google.com" target="_blank" rel="noopener noreferrer" class="tile"><i class="fab fa-google"></i> Google</a>
+</div>
     <!-- Main Content Container -->
     <div class="app-container">
         <main>
@@ -53,7 +87,8 @@
             <div id="linkGrid" class="link-grid">
                 <div class="empty-state">
                     <div class="empty-icon"><i class="fas fa-film"></i></div>
-                    <div class="empty-title">Empty</div>
+                    <div class="empty-title">Vault is Empty</div>
+                    <p class="empty-sub">Paste any URL or search above to save movies &amp; links.</p>
                 </div>
             </div>
         </main>
@@ -71,7 +106,12 @@
     <!-- Thumbnail Picker Modal -->
     <div id="thumbModal" class="modal-overlay hidden">
         <div class="modal-content border-panel">
-            <h2>Cover</h2>
+            <h2>Cover &amp; Metadata</h2>
+            <div id="thumbMetaPreview" class="thumb-meta-preview">
+                <h4 id="thumbMetaTitle" class="thumb-meta-title"></h4>
+                <p id="thumbMetaDesc" class="thumb-meta-desc"></p>
+                <div id="thumbMetaTags" class="thumb-meta-tags"></div>
+            </div>
             <p id="thumbStatus" class="modal-subtitle"></p>
             <div id="thumbPicker" class="thumb-picker"></div>
             <div class="modal-actions">
@@ -125,32 +165,30 @@
     <div id="movieModal" class="modal-overlay hidden">
         <div class="modal-content border-panel movie-modal-panel" style="max-width: 640px;">
             <div style="display: flex; gap: 18px; margin-bottom: 18px;">
-                <img id="movieModalPoster" src="" alt="Poster" style="width: 120px; height: 175px; object-fit: cover; border-radius: 8px; flex-shrink: 0; background: #000; box-shadow: 0 10px 25px rgba(0,0,0,0.8);">
+                <img id="movieModalPoster" src="" alt="Poster" style="width: 120px; height: 175px; object-fit: cover; border-radius: var(--radius-md); flex-shrink: 0; background: var(--surface-hover); box-shadow: var(--shadow-md);">
                 <div style="flex: 1; min-width: 0;">
-                    <div style="display: inline-flex; align-items: center; gap: 6px; background: #f5c518; color: #000; font-size: 0.72rem; font-weight: 900; padding: 3px 8px; border-radius: 4px; margin-bottom: 8px;">
+                    <div style="display: inline-flex; align-items: center; gap: 6px; background: #f5c518; color: #000; font-size: 0.72rem; font-weight: 800; padding: 3px 8px; border-radius: var(--radius-sm); margin-bottom: 8px;">
                         <i class="fab fa-imdb"></i> <span id="movieModalType">Movie</span>
                     </div>
-                    <h2 id="movieModalTitle" style="font-family: 'Bebas Neue', sans-serif; font-size: 2rem; letter-spacing: 0.5px; font-weight: 400; line-height: 1; margin-bottom: 6px; border: none; padding: 0; color: #fff;"></h2>
-                    <p id="movieModalYear" style="font-size: 0.85rem; color: #aaa; margin-bottom: 10px;"></p>
-                    <p id="movieModalCast" style="font-size: 0.85rem; line-height: 1.4; color: #ddd;"></p>
+                    <h2 id="movieModalTitle" style="font-family: var(--font-heading); font-size: 2rem; letter-spacing: 0.5px; font-weight: 400; line-height: 1; margin-bottom: 6px; border: none; padding: 0; color: var(--text-primary);"></h2>
+                    <p id="movieModalYear" style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 10px;"></p>
+                    <p id="movieModalCast" style="font-size: 0.85rem; line-height: 1.4; color: var(--text-secondary);"></p>
                 </div>
             </div>
-
             <!-- Trailer Video Container -->
-            <div id="movieTrailerWrap" class="hidden" style="position: relative; width: 100%; padding-top: 56.25%; border-radius: 8px; overflow: hidden; background: #000; margin-bottom: 18px; border: 1px solid #333;">
+            <div id="movieTrailerWrap" class="hidden" style="position: relative; width: 100%; padding-top: 56.25%; border-radius: var(--radius-md); overflow: hidden; background: #000; margin-bottom: 18px; border: 1px solid var(--border-color);">
                 <iframe id="movieTrailerIframe" src="" style="position: absolute; top:0; left:0; width:100%; height:100%; border:none;" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
             </div>
 
             <div class="modal-actions" style="display: flex; gap: 10px; flex-wrap: wrap;">
                 <button id="saveMovieToVaultBtn" class="btn primary" style="flex: 1;"><i class="fas fa-plus"></i> Add</button>
-                <a id="openImdbPageBtn" href="#" target="_blank" rel="noopener noreferrer" class="btn secondary" style="flex: 1; text-align: center; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; gap: 6px; background: rgba(245, 197, 24, 0.15); color: #f5c518; border: 1px solid rgba(245, 197, 24, 0.3);">
+                <a id="openImdbPageBtn" href="#" target="_blank" rel="noopener noreferrer" class="btn secondary" style="flex: 1; text-align: center; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; gap: 6px; background: rgba(245, 197, 24, 0.12); color: #f5c518; border: 1px solid rgba(245, 197, 24, 0.25);">
                     <i class="fab fa-imdb"></i> IMDb
                 </a>
                 <button id="closeMovieModal" class="btn secondary">Close</button>
             </div>
         </div>
     </div>
-
     <!-- Fullscreen Fit Lightbox Modal -->
     <div id="lightboxModal" class="lightbox-overlay hidden">
         <div class="lightbox-toolbar">
@@ -163,7 +201,6 @@
             <img id="lightboxImg" src="" alt="Preview" class="fit-contain">
         </div>
     </div>
-
     <script src="app.js"></script>
 </body>
 

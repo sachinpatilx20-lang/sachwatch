@@ -36,6 +36,10 @@ class VidLinkApp {
         this.thumbModal = document.getElementById('thumbModal');
         this.thumbPicker = document.getElementById('thumbPicker');
         this.thumbStatus = document.getElementById('thumbStatus');
+        this.thumbMetaPreview = document.getElementById('thumbMetaPreview');
+        this.thumbMetaTitle = document.getElementById('thumbMetaTitle');
+        this.thumbMetaDesc = document.getElementById('thumbMetaDesc');
+        this.thumbMetaTags = document.getElementById('thumbMetaTags');
         this.confirmThumbBtn = document.getElementById('confirmThumb');
         this.closeModalBtn = document.getElementById('closeModal');
         this.retryFetchBtn = document.getElementById('retryFetchBtn');
@@ -308,9 +312,45 @@ class VidLinkApp {
         });
     }
 
+    async fetchWithTimeout(fetchUrl, options = {}, timeoutMs = 5000) {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+        try {
+            const res = await fetch(fetchUrl, { ...options, signal: controller.signal });
+            clearTimeout(timeoutId);
+            return res;
+        } catch (e) {
+            clearTimeout(timeoutId);
+            throw e;
+        }
+    }
+
+    decodeHtml(str) {
+        if (!str) return '';
+        try {
+            const doc = new DOMParser().parseFromString(str, 'text/html');
+            return doc.documentElement.textContent || str;
+        } catch (e) {
+            return str;
+        }
+    }
+
+    cleanTitle(title, domain = '') {
+        if (!title) return '';
+        let t = this.decodeHtml(title).trim();
+        // Remove common trailing branding tags
+        t = t.replace(/\s*[-|•–—]\s*(YouTube|Netflix|IMDb|Spotify|SoundCloud|Prime Video|Wikipedia|GitHub|Vimeo|Reddit)\s*$/i, '');
+        return t.trim() || title;
+    }
+
     async handleAddLink() {
-        const url = this.urlInput ? this.urlInput.value.trim() : '';
+        let url = this.urlInput ? this.urlInput.value.trim() : '';
         if (!url) return;
+
+        // Auto-prefix protocol if missing
+        if (!/^https?:\/\//i.test(url)) {
+            url = 'https://' + url;
+        }
 
         if (this.addTagsInput) this.handleAddFormTag('add');
         this.currentLinkTags = [...this.tempTags];
@@ -333,7 +373,12 @@ class VidLinkApp {
 
         try {
             // Check for duplicates
-            const existingLink = this.links.find(l => l.url === url);
+            const existingLink = this.links.find(l => {
+                const normL = (l.url || '').trim().toLowerCase().replace(/\/$/, '');
+                const normU = url.trim().toLowerCase().replace(/\/$/, '');
+                return normL === normU;
+            });
+
             if (existingLink) {
                 this.showToast('Saved already', 'error');
                 if (this.urlInput) this.urlInput.value = '';
@@ -356,9 +401,19 @@ class VidLinkApp {
 
             const metadata = await this.fetchMetadata(url);
             this.currentMetadata = metadata;
+
+            // Merge auto-extracted tags
+            if (metadata.tags && Array.isArray(metadata.tags)) {
+                metadata.tags.forEach(t => {
+                    if (!this.currentLinkTags.includes(t)) {
+                        this.currentLinkTags.push(t);
+                    }
+                });
+            }
+
             this.showThumbPicker(metadata.images || []);
         } catch (error) {
-            console.error('Metadata error:', error);
+            console.error('Metadata extraction error:', error);
             const fb = `https://s.wordpress.com/mshots/v1/${encodeURIComponent(url)}?w=1200`;
             this.showThumbPicker([], fb);
         } finally {
@@ -388,6 +443,7 @@ class VidLinkApp {
             images: [],
             fallback: `https://s.wordpress.com/mshots/v1/${encodeURIComponent(url)}?w=1200`,
             url: url,
+            tags: [],
             isScreenshot: false
         };
 
@@ -395,83 +451,269 @@ class VidLinkApp {
             try { return new URL(relative, url).href; } catch (e) { return relative; }
         };
 
-        // Try YouTube OEmbed fast path
-        if (url.includes('youtube.com/watch') || url.includes('youtu.be/')) {
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        // 1. DEDICATED EXTRACTORS (Zero-CORS, Fast, High Precision)
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+        // A. YouTube (Videos, Shorts, Live, Music, Embeds)
+        const ytMatch = url.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=|shorts\/|live\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/i);
+        if (ytMatch && ytMatch[1]) {
+            const vidId = ytMatch[1];
             try {
-                let ytUrl = url;
-                if (url.includes('youtu.be/')) {
-                    const id = url.split('youtu.be/')[1].split('?')[0];
-                    ytUrl = `https://www.youtube.com/watch?v=${id}`;
+                const oembedRes = await this.fetchWithTimeout(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${vidId}&format=json`, {}, 4000);
+                if (oembedRes.ok) {
+                    const data = await oembedRes.json();
+                    if (data.title) results.title = this.cleanTitle(data.title, 'YouTube');
+                    if (data.author_name) results.description = `YouTube Video by ${data.author_name}`;
                 }
-                const res = await fetch(`https://www.youtube.com/oembed?url=${encodeURIComponent(ytUrl)}&format=json`);
-                const data = await res.json();
-                if (data.title) {
-                    results.title = data.title;
-                    results.description = `YouTube Video by ${data.author_name}`;
+            } catch (e) {}
+
+            results.images = [
+                `https://i.ytimg.com/vi/${vidId}/maxresdefault.jpg`,
+                `https://i.ytimg.com/vi/${vidId}/sddefault.jpg`,
+                `https://i.ytimg.com/vi/${vidId}/hqdefault.jpg`,
+                `https://i.ytimg.com/vi/${vidId}/mqdefault.jpg`
+            ];
+            results.tags = ['video', 'youtube'];
+            return results;
+        }
+
+        // B. IMDb Movie/TV Series Direct JSONP Extractor
+        const imdbMatch = url.match(/imdb\.com\/title\/(tt\d+)/i);
+        if (imdbMatch && imdbMatch[1]) {
+            const ttId = imdbMatch[1];
+            try {
+                const imdbData = await new Promise((resolve, reject) => {
+                    const callbackName = `imdb$${ttId}`;
+                    const script = document.createElement('script');
+                    script.src = `https://sg.media-imdb.com/suggests/${ttId.charAt(0)}/${ttId}.json`;
+                    script.async = true;
+                    const timer = setTimeout(() => { cleanup(); reject(new Error('IMDb timeout')); }, 4500);
+                    window[callbackName] = (data) => { cleanup(); resolve(data); };
+                    script.onerror = () => { cleanup(); reject(new Error('IMDb script error')); };
+                    function cleanup() {
+                        clearTimeout(timer);
+                        if (script.parentNode) script.parentNode.removeChild(script);
+                        delete window[callbackName];
+                    }
+                    document.head.appendChild(script);
+                });
+
+                if (imdbData?.d && imdbData.d.length > 0) {
+                    const item = imdbData.d[0];
+                    const year = item.y || item.tl || '';
+                    results.title = year ? `${item.l} (${year})` : item.l;
+                    results.description = item.s ? `Starring: ${item.s}` : 'IMDb Title';
+                    if (item.i && item.i[0]) results.images.push(item.i[0]);
+                    results.tags = ['movie'];
+                    return results;
+                }
+            } catch (e) {
+                console.warn('IMDb direct extract error:', e);
+            }
+        }
+
+        // C. Spotify (Tracks, Albums, Playlists, Artists, Shows, Episodes)
+        if (/open\.spotify\.com\/(track|album|playlist|artist|episode|show)\/([a-zA-Z0-9]+)/i.test(url)) {
+            try {
+                const res = await this.fetchWithTimeout(`https://open.spotify.com/oembed?url=${encodeURIComponent(url)}`, {}, 4000);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.title) results.title = this.cleanTitle(data.title, 'Spotify');
+                    results.description = `${data.provider_name || 'Spotify'} • Music`;
                     if (data.thumbnail_url) results.images.push(data.thumbnail_url);
+                    results.tags = ['music', 'spotify'];
                     return results;
                 }
             } catch (e) {}
         }
 
-        // Run other fetchers in parallel to get max images faster
-        await Promise.allSettled([
-            fetch(`https://noembed.com/embed?url=${encodeURIComponent(url)}`)
-                .then(res => res.json())
-                .then(data => {
-                    if (data.title && results.title === url) results.title = data.title;
-                    if (data.author_name && results.description === 'Fetching metadata...') results.description = `Shared by ${data.author_name || 'user'}`;
-                    if (data.thumbnail_url) results.images.push(data.thumbnail_url);
-                }),
-            fetch(`https://api.microlink.io/?url=${encodeURIComponent(url)}`)
-                .then(res => res.json())
-                .then(data => {
-                    if (data.status === 'success') {
-                        const m = data.data;
-                        if (m.title && results.title === url) results.title = m.title;
-                        if (m.description && results.description === 'Fetching metadata...') results.description = m.description;
-                        if (m.image?.url) results.images.push(m.image.url);
-                        if (m.logo?.url) results.images.push(m.logo.url);
-                    }
-                }),
-            fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`)
-                .then(res => res.json())
-                .then(data => {
-                    const doc = new DOMParser().parseFromString(data.contents, 'text/html');
-                    const getM = (s) => doc.querySelector(`meta[property="${s}"], meta[name="${s}"]`)?.getAttribute('content');
-                    
-                    const title = getM('og:title') || getM('twitter:title') || doc.querySelector('[itemprop="name"]')?.getAttribute('content') || doc.title;
-                    if (title && results.title === url) results.title = title;
-                    
-                    const desc = getM('og:description') || getM('twitter:description') || doc.querySelector('[itemprop="description"]')?.getAttribute('content') || getM('description');
-                    if (desc && results.description === 'Fetching metadata...') results.description = desc || 'No description.';
-                    
-                    const og = getM('og:image') || getM('twitter:image') || doc.querySelector('[itemprop="image"]')?.getAttribute('content');
-                    if (og) results.images.push(resolveUrl(og));
-
-                    // Extract more images (icons and img tags)
-                    ['apple-touch-icon', 'icon', 'shortcut icon'].forEach(rel => {
-                        const href = doc.querySelector(`link[rel="${rel}"]`)?.getAttribute('href');
-                        if (href) results.images.push(resolveUrl(href));
-                    });
-
-                    Array.from(doc.querySelectorAll('img'))
-                        .map(img => img.getAttribute('src'))
-                        .filter(Boolean)
-                        .filter(src => src.startsWith('http') || src.startsWith('/'))
-                        .slice(0, 15)
-                        .forEach(src => results.images.push(resolveUrl(src)));
-                })
-        ]).catch(err => console.warn('Parallel fetch error:', err));
-
-        // If no title found, use hostname
-        if (results.title === url) {
+        // D. SoundCloud
+        if (/soundcloud\.com\/[^\/]+\/[^\/]+/i.test(url)) {
             try {
-                results.title = new URL(url).hostname;
+                const res = await this.fetchWithTimeout(`https://soundcloud.com/oembed?url=${encodeURIComponent(url)}&format=json`, {}, 4000);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.title) results.title = this.cleanTitle(data.title, 'SoundCloud');
+                    results.description = data.description || (data.author_name ? `SoundCloud track by ${data.author_name}` : 'SoundCloud Audio');
+                    if (data.thumbnail_url) results.images.push(data.thumbnail_url);
+                    results.tags = ['music', 'audio'];
+                    return results;
+                }
+            } catch (e) {}
+        }
+
+        // E. Wikipedia REST Summary API
+        const wikiMatch = url.match(/([a-z]+)\.wikipedia\.org\/wiki\/([^?#]+)/i);
+        if (wikiMatch) {
+            const [, lang, pageSlug] = wikiMatch;
+            try {
+                const res = await this.fetchWithTimeout(`https://${lang}.wikipedia.org/api/rest_v1/page/summary/${pageSlug}`, {}, 4500);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.title) results.title = data.title;
+                    if (data.extract) results.description = data.extract;
+                    if (data.originalimage?.source) results.images.push(data.originalimage.source);
+                    if (data.thumbnail?.source) results.images.push(data.thumbnail.source);
+                    results.tags = ['wiki', 'article'];
+                    return results;
+                }
+            } catch (e) {}
+        }
+
+        // F. GitHub Repositories
+        const ghMatch = url.match(/github\.com\/([a-zA-Z0-9_-]+)\/([a-zA-Z0-9_.-]+)/i);
+        if (ghMatch) {
+            const [, owner, repo] = ghMatch;
+            const cleanRepo = repo.replace(/\.git$/i, '');
+            results.images.push(`https://opengraph.githubassets.com/1/${owner}/${cleanRepo}`);
+            try {
+                const res = await this.fetchWithTimeout(`https://api.github.com/repos/${owner}/${cleanRepo}`, {
+                    headers: { 'Accept': 'application/vnd.github.v3+json' }
+                }, 4000);
+                if (res.ok) {
+                    const data = await res.json();
+                    results.title = data.full_name || `${owner}/${cleanRepo}`;
+                    results.description = data.description || 'GitHub Repository';
+                    if (data.owner?.avatar_url) results.images.push(data.owner.avatar_url);
+                }
+            } catch (e) {}
+            results.tags = ['code', 'github'];
+            return results;
+        }
+
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        // 2. PARALLEL UNIVERSAL ENGINES (For Any Web Page)
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+        // 1. Microlink Open Graph Engine
+        const microlinkPromise = this.fetchWithTimeout(`https://api.microlink.io/?url=${encodeURIComponent(url)}`, {}, 5000)
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === 'success' && data.data) {
+                    const m = data.data;
+                    if (m.title && results.title === url) results.title = this.cleanTitle(m.title);
+                    if (m.description && (!results.description || results.description === 'Fetching metadata...')) {
+                        results.description = this.decodeHtml(m.description);
+                    }
+                    if (m.image?.url) results.images.push(m.image.url);
+                    if (m.logo?.url) results.images.push(m.logo.url);
+                }
+            }).catch(() => {});
+
+        // 2. Jina AI Fast Reader Engine
+        const jinaPromise = this.fetchWithTimeout(`https://r.jina.ai/${url}`, {
+            headers: { 'Accept': 'application/json' }
+        }, 5000)
+            .then(res => res.json())
+            .then(res => {
+                const data = res?.data;
+                if (data) {
+                    if (data.title && results.title === url) results.title = this.cleanTitle(data.title);
+                    if (data.description && (!results.description || results.description === 'Fetching metadata...')) {
+                        results.description = this.decodeHtml(data.description);
+                    }
+                }
+            }).catch(() => {});
+
+        // 3. NoEmbed Generic oEmbed Provider
+        const noembedPromise = this.fetchWithTimeout(`https://noembed.com/embed?url=${encodeURIComponent(url)}`, {}, 4000)
+            .then(res => res.json())
+            .then(data => {
+                if (data.title && results.title === url) results.title = this.cleanTitle(data.title);
+                if (data.author_name && (!results.description || results.description === 'Fetching metadata...')) {
+                    results.description = `By ${data.author_name}`;
+                }
+                if (data.thumbnail_url) results.images.push(data.thumbnail_url);
+            }).catch(() => {});
+
+        // 4. AllOrigins HTML Parser (Deep JSON-LD & OG tags)
+        const alloriginsPromise = this.fetchWithTimeout(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`, {}, 5000)
+            .then(res => res.json())
+            .then(data => {
+                if (!data?.contents) return;
+                const doc = new DOMParser().parseFromString(data.contents, 'text/html');
+                const getM = (s) => doc.querySelector(`meta[property="${s}"], meta[name="${s}"]`)?.getAttribute('content');
+
+                // JSON-LD Structured Data
+                try {
+                    const ldScripts = doc.querySelectorAll('script[type="application/ld+json"]');
+                    for (const s of ldScripts) {
+                        const parsed = JSON.parse(s.textContent.trim());
+                        const item = Array.isArray(parsed) ? parsed[0] : (parsed['@graph'] ? parsed['@graph'][0] : parsed);
+                        if (item) {
+                            const ldTitle = item.headline || item.name;
+                            const ldDesc = item.description;
+                            const ldImg = typeof item.image === 'string' ? item.image : (item.image?.url || item.thumbnailUrl);
+                            if (ldTitle && results.title === url) results.title = this.cleanTitle(ldTitle);
+                            if (ldDesc && (!results.description || results.description === 'Fetching metadata...')) {
+                                results.description = this.decodeHtml(ldDesc);
+                            }
+                            if (ldImg) results.images.push(resolveUrl(ldImg));
+                            if (results.title !== url) break;
+                        }
+                    }
+                } catch(e) {}
+
+                const title = getM('og:title') || getM('twitter:title') || doc.querySelector('[itemprop="name"]')?.getAttribute('content') || doc.title;
+                if (title && results.title === url) results.title = this.cleanTitle(title);
+
+                const desc = getM('og:description') || getM('twitter:description') || doc.querySelector('[itemprop="description"]')?.getAttribute('content') || getM('description');
+                if (desc && (!results.description || results.description === 'Fetching metadata...')) {
+                    results.description = this.decodeHtml(desc);
+                }
+
+                const og = getM('og:image:secure_url') || getM('og:image') || getM('twitter:image') || getM('twitter:image:src') || doc.querySelector('[itemprop="image"]')?.getAttribute('content');
+                if (og) results.images.push(resolveUrl(og));
+
+                ['apple-touch-icon', 'icon', 'shortcut icon'].forEach(rel => {
+                    const href = doc.querySelector(`link[rel="${rel}"]`)?.getAttribute('href');
+                    if (href) results.images.push(resolveUrl(href));
+                });
+            }).catch(() => {});
+
+        await Promise.allSettled([microlinkPromise, jinaPromise, noembedPromise, alloriginsPromise]);
+
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        // 3. SMART AUTOMATIC CATEGORY TAGS
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        const host = this.getHostname(url).toLowerCase();
+        if (host.includes('netflix') || host.includes('primevideo') || host.includes('hotstar') || host.includes('sonyliv') || host.includes('zee5') || host.includes('hulu') || host.includes('disney')) {
+            results.tags.push('movie', 'streaming');
+        } else if (host.includes('youtube') || host.includes('vimeo') || host.includes('dailymotion') || host.includes('tiktok') || host.includes('twitch')) {
+            results.tags.push('video');
+        } else if (host.includes('spotify') || host.includes('soundcloud') || host.includes('music.apple') || host.includes('bandcamp')) {
+            results.tags.push('music');
+        } else if (host.includes('reddit') || host.includes('twitter') || host.includes('x.com') || host.includes('instagram')) {
+            results.tags.push('social');
+        } else if (host.includes('github') || host.includes('gitlab') || host.includes('stackoverflow')) {
+            results.tags.push('code');
+        } else if (host.includes('medium') || host.includes('wikipedia') || host.includes('substack') || host.includes('dev.to')) {
+            results.tags.push('article');
+        }
+        results.tags = [...new Set(results.tags.filter(Boolean))];
+
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        // 4. CLEANUP & FALLBACKS
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        if (!results.title || results.title === url) {
+            try {
+                results.title = new URL(url).hostname.replace('www.', '');
             } catch(e) {}
         }
 
-        // Remove duplicates and empty
+        if (!results.description || results.description === 'Fetching metadata...') {
+            results.description = `Saved link from ${this.getHostname(url)}`;
+        }
+
+        // Add Google S2 HD Favicon and DuckDuckGo Favicon as fallback icon options
+        try {
+            const u = new URL(url);
+            results.images.push(`https://www.google.com/s2/favicons?sz=128&domain=${u.hostname}`);
+            results.images.push(`https://icons.duckduckgo.com/ip3/${u.hostname}.ico`);
+        } catch(e) {}
+
+        // Deduplicate and filter images
         results.images = [...new Set(results.images.filter(Boolean))];
 
         if (results.images.length === 0) {
@@ -487,18 +729,45 @@ class VidLinkApp {
         const allImages = overrideFB ? [overrideFB] : images;
         const isScreenshotOnly = this.currentMetadata?.isScreenshot || (allImages.length === 1 && allImages[0].includes('mshots'));
 
+        if (this.thumbMetaPreview) {
+            this.thumbMetaPreview.classList.remove('hidden');
+            if (this.thumbMetaTitle) this.thumbMetaTitle.textContent = this.currentMetadata?.title || this.currentUrl;
+            if (this.thumbMetaDesc) this.thumbMetaDesc.textContent = this.currentMetadata?.description || 'No description available.';
+            if (this.thumbMetaTags) {
+                const tagsToDisplay = this.currentLinkTags && this.currentLinkTags.length > 0 ? this.currentLinkTags : (this.currentMetadata?.tags || []);
+                this.thumbMetaTags.innerHTML = tagsToDisplay.map(t => `<span class="thumb-meta-tag">${t}</span>`).join('');
+            }
+        }
+
         if (isScreenshotOnly) {
-            this.thumbStatus.innerText = "Use screenshot?";
-            this.thumbStatus.style.color = "#d9534f"; // Alert color
+            this.thumbStatus.innerText = "Screenshot Cover";
+            this.thumbStatus.style.color = "#e50914";
         } else {
-            this.thumbStatus.innerText = "Select cover:";
-            this.thumbStatus.style.color = "#666";
+            this.thumbStatus.innerText = "Select cover image:";
+            this.thumbStatus.style.color = "#ccc";
         }
 
         allImages.forEach((img, index) => {
             const div = document.createElement('div');
             div.className = 'thumb-option' + (index === 0 ? ' selected' : '');
-            div.innerHTML = `<img src="${img}">`;
+            div.innerHTML = `<img src="${img}" loading="lazy">`;
+            
+            const imgEl = div.querySelector('img');
+            imgEl.onerror = () => {
+                if (img.includes('maxresdefault.jpg')) {
+                    imgEl.src = img.replace('maxresdefault.jpg', 'hqdefault.jpg');
+                    return;
+                }
+                div.remove();
+                if (!this.selectedThumb || this.selectedThumb === img) {
+                    const next = this.thumbPicker.querySelector('.thumb-option');
+                    if (next) {
+                        next.classList.add('selected');
+                        this.selectedThumb = next.querySelector('img')?.src || '';
+                    }
+                }
+            };
+
             div.onclick = () => {
                 this.thumbPicker.querySelectorAll('.thumb-option').forEach(o => o.classList.remove('selected'));
                 div.classList.add('selected');
@@ -506,7 +775,8 @@ class VidLinkApp {
             };
             this.thumbPicker.appendChild(div);
         });
-        this.selectedThumb = allImages[0];
+
+        this.selectedThumb = allImages[0] || '';
         this.showModal(this.thumbModal);
     }
 
@@ -744,8 +1014,9 @@ class VidLinkApp {
             const isFiltering = this.activeTag !== 'all' || this.searchQuery.trim();
             this.linkGrid.innerHTML = `
                 <div class="empty-state">
-                    <div class="empty-icon">${isFiltering ? '🔍' : '🍿'}</div>
-                    <div class="empty-title">${isFiltering ? 'No results' : 'Empty'}</div>
+                    <div class="empty-icon"><i class="${isFiltering ? 'fas fa-search' : 'fas fa-film'}"></i></div>
+                    <div class="empty-title">${isFiltering ? 'No results found' : 'Vault is Empty'}</div>
+                    <p class="empty-sub">${isFiltering ? 'Try searching for different keywords or tag filters.' : 'Paste any URL or search above to save movies & links.'}</p>
                 </div>`;
             return;
         }
