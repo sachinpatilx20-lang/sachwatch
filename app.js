@@ -18,10 +18,63 @@ class VidLinkApp {
         this.currentSort = localStorage.getItem('sachin_sort') || 'newest';
         this.viewMode = localStorage.getItem('sachin_view_mode') || 'grid';
         this.deferredInstallPrompt = null;
+        this.currentSurpriseItem = null;
+
+        // Daily Cinephile Quotes Collection
+        this.cineQuotes = [
+            { text: "Cinema is a matter of what's in the frame and what's out.", author: "Martin Scorsese" },
+            { text: "May the Force be with you.", author: "Star Wars" },
+            { text: "I'm going to make him an offer he can't refuse.", author: "The Godfather" },
+            { text: "Here's looking at you, kid.", author: "Casablanca" },
+            { text: "There is no spoon.", author: "The Matrix" },
+            { text: "Why do we fall? So that we can learn to pick ourselves up.", author: "Batman Begins" },
+            { text: "Every man dies, not every man really lives.", author: "Braveheart" },
+            { text: "Carpe diem. Seize the day, boys. Make your lives extraordinary.", author: "Dead Poets Society" },
+            { text: "Great things are done by a series of small things brought together.", author: "Vincent Van Gogh" },
+            { text: "It's what you do right now that makes a difference.", author: "Black Hawk Down" },
+            { text: "Do, or do not. There is no try.", author: "Yoda" },
+            { text: "Hope is a good thing, maybe the best of things, and no good thing ever dies.", author: "Shawshank Redemption" },
+            { text: "Stay hungry, stay foolish.", author: "Steve Jobs" },
+            { text: "Keep your eyes on the stars, and your feet on the ground.", author: "Theodore Roosevelt" },
+            { text: "Life moves pretty fast. If you don't stop and look around once in a while, you could miss it.", author: "Ferris Bueller" }
+        ];
+        this.quoteIndex = Math.floor(Math.random() * this.cineQuotes.length);
+
+        // Customizable Quick Tiles
+        const DEFAULT_TILES = [
+            { name: "YouTube", url: "https://www.youtube.com", icon: "fab fa-youtube" },
+            { name: "YT Music", url: "https://music.youtube.com", icon: "fas fa-music" },
+            { name: "Prime Video", url: "https://www.primevideo.com", icon: "fas fa-play" },
+            { name: "Netflix", url: "https://netflix.com", icon: "fas fa-film" },
+            { name: "JioHotstar", url: "https://www.hotstar.com", icon: "fas fa-star" },
+            { name: "SonyLIV", url: "https://www.sonyliv.com", icon: "fas fa-tv" },
+            { name: "ZEE5", url: "https://www.zee5.com", icon: "fas fa-play-circle" },
+            { name: "Spotify", url: "https://open.spotify.com", icon: "fab fa-spotify" },
+            { name: "Instagram", url: "https://www.instagram.com/reels", icon: "fab fa-instagram" },
+            { name: "WhatsApp", url: "https://web.whatsapp.com", icon: "fab fa-whatsapp" },
+            { name: "Telegram", url: "https://web.telegram.org", icon: "fab fa-telegram" },
+            { name: "Reddit", url: "https://www.reddit.com", icon: "fab fa-reddit-alien" },
+            { name: "Twitter", url: "https://www.x.com", icon: "fab fa-x-twitter" },
+            { name: "Discord", url: "https://discord.com/channels/@me", icon: "fab fa-discord" },
+            { name: "Google", url: "https://www.google.com", icon: "fab fa-google" },
+            { name: "IMDb", url: "https://www.imdb.com", icon: "fab fa-imdb" },
+            { name: "mPhg", url: "https://yarrlists.net/movies-and-tv-shows", icon: "fas fa-film" },
+            { name: "FMHY", url: "https://fmhy.net/video", icon: "fas fa-clapperboard" }
+        ];
+        this.customTiles = (JSON.parse(localStorage.getItem('sachin_custom_tiles')) || DEFAULT_TILES)
+            .filter(t => !t.url.includes('twitch.tv') && !t.url.includes('crunchyroll.com'))
+            .map(t => {
+                if (t.icon === 'fab fa-popcorn' || !t.icon) t.icon = 'fas fa-film';
+                return t;
+            });
 
         this.initElements();
         this.initEvents();
         this.setTheme(this.theme);
+        this.startLiveClock();
+        this.initDailyWidgets();
+        this.renderQuickTiles();
+        this.initScratchpad();
         this.render();
     }
 
@@ -91,15 +144,46 @@ class VidLinkApp {
         this.lightboxFitToggleBtn = document.getElementById('lightboxFitToggleBtn');
         this.closeLightboxBtn = document.getElementById('closeLightboxBtn');
 
-        // New UI Elements
+        // Daily Interactive Elements
+        this.headerSurpriseBtn = document.getElementById('headerSurpriseBtn');
+        this.headerNotesBtn = document.getElementById('headerNotesBtn');
+        this.headerShortcutsBtn = document.getElementById('headerShortcutsBtn');
+        this.surpriseMeBtn = document.getElementById('surpriseMeBtn');
+        this.dailyQuoteCard = document.getElementById('dailyQuoteCard');
+        this.nextQuoteBtn = document.getElementById('nextQuoteBtn');
+        this.quickTilesContainer = document.getElementById('quickTilesContainer');
+
+        // Surprise Modal Elements
+        this.surpriseModal = document.getElementById('surpriseModal');
+        this.surpriseCardContainer = document.getElementById('surpriseCardContainer');
+        this.surpriseRollAgainBtn = document.getElementById('surpriseRollAgainBtn');
+        this.surpriseOpenBtn = document.getElementById('surpriseOpenBtn');
+        this.closeSurpriseModalBtn = document.getElementById('closeSurpriseModalBtn');
+
+        // Scratchpad Modal Elements
+        this.scratchpadModal = document.getElementById('scratchpadModal');
+        this.scratchpadInput = document.getElementById('scratchpadInput');
+        this.scratchpadStats = document.getElementById('scratchpadStats');
+        this.copyScratchpadBtn = document.getElementById('copyScratchpadBtn');
+        this.clearScratchpadBtn = document.getElementById('clearScratchpadBtn');
+        this.closeScratchpadBtn = document.getElementById('closeScratchpadBtn');
+
+        // Custom Shortcut Modal Elements
+        this.customTileModal = document.getElementById('customTileModal');
+        this.customTileTitle = document.getElementById('customTileTitle');
+        this.customTileUrl = document.getElementById('customTileUrl');
+        this.saveCustomTileBtn = document.getElementById('saveCustomTileBtn');
+        this.closeCustomTileModalBtn = document.getElementById('closeCustomTileModalBtn');
+
+        // Shortcuts Modal
+        this.shortcutsModal = document.getElementById('shortcutsModal');
+        this.closeShortcutsModalBtn = document.getElementById('closeShortcutsModalBtn');
+
+        // Toolbar Elements
         this.statsCount = document.getElementById('statsCount');
         this.sortSelect = document.getElementById('sortSelect');
         this.viewToggleBtn = document.getElementById('viewToggleBtn');
         this.pwaInstallBtn = document.getElementById('pwaInstallBtn');
-        this.navAllBtn = document.getElementById('navAllBtn');
-        this.navMoviesBtn = document.getElementById('navMoviesBtn');
-        this.navSearchBtn = document.getElementById('navSearchBtn');
-        this.navScrollTopBtn = document.getElementById('navScrollTopBtn');
 
         this.searchCache = new Map();
         this.searchTimeout = null;
@@ -162,16 +246,85 @@ class VidLinkApp {
         }
 
         document.addEventListener('keydown', (e) => {
+            const inInput = ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName);
             if (e.key === 'Escape') this.closeAllModals();
-            // Press '/' to search if not already in an input
-            if (e.key === '/' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
-                e.preventDefault();
-                if (this.searchInput) {
-                    this.searchInput.focus();
-                    this.searchInput.select();
+            if (!inInput) {
+                if (e.key === '/') {
+                    e.preventDefault();
+                    if (this.searchInput) {
+                        this.searchInput.focus();
+                        this.searchInput.select();
+                    }
+                } else if (e.key.toLowerCase() === 'r') {
+                    e.preventDefault();
+                    this.rollSurprisePick();
+                } else if (e.key.toLowerCase() === 'n') {
+                    e.preventDefault();
+                    this.openScratchpad();
+                } else if (e.key.toLowerCase() === 't') {
+                    e.preventDefault();
+                    this.toggleTheme();
+                } else if (e.key === '?') {
+                    e.preventDefault();
+                    this.openShortcuts();
                 }
             }
         });
+
+        // Daily Hero & Quick Tool Button Listeners
+        if (this.headerSurpriseBtn) this.headerSurpriseBtn.addEventListener('click', () => this.rollSurprisePick());
+        if (this.surpriseMeBtn) this.surpriseMeBtn.addEventListener('click', () => this.rollSurprisePick());
+        if (this.headerNotesBtn) this.headerNotesBtn.addEventListener('click', () => this.openScratchpad());
+        if (this.headerShortcutsBtn) this.headerShortcutsBtn.addEventListener('click', () => this.openShortcuts());
+
+        if (this.dailyQuoteCard) this.dailyQuoteCard.addEventListener('click', () => this.nextQuote());
+        if (this.nextQuoteBtn) this.nextQuoteBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.nextQuote();
+        });
+
+        // Surprise Me Modal Events
+        if (this.surpriseRollAgainBtn) this.surpriseRollAgainBtn.addEventListener('click', () => this.rollSurprisePick());
+        if (this.surpriseOpenBtn) {
+            this.surpriseOpenBtn.addEventListener('click', () => {
+                if (this.currentSurpriseItem?.url) {
+                    window.open(this.currentSurpriseItem.url, '_blank');
+                    this.hideModal(this.surpriseModal);
+                }
+            });
+        }
+        if (this.closeSurpriseModalBtn) this.closeSurpriseModalBtn.addEventListener('click', () => this.hideModal(this.surpriseModal));
+
+        // Scratchpad Events
+        if (this.closeScratchpadBtn) this.closeScratchpadBtn.addEventListener('click', () => this.hideModal(this.scratchpadModal));
+        if (this.clearScratchpadBtn) {
+            this.clearScratchpadBtn.addEventListener('click', () => {
+                if (confirm('Clear your scratchpad notes?')) {
+                    if (this.scratchpadInput) this.scratchpadInput.value = '';
+                    localStorage.removeItem('sachin_scratchpad');
+                    this.updateScratchpadStats();
+                    this.showToast('Scratchpad cleared', 'info');
+                }
+            });
+        }
+        if (this.copyScratchpadBtn) {
+            this.copyScratchpadBtn.addEventListener('click', () => {
+                if (this.scratchpadInput?.value) {
+                    navigator.clipboard.writeText(this.scratchpadInput.value).then(() => {
+                        this.showToast('Notes copied to clipboard!', 'success');
+                    });
+                } else {
+                    this.showToast('Nothing to copy', 'info');
+                }
+            });
+        }
+
+        // Custom Quick Tile Events
+        if (this.saveCustomTileBtn) this.saveCustomTileBtn.addEventListener('click', () => this.saveCustomTile());
+        if (this.closeCustomTileModalBtn) this.closeCustomTileModalBtn.addEventListener('click', () => this.hideModal(this.customTileModal));
+
+        // Shortcuts Modal Events
+        if (this.closeShortcutsModalBtn) this.closeShortcutsModalBtn.addEventListener('click', () => this.hideModal(this.shortcutsModal));
 
         // PWA Install Prompt Listeners
         window.addEventListener('beforeinstallprompt', (e) => {
@@ -401,7 +554,7 @@ class VidLinkApp {
     }
 
     closeAllModals() {
-        [this.thumbModal, this.editModal, this.movieModal, this.lightboxModal].forEach(m => {
+        [this.thumbModal, this.editModal, this.movieModal, this.lightboxModal, this.surpriseModal, this.scratchpadModal, this.customTileModal, this.shortcutsModal].forEach(m => {
             if (m && !m.classList.contains('hidden')) {
                 this.hideModal(m);
                 if (m === this.thumbModal && this.links.length === 0) this.render();
@@ -1097,7 +1250,18 @@ class VidLinkApp {
         }
 
         // Tag filter
-        if (this.activeTag !== 'all') {
+        if (this.activeTag === 'fav') {
+            filtered = filtered.filter(l => !!l.isFavorite);
+        } else if (this.activeTag === 'watched') {
+            filtered = filtered.filter(l => !!l.isWatched);
+        } else if (this.activeTag === 'towatch') {
+            filtered = filtered.filter(l => !l.isWatched);
+        } else if (this.activeTag === 'movie') {
+            filtered = filtered.filter(l => {
+                const tags = Array.isArray(l.tags) ? l.tags : (Array.isArray(l.actors) ? l.actors : (l.category ? [l.category] : []));
+                return tags.includes('movie') || (l.url && l.url.includes('imdb.com/title/'));
+            });
+        } else if (this.activeTag !== 'all') {
             filtered = filtered.filter(l => {
                 const tags = Array.isArray(l.tags) ? l.tags : (Array.isArray(l.actors) ? l.actors : (l.category ? [l.category] : []));
                 return tags.includes(this.activeTag);
@@ -1105,7 +1269,13 @@ class VidLinkApp {
         }
 
         // Sorting according to user choice
-        if (this.currentSort === 'newest') {
+        if (this.currentSort === 'fav') {
+            filtered.sort((a, b) => {
+                if (a.isFavorite && !b.isFavorite) return -1;
+                if (!a.isFavorite && b.isFavorite) return 1;
+                return (b.date || 0) - (a.date || 0);
+            });
+        } else if (this.currentSort === 'newest') {
             filtered.sort((a, b) => (b.date || 0) - (a.date || 0));
         } else if (this.currentSort === 'oldest') {
             filtered.sort((a, b) => (a.date || 0) - (b.date || 0));
@@ -1134,8 +1304,8 @@ class VidLinkApp {
             this.linkGrid.innerHTML = `
                 <div class="empty-state">
                     <div class="empty-icon"><i class="${isFiltering ? 'fas fa-search' : 'fas fa-film'}"></i></div>
-                    <div class="empty-title">${isFiltering ? 'No results found' : 'Watchlist is Empty'}</div>
-                    <p class="empty-sub">${isFiltering ? 'Try searching for different keywords or tag filters.' : 'Paste any URL or search above to save movies & links.'}</p>
+                    <div class="empty-title">${isFiltering ? 'No matching items' : 'Watchlist is Empty'}</div>
+                    <p class="empty-sub">${isFiltering ? 'Try searching different keywords or switching category tabs.' : 'Paste any URL or search above to save movies & links.'}</p>
                     ${!isFiltering ? `
                     <div class="empty-starter-chips">
                         <button class="starter-chip" onclick="window.vidLinkApp.addDemoItem('https://www.netflix.com', 'Netflix Streaming Hub', ['streaming', 'movie'])"><i class="fas fa-play"></i> + Netflix</button>
@@ -1152,14 +1322,20 @@ class VidLinkApp {
             const favicon = this.getFaviconUrl(l.url);
             const relativeTime = this.getRelativeTime(l.date);
             const isMovie = tags.includes('movie') || (l.url && l.url.includes('imdb.com/title/'));
+            const isFav = !!l.isFavorite;
+            const isWatched = !!l.isWatched;
             const escapedTitle = (l.title || 'Screen View').replace(/'/g, "\\'");
             const escapedThumb = (l.thumb || '').replace(/'/g, "\\'");
 
             return `
-            <div class="card ${isMovie ? 'card-movie-vertical' : ''}" data-id="${l.id}">
+            <div class="card ${isMovie ? 'card-movie-vertical' : ''} ${isFav ? 'is-favorite' : ''} ${isWatched ? 'is-watched' : ''}" data-id="${l.id}">
                 <div class="card-img-wrapper" onclick="window.open('${l.url}', '_blank')">
                     <img src="${l.thumb}" class="card-img" loading="lazy" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=&quot;http://www.w3.org/2000/svg&quot; width=&quot;400&quot; height=&quot;225&quot; viewBox=&quot;0 0 400 225&quot;><rect width=&quot;400&quot; height=&quot;225&quot; fill=&quot;%231a1a1a&quot;/><text x=&quot;50%&quot; y=&quot;50%&quot; dominant-baseline=&quot;middle&quot; text-anchor=&quot;middle&quot; fill=&quot;%23888&quot; font-family=&quot;sans-serif&quot; font-size=&quot;14&quot;>No Image</text></svg>'">
-                    ${isMovie ? `<span style="position: absolute; top: 8px; left: 8px; background: rgba(0,0,0,0.75); color: #f5c518; padding: 2px 8px; border-radius: 6px; font-size: 0.68rem; font-weight: 800; backdrop-filter: blur(4px);"><i class="fab fa-imdb"></i> MOVIE</span>` : ''}
+                    <div class="card-top-badges">
+                        ${isMovie ? `<span class="badge-tag badge-movie"><i class="fab fa-imdb"></i> MOVIE</span>` : ''}
+                        ${isFav ? `<span class="badge-tag badge-starred"><i class="fas fa-star"></i></span>` : ''}
+                        ${isWatched ? `<span class="badge-tag badge-watched"><i class="fas fa-check"></i> WATCHED</span>` : ''}
+                    </div>
                 </div>
                 <div class="card-content">
                     <div class="card-header-row">
@@ -1178,6 +1354,12 @@ class VidLinkApp {
                             <div class="card-actions">
                                 <button class="btn open-btn" onclick="window.open('${l.url}', '_blank')" title="Open">
                                     Open
+                                </button>
+                                <button class="btn default-btn icon-only btn-fav ${isFav ? 'active' : ''}" onclick="window.vidLinkApp.toggleFavorite('${l.id}')" title="${isFav ? 'Unstar' : 'Star / Pin to Top'}">
+                                    <i class="${isFav ? 'fas' : 'far'} fa-star"></i>
+                                </button>
+                                <button class="btn default-btn icon-only btn-watched ${isWatched ? 'active' : ''}" onclick="window.vidLinkApp.toggleWatched('${l.id}')" title="${isWatched ? 'Mark as Unwatched' : 'Mark as Watched'}">
+                                    <i class="fas ${isWatched ? 'fa-check-circle' : 'fa-circle-check'}"></i>
                                 </button>
                                 ${isMovie ? `
                                 <button class="btn default-btn icon-only" onclick="window.vidLinkApp.quickTrailer('${escapedTitle}')" title="Watch Trailer">
@@ -1205,10 +1387,14 @@ class VidLinkApp {
 
     updateTagBar() {
         const allTags = this.links.flatMap(l => Array.isArray(l.tags) ? l.tags : (Array.isArray(l.actors) ? l.actors : (l.category ? [l.category] : [])));
-        const uniqueTags = [...new Set(allTags)].filter(Boolean).sort();
+        const uniqueTags = [...new Set(allTags)].filter(t => t && t !== 'movie').sort();
         
         const html = [
-            `<button class="cat-pill ${this.activeTag === 'all' ? 'active' : ''}" data-tag="all">All Tags</button>`,
+            `<button class="cat-pill ${this.activeTag === 'all' ? 'active' : ''}" data-tag="all">All</button>`,
+            `<button class="cat-pill ${this.activeTag === 'fav' ? 'active' : ''}" data-tag="fav"><i class="fas fa-star" style="color: #f5c518;"></i> Starred</button>`,
+            `<button class="cat-pill ${this.activeTag === 'movie' ? 'active' : ''}" data-tag="movie"><i class="fas fa-film"></i> Movies</button>`,
+            `<button class="cat-pill ${this.activeTag === 'towatch' ? 'active' : ''}" data-tag="towatch"><i class="far fa-clock"></i> To Watch</button>`,
+            `<button class="cat-pill ${this.activeTag === 'watched' ? 'active' : ''}" data-tag="watched"><i class="fas fa-check-circle" style="color: #22c55e;"></i> Watched</button>`,
             ...uniqueTags.map(tag => `<button class="cat-pill ${this.activeTag === tag ? 'active' : ''}" data-tag="${tag}">${tag}</button>`)
         ].join('');
         
@@ -1479,7 +1665,7 @@ class VidLinkApp {
         const item = {
             id: 'l_' + Date.now(),
             url: url,
-            thumb: 'star.svg',
+            thumb: 'icon.svg',
             title: title,
             desc: `Quick launch link for ${title}`,
             tags: tags,
@@ -1498,7 +1684,7 @@ class VidLinkApp {
             this.movieTrailerIframe.src = `https://www.youtube.com/embed/${vidId}?autoplay=1&rel=0`;
             this.movieTrailerWrap.classList.remove('hidden');
             if (this.movieModalTitle) this.movieModalTitle.textContent = title;
-            if (this.movieModalPoster) this.movieModalPoster.src = 'star.svg';
+            if (this.movieModalPoster) this.movieModalPoster.src = 'icon.svg';
             if (this.movieModalYear) this.movieModalYear.textContent = 'Official Trailer';
             if (this.movieModalCast) this.movieModalCast.textContent = '';
             if (this.movieModalType) this.movieModalType.textContent = 'Trailer';
@@ -1506,6 +1692,212 @@ class VidLinkApp {
         } else {
             window.open(`https://www.youtube.com/results?search_query=${encodeURIComponent(title + ' official trailer')}`, '_blank');
         }
+    }
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // DAILY INTERACTIVE FEATURES
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    toggleFavorite(id) {
+        const link = this.links.find(l => l.id === id);
+        if (!link) return;
+        link.isFavorite = !link.isFavorite;
+        this.updateStorage();
+        this.render();
+        this.showToast(link.isFavorite ? 'Starred link ★' : 'Removed from Starred', 'info');
+    }
+
+    toggleWatched(id) {
+        const link = this.links.find(l => l.id === id);
+        if (!link) return;
+        link.isWatched = !link.isWatched;
+        this.updateStorage();
+        this.render();
+        this.showToast(link.isWatched ? 'Marked as Watched ✓' : 'Marked as Unwatched', 'info');
+    }
+
+    startLiveClock() {
+        this.updateLiveClock();
+        setInterval(() => this.updateLiveClock(), 1000);
+    }
+
+    updateLiveClock() {
+        const now = new Date();
+        const hrs = now.getHours();
+        const mins = String(now.getMinutes()).padStart(2, '0');
+        const secs = String(now.getSeconds()).padStart(2, '0');
+        const timeStr = `${String(hrs).padStart(2, '0')}:${mins}:${secs}`;
+        
+        let greeting = 'Welcome, Sachin';
+        let icon = '✨';
+        if (hrs >= 5 && hrs < 12) {
+            greeting = 'Good morning, Sachin';
+            icon = '🌅';
+        } else if (hrs >= 12 && hrs < 17) {
+            greeting = 'Good afternoon, Sachin';
+            icon = '☀️';
+        } else if (hrs >= 17 && hrs < 22) {
+            greeting = 'Good evening, Sachin';
+            icon = '🌆';
+        } else {
+            greeting = 'Good night, Sachin';
+            icon = '🌙';
+        }
+
+        const options = { weekday: 'long', month: 'short', day: 'numeric' };
+        const dateStr = now.toLocaleDateString(undefined, options);
+
+        const clockEl = document.getElementById('liveClockText');
+        const dateEl = document.getElementById('liveDateText');
+        const greetEl = document.getElementById('greetingText');
+        const iconEl = document.getElementById('greetingTimeIcon');
+
+        if (clockEl) clockEl.textContent = timeStr;
+        if (dateEl) dateEl.textContent = dateStr;
+        if (greetEl) greetEl.textContent = greeting;
+        if (iconEl) iconEl.textContent = icon;
+    }
+
+    initDailyWidgets() {
+        this.updateQuoteDisplay();
+    }
+
+    updateQuoteDisplay() {
+        const q = this.cineQuotes[this.quoteIndex];
+        const textEl = document.getElementById('dailyQuoteText');
+        const authorEl = document.getElementById('dailyQuoteAuthor');
+        if (textEl && q) textEl.textContent = q.text;
+        if (authorEl && q) authorEl.textContent = `— ${q.author}`;
+    }
+
+    nextQuote() {
+        this.quoteIndex = (this.quoteIndex + 1) % this.cineQuotes.length;
+        this.updateQuoteDisplay();
+    }
+
+    renderQuickTiles() {
+        if (!this.quickTilesContainer) return;
+        const tilesHtml = this.customTiles.map((tile, idx) => `
+            <div class="tile-wrapper">
+                <a href="${tile.url}" target="_blank" rel="noopener noreferrer" class="tile" title="${tile.name}">
+                    <i class="${tile.icon || 'fas fa-link'}"></i> ${tile.name}
+                </a>
+                <button class="tile-delete-btn" onclick="window.vidLinkApp.removeCustomTile(${idx})" title="Remove Shortcut">×</button>
+            </div>
+        `).join('');
+
+        this.quickTilesContainer.innerHTML = `
+            ${tilesHtml}
+            <button class="tile tile-add-btn" onclick="window.vidLinkApp.openAddTileModal()" title="Add Custom Shortcut">
+                <i class="fas fa-plus"></i> Add
+            </button>
+        `;
+    }
+
+    openAddTileModal() {
+        if (this.customTileTitle) this.customTileTitle.value = '';
+        if (this.customTileUrl) this.customTileUrl.value = '';
+        this.showModal(this.customTileModal);
+        if (this.customTileTitle) this.customTileTitle.focus();
+    }
+
+    saveCustomTile() {
+        const title = this.customTileTitle?.value.trim();
+        let url = this.customTileUrl?.value.trim();
+        if (!title || !url) {
+            this.showToast('Please enter both title and URL', 'error');
+            return;
+        }
+        if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+
+        this.customTiles.push({
+            name: title,
+            url: url,
+            icon: 'fas fa-arrow-up-right-from-square'
+        });
+        localStorage.setItem('sachin_custom_tiles', JSON.stringify(this.customTiles));
+        this.renderQuickTiles();
+        this.hideModal(this.customTileModal);
+        this.showToast(`Added shortcut "${title}"!`, 'success');
+    }
+
+    removeCustomTile(index) {
+        const removed = this.customTiles.splice(index, 1);
+        localStorage.setItem('sachin_custom_tiles', JSON.stringify(this.customTiles));
+        this.renderQuickTiles();
+        if (removed && removed[0]) {
+            this.showToast(`Removed "${removed[0].name}"`, 'info');
+        }
+    }
+
+    rollSurprisePick() {
+        if (!this.links || this.links.length === 0) {
+            this.showToast('Watchlist is empty! Save some movies or links first.', 'info');
+            return;
+        }
+
+        const unwatched = this.links.filter(l => !l.isWatched);
+        const pool = unwatched.length > 0 ? unwatched : this.links;
+        const randomItem = pool[Math.floor(Math.random() * pool.length)];
+
+        this.currentSurpriseItem = randomItem;
+        this.renderSurpriseCard(randomItem);
+        this.showModal(this.surpriseModal);
+    }
+
+    renderSurpriseCard(item) {
+        if (!this.surpriseCardContainer) return;
+        const isMovie = (item.tags || []).includes('movie') || (item.url && item.url.includes('imdb.com/title/'));
+        const hostname = this.getHostname(item.url);
+        const tags = Array.isArray(item.tags) ? item.tags : [];
+
+        this.surpriseCardContainer.innerHTML = `
+            <div class="surprise-inner-card">
+                <img src="${item.thumb || 'icon.svg'}" class="surprise-inner-thumb" onerror="this.src='icon.svg'">
+                <div class="surprise-inner-details">
+                    <h3 class="surprise-inner-title">${item.title}</h3>
+                    <div class="surprise-inner-meta">
+                        <span><i class="fas fa-globe"></i> ${hostname}</span>
+                        ${isMovie ? ' • <span style="color: #f5c518; font-weight: 700;"><i class="fab fa-imdb"></i> Movie</span>' : ''}
+                        ${item.isWatched ? ' • <span style="color: #22c55e;"><i class="fas fa-check"></i> Watched</span>' : ''}
+                    </div>
+                    <p class="surprise-inner-desc">${item.desc || 'No description provided.'}</p>
+                    <div class="surprise-inner-tags">
+                        ${tags.map(t => `<span class="card-tag-tag">${t}</span>`).join('')}
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    initScratchpad() {
+        if (!this.scratchpadInput) return;
+        this.scratchpadInput.value = localStorage.getItem('sachin_scratchpad') || '';
+        this.updateScratchpadStats();
+        this.scratchpadInput.addEventListener('input', () => {
+            localStorage.setItem('sachin_scratchpad', this.scratchpadInput.value);
+            this.updateScratchpadStats();
+        });
+    }
+
+    openScratchpad() {
+        if (this.scratchpadInput) {
+            this.scratchpadInput.value = localStorage.getItem('sachin_scratchpad') || '';
+            this.updateScratchpadStats();
+        }
+        this.showModal(this.scratchpadModal);
+        setTimeout(() => this.scratchpadInput?.focus(), 100);
+    }
+
+    updateScratchpadStats() {
+        if (!this.scratchpadStats || !this.scratchpadInput) return;
+        const text = this.scratchpadInput.value.trim();
+        const words = text ? text.split(/\s+/).length : 0;
+        const chars = text.length;
+        this.scratchpadStats.textContent = `${words} words · ${chars} chars`;
+    }
+
+    openShortcuts() {
+        this.showModal(this.shortcutsModal);
     }
 }
 

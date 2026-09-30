@@ -1,31 +1,46 @@
-const CACHE_NAME = 'sachin-stream-v2';
-const urlsToCache = [
+const CACHE_NAME = 'sachin-hub-v7';
+
+// Core local assets to pre-cache on install
+const CORE_ASSETS = [
   './',
   './index.html',
   './style.css',
   './app.js',
-  './manifest.json'
+  './manifest.json',
+  './icon.svg'
 ];
 
-// Install: Cache critical assets and activate immediately
+// Third-party CDNs to cache for complete offline aesthetics (Google Fonts & Font Awesome)
+const CACHEABLE_ORIGINS = [
+  'fonts.googleapis.com',
+  'fonts.gstatic.com',
+  'cdnjs.cloudflare.com'
+];
+
+// Install: Pre-cache local assets & activate immediately
 self.addEventListener('install', event => {
   self.skipWaiting();
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => {
-      return cache.addAll(urlsToCache);
-    }).catch(err => {
-      console.warn('SW cache.addAll non-critical error:', err);
+    caches.open(CACHE_NAME).then(async cache => {
+      for (const asset of CORE_ASSETS) {
+        try {
+          await cache.add(asset);
+        } catch (err) {
+          console.warn(`[SW] Precache non-critical skip for: ${asset}`, err);
+        }
+      }
     })
   );
 });
 
-// Activate: Clean up old caches
+// Activate: Immediately purge all outdated cache versions and claim active clients
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(keys => {
       return Promise.all(
         keys.map(key => {
           if (key !== CACHE_NAME) {
+            console.log(`[SW] Purging old cache: ${key}`);
             return caches.delete(key);
           }
         })
@@ -34,30 +49,62 @@ self.addEventListener('activate', event => {
   );
 });
 
-// Fetch: Stale-While-Revalidate strategy for fast offline & instant updates
+// Fetch: Hybrid Strategy (Network-First for local code, Cache-First for CDNs, Network-Only for dynamic APIs)
 self.addEventListener('fetch', event => {
-  // Only cache GET requests
-  if (event.request.method !== 'GET') return;
+  const request = event.request;
+  if (request.method !== 'GET') return;
 
-  // Let external APIs / IMDb / YouTube embeds bypass service worker cache
-  const url = new URL(event.request.url);
-  if (!url.origin.includes(self.location.origin) && !urlsToCache.includes(url.pathname)) {
+  const url = new URL(request.url);
+
+  // 1. Bypass external dynamic APIs (IMDb search JSONP, YouTube trailers, screenshot generators, favicons)
+  const isDynamicApi = url.hostname.includes('imdb.com') ||
+                        url.hostname.includes('youtube.com') ||
+                        url.hostname.includes('allorigins') ||
+                        url.hostname.includes('wordpress.com') ||
+                        url.hostname.includes('google.com/s2/favicons');
+
+  if (isDynamicApi) {
+    return; // Pass through directly to network
+  }
+
+  // 2. Cache-First for Third-Party Fonts & Icons CDN (Instant load & full offline support)
+  const isCdnAsset = CACHEABLE_ORIGINS.some(origin => url.hostname.includes(origin));
+  if (isCdnAsset) {
+    event.respondWith(
+      caches.match(request).then(cached => {
+        if (cached) return cached;
+        return fetch(request).then(networkResponse => {
+          if (networkResponse && networkResponse.status === 200) {
+            const clone = networkResponse.clone();
+            caches.open(CACHE_NAME).then(cache => cache.put(request, clone));
+          }
+          return networkResponse;
+        }).catch(() => {
+          return new Response('', { status: 408, statusText: 'Offline' });
+        });
+      })
+    );
     return;
   }
 
-  event.respondWith(
-    caches.match(event.request).then(cachedResponse => {
-      const fetchPromise = fetch(event.request).then(networkResponse => {
+  // 3. Network-First with Cache Fallback for Local App Shell (Guarantees instant fresh updates when online, reliable offline fallback)
+  if (url.origin === self.location.origin) {
+    event.respondWith(
+      fetch(request).then(networkResponse => {
         if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
-          const responseToCache = networkResponse.clone();
-          caches.open(CACHE_NAME).then(cache => {
-            cache.put(event.request, responseToCache);
-          });
+          const clone = networkResponse.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(request, clone));
         }
         return networkResponse;
-      }).catch(() => cachedResponse);
-
-      return cachedResponse || fetchPromise;
-    })
-  );
+      }).catch(async () => {
+        const cached = await caches.match(request);
+        if (cached) return cached;
+        // Navigation fallback to index.html if navigating
+        if (request.mode === 'navigate') {
+          return (await caches.match('./index.html')) || (await caches.match('./'));
+        }
+        return new Response('Offline', { status: 503, statusText: 'Offline' });
+      })
+    );
+  }
 });

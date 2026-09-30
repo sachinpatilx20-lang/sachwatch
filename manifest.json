@@ -9,18 +9,34 @@
   "background_color": "#0e0f13",
   "theme_color": "#e50914",
   "categories": ["entertainment", "video", "utilities"],
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "192x192 512x512 any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "icon.svg",
+      "sizes": "192x192 512x512 any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
   "shortcuts": [
     {
       "name": "Search & Add",
       "short_name": "Search",
       "description": "Search IMDb or add a link",
-      "url": "./index.html?action=search"
+      "url": "./index.html?action=search",
+      "icons": [{ "src": "icon.svg", "sizes": "192x192" }]
     },
     {
       "name": "Movies Watchlist",
       "short_name": "Movies",
       "description": "View saved movies",
-      "url": "./index.html?filter=movie"
+      "url": "./index.html?filter=movie",
+      "icons": [{ "src": "icon.svg", "sizes": "192x192" }]
     }
   ]
 }

@@ -1,0 +1,122 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Background Gradient -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#14151d"/>
+      <stop offset="50%" stop-color="#0b0c10"/>
+      <stop offset="100%" stop-color="#050507"/>
+    </linearGradient>
+
+    <!-- Crimson Neon Accent Gradient -->
+    <linearGradient id="crimsonNeon" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ff3344"/>
+      <stop offset="100%" stop-color="#b8000b"/>
+    </linearGradient>
+
+    <!-- Metallic Silver Shading -->
+    <linearGradient id="metalSilver" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="45%" stop-color="#e2e8f0"/>
+      <stop offset="100%" stop-color="#94a3b8"/>
+    </linearGradient>
+
+    <!-- Glowing Eye Radial -->
+    <radialGradient id="eyeGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ff4d5a"/>
+      <stop offset="40%" stop-color="#e50914"/>
+      <stop offset="100%" stop-color="rgba(229, 9, 20, 0)"/>
+    </radialGradient>
+
+    <!-- Ambient Red Core Glow -->
+    <radialGradient id="coreAura" cx="50%" cy="45%" r="55%">
+      <stop offset="0%" stop-color="rgba(229, 9, 20, 0.35)"/>
+      <stop offset="70%" stop-color="rgba(229, 9, 20, 0.05)"/>
+      <stop offset="100%" stop-color="rgba(0, 0, 0, 0)"/>
+    </radialGradient>
+
+    <!-- Outer Rim Stroke Gradient -->
+    <linearGradient id="rimStroke" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="rgba(255, 255, 255, 0.22)"/>
+      <stop offset="50%" stop-color="rgba(229, 9, 20, 0.4)"/>
+      <stop offset="100%" stop-color="rgba(255, 255, 255, 0.05)"/>
+    </linearGradient>
+
+    <!-- Soft Glow Filter -->
+    <filter id="neonBlur" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Base App Tile with Squircle Border -->
+  <rect width="512" height="512" rx="118" fill="url(#bgGrad)"/>
+  <rect width="510" height="510" x="1" y="1" rx="117" fill="none" stroke="url(#rimStroke)" stroke-width="2.5"/>
+
+  <!-- Subtle Cyber Tech Grid Circles -->
+  <circle cx="256" cy="245" r="185" fill="url(#coreAura)"/>
+  <circle cx="256" cy="245" r="180" fill="none" stroke="rgba(255, 255, 255, 0.03)" stroke-width="1.5" stroke-dasharray="8 8"/>
+  <circle cx="256" cy="245" r="145" fill="none" stroke="rgba(229, 9, 20, 0.08)" stroke-width="1.5"/>
+
+  <!-- Top Decorative Stars ✦ -->
+  <g fill="url(#crimsonNeon)" filter="url(#neonBlur)">
+    <!-- Left Star ✦ -->
+    <path d="M 125 105 Q 125 125 105 125 Q 125 125 125 145 Q 125 125 145 125 Q 125 125 125 105 Z"/>
+    <!-- Right Star ✦ -->
+    <path d="M 387 105 Q 387 125 367 125 Q 387 125 387 145 Q 387 125 407 125 Q 387 125 387 105 Z"/>
+  </g>
+
+  <!-- Skull Silhouette Shadow/Backglow -->
+  <path d="M 256 120 C 180 120 138 175 138 245 C 138 290 162 325 186 345 C 192 350 196 360 196 372 L 196 395 C 196 405 206 414 218 414 L 294 414 C 306 414 316 405 316 395 L 316 372 C 316 360 320 350 326 345 C 350 325 374 290 374 245 C 374 175 332 120 256 120 Z"
+        fill="rgba(229, 9, 20, 0.25)" filter="url(#neonBlur)"/>
+
+  <!-- Stylized Cybernetic Skull Main Body -->
+  <path d="M 256 122 C 182 122 142 176 142 245 C 142 288 165 322 188 342 C 194 347 198 358 198 370 L 198 394 C 198 402 206 410 216 410 L 296 410 C 306 410 314 402 314 394 L 314 370 C 314 358 318 347 324 342 C 347 322 370 288 370 245 C 370 176 330 122 256 122 Z"
+        fill="url(#metalSilver)"/>
+
+  <!-- Cranium Chiseled Brow Geometry / Detail -->
+  <path d="M 185 220 L 256 235 L 327 220 C 335 200 328 165 256 160 C 184 165 177 200 185 220 Z"
+        fill="rgba(15, 17, 23, 0.2)"/>
+
+  <!-- Skull Glowing Eye Sockets -->
+  <!-- Left Eye -->
+  <ellipse cx="205" cy="265" rx="30" ry="36" transform="rotate(12, 205, 265)" fill="#090a0f"/>
+  <ellipse cx="205" cy="265" rx="20" ry="24" transform="rotate(12, 205, 265)" fill="url(#eyeGlow)"/>
+  <circle cx="206" cy="264" r="8" fill="#ffffff" filter="url(#neonBlur)"/>
+  <circle cx="206" cy="264" r="4" fill="#ffffff"/>
+
+  <!-- Right Eye -->
+  <ellipse cx="307" cy="265" rx="30" ry="36" transform="rotate(-12, 307, 265)" fill="#090a0f"/>
+  <ellipse cx="307" cy="265" rx="20" ry="24" transform="rotate(-12, 307, 265)" fill="url(#eyeGlow)"/>
+  <circle cx="306" cy="264" r="8" fill="#ffffff" filter="url(#neonBlur)"/>
+  <circle cx="306" cy="264" r="4" fill="#ffffff"/>
+
+  <!-- Inverted Heart Nasal Cavity -->
+  <path d="M 256 295 L 244 322 C 242 328 247 334 253 332 L 256 330 L 259 332 C 265 334 270 328 268 322 Z" fill="#090a0f"/>
+
+  <!-- Cheekbone Sculpt Indentations -->
+  <path d="M 148 265 C 158 290 178 312 195 324 L 186 305 C 168 295 155 280 148 265 Z" fill="#64748b" opacity="0.6"/>
+  <path d="M 364 265 C 354 290 334 312 317 324 L 326 305 C 344 295 357 280 364 265 Z" fill="#64748b" opacity="0.6"/>
+
+  <!-- Teeth / Jaw Vents (Cinematic Grille) -->
+  <g fill="#0b0c10">
+    <rect x="220" y="375" width="12" height="30" rx="3"/>
+    <rect x="238" y="375" width="12" height="30" rx="3"/>
+    <rect x="256" y="375" width="12" height="30" rx="3"/>
+    <rect x="274" y="375" width="12" height="30" rx="3"/>
+  </g>
+
+  <!-- Center Forehead Streaming Play Triangle (Neon Red) -->
+  <g filter="url(#neonBlur)">
+    <polygon points="248,172 248,202 272,187" fill="url(#crimsonNeon)"/>
+  </g>
+  <polygon points="249,174 249,200 270,187" fill="#ffffff"/>
+
+  <!-- Bottom Monogram "SACHIN" / "S" Neon Accent Bar -->
+  <g filter="url(#neonBlur)">
+    <line x1="160" y1="450" x2="352" y2="450" stroke="url(#crimsonNeon)" stroke-width="4" stroke-linecap="round"/>
+  </g>
+  <line x1="190" y1="450" x2="322" y2="450" stroke="#ffffff" stroke-width="2" stroke-linecap="round"/>
+</svg>

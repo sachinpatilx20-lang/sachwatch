@@ -8,12 +8,13 @@
     <meta name="description" content="Minimalist personal streaming links and movie watchlist">
     <!-- Netflix Fonts: Bebas Neue for Brand Title & Inter for Body -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link rel="stylesheet" href="style.css">
     <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#141414">
+    <meta name="theme-color" content="#e50914">
+    <link rel="icon" type="image/svg+xml" href="icon.svg">
+    <link rel="apple-touch-icon" href="icon.svg">
 </head>
 
 <body class="dark-theme netflix-theme">
@@ -25,6 +26,15 @@
                 <span class="brand-title">✦-- S💀ch.🖕🏻n --✦</span>
             </a>
             <div class="header-right-actions" style="flex: 1; display: flex; justify-content: flex-end; align-items: center; gap: 8px;">
+                <button id="headerSurpriseBtn" class="btn icon-btn header-tool-btn" title="Surprise Me (Roll Random Watch) [R]">
+                    <i class="fas fa-dice"></i>
+                </button>
+                <button id="headerNotesBtn" class="btn icon-btn header-tool-btn" title="Daily Scratchpad & Quick Notes [N]">
+                    <i class="fas fa-pen-to-square"></i>
+                </button>
+                <button id="headerShortcutsBtn" class="btn icon-btn header-tool-btn" title="Keyboard Shortcuts [?]">
+                    <i class="fas fa-keyboard"></i>
+                </button>
                 <button id="pwaInstallBtn" class="btn icon-btn pwa-badge-btn hidden" title="Install App to Device">
                     <i class="fas fa-download"></i>
                 </button>
@@ -44,6 +54,8 @@
             </div>
         </div>
     </header>
+
+
     <!-- Global Loader Overlay -->
     <div id="loader" class="loader-overlay hidden">
         <div class="loader-spinner"></div>
@@ -56,7 +68,7 @@
         <div class="search-box-container" style="position: relative;">
             <div class="search-input-wrapper">
                 <i class="fas fa-search search-icon"></i>
-                <input type="text" id="searchInput" placeholder="Search or paste URL..." autocomplete="off">
+                <input type="text" id="searchInput" placeholder="Search or paste URL... (Press '/' to focus)" autocomplete="off">
                 <button id="searchClearBtn" class="search-clear-btn hidden" title="Clear">×</button>
                 <button id="addBtn" class="btn primary small-save-btn" title="Save Link"><i class="fas fa-plus"></i> Save</button>
             </div>
@@ -66,27 +78,8 @@
     </section>
 
     <!-- Quick Access Hub -->
-    <div class="streaming-tiles-container">
-        <a href="https://www.youtube.com" target="_blank" rel="noopener noreferrer" class="tile"><i class="fab fa-youtube"></i> YouTube</a>
-        <a href="https://music.youtube.com" target="_blank" rel="noopener noreferrer" class="tile"><i class="fas fa-music"></i> YT Music</a>
-        <a href="https://www.primevideo.com" target="_blank" rel="noopener noreferrer" class="tile"><i class="fas fa-play"></i> Prime Video</a>
-        <a href="https://netflix.com" target="_blank" rel="noopener noreferrer" class="tile"><i class="fas fa-film"></i> Netflix</a>
-        <a href="https://www.hotstar.com" target="_blank" rel="noopener noreferrer" class="tile"><i class="fas fa-star"></i> JioHotstar</a>
-        <a href="https://www.sonyliv.com" target="_blank" rel="noopener noreferrer" class="tile"><i class="fas fa-tv"></i> SonyLIV</a>
-        <a href="https://www.zee5.com" target="_blank" rel="noopener noreferrer" class="tile"><i class="fas fa-play-circle"></i> ZEE5</a>
-        <a href="https://open.spotify.com" target="_blank" rel="noopener noreferrer" class="tile"><i class="fab fa-spotify"></i> Spotify</a>
-        <a href="https://www.twitch.tv" target="_blank" rel="noopener noreferrer" class="tile"><i class="fab fa-twitch"></i> Twitch</a>
-        <a href="https://www.crunchyroll.com" target="_blank" rel="noopener noreferrer" class="tile"><i class="fas fa-tv"></i> Crunchyroll</a>
-        <a href="https://www.instagram.com/reels" target="_blank" rel="noopener noreferrer" class="tile"><i class="fab fa-instagram"></i> Instagram</a>
-        <a href="https://web.whatsapp.com" target="_blank" rel="noopener noreferrer" class="tile"><i class="fab fa-whatsapp"></i> WhatsApp</a>
-        <a href="https://web.telegram.org" target="_blank" rel="noopener noreferrer" class="tile"><i class="fab fa-telegram"></i> Telegram</a>
-        <a href="https://www.reddit.com" target="_blank" rel="noopener noreferrer" class="tile"><i class="fab fa-reddit-alien"></i> Reddit</a>
-        <a href="https://www.x.com" target="_blank" rel="noopener noreferrer" class="tile"><i class="fab fa-x-twitter"></i> Twitter</a>
-        <a href="https://discord.com/channels/@me" target="_blank" rel="noopener noreferrer" class="tile"><i class="fab fa-discord"></i> Discord</a>
-        <a href="https://www.google.com" target="_blank" rel="noopener noreferrer" class="tile"><i class="fab fa-google"></i> Google</a>
-        <a href="https://www.imdb.com" target="_blank" rel="noopener noreferrer" class="tile"><i class="fab fa-imdb"></i> IMDb</a>
-        <a href="https://yarrlists.net/movies-and-tv-shows" target="_blank" rel="noopener noreferrer" class="tile"><i class="fab fa-imdb"></i>mPhg</a>
-        <a href="https://fmhy.net/video" target="_blank" rel="noopener noreferrer" class="tile"><i class="fab fa-imdb"></i>FMHY</a>
+    <div class="streaming-tiles-container" id="quickTilesContainer">
+        <!-- Rendered dynamically with customizable tiles & + Add Shortcut -->
     </div>
 
     <!-- Main Content Container -->
@@ -96,14 +89,21 @@
             <div class="section-header-bar">
                 <div id="tagFilter" class="category-bar">
                     <button class="cat-pill active" data-tag="all">All</button>
+                    <button class="cat-pill" data-tag="fav"><i class="fas fa-star" style="color: #f5c518;"></i> Starred</button>
                     <button class="cat-pill" data-tag="movie"><i class="fas fa-film"></i> Movies</button>
+                    <button class="cat-pill" data-tag="towatch"><i class="far fa-clock"></i> To Watch</button>
+                    <button class="cat-pill" data-tag="watched"><i class="fas fa-check-circle" style="color: #22c55e;"></i> Watched</button>
                 </div>
                 <div class="watchlist-toolbar">
+                    <button id="surpriseMeBtn" class="btn surprise-pill-btn" title="Surprise Me (Roll Random Watch) [R]">
+                        <i class="fas fa-dice"></i> <span>Surprise Pick</span>
+                    </button>
                     <div class="sort-wrapper">
                         <select id="sortSelect" class="sort-select" title="Sort watchlist">
                             <option value="newest">Newest</option>
                             <option value="oldest">Oldest</option>
                             <option value="alpha">A-Z</option>
+                            <option value="fav">Starred First</option>
                         </select>
                     </div>
                     <button id="viewToggleBtn" class="btn view-toggle-btn" title="Toggle Grid or Compact View">
@@ -230,8 +230,108 @@
             <img id="lightboxImg" src="" alt="Preview" class="fit-contain">
         </div>
     </div>
+    <!-- Surprise Me / What to Watch Randomizer Modal -->
+    <div id="surpriseModal" class="modal-overlay hidden">
+        <div class="modal-content border-panel surprise-modal-panel" style="max-width: 580px;">
+            <div class="surprise-modal-header">
+                <div class="surprise-badge"><i class="fas fa-dice"></i> Daily Decision Maker</div>
+                <h2>What To Watch Today</h2>
+                <p class="modal-subtitle">Can't decide? Here is your personalized pick from your watchlist:</p>
+            </div>
+            <div id="surpriseCardContainer" class="surprise-card-box">
+                <!-- Populated dynamically -->
+            </div>
+            <div class="modal-actions" style="display: flex; gap: 10px; margin-top: 20px;">
+                <button id="surpriseRollAgainBtn" class="btn secondary" style="flex: 1;"><i class="fas fa-rotate"></i> Roll Again</button>
+                <button id="surpriseOpenBtn" class="btn primary" style="flex: 1;"><i class="fas fa-play"></i> Open Now</button>
+                <button id="closeSurpriseModalBtn" class="btn secondary">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Daily Scratchpad & Quick Notes Modal -->
+    <div id="scratchpadModal" class="modal-overlay hidden">
+        <div class="modal-content border-panel scratchpad-panel" style="max-width: 680px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <div>
+                    <h2 style="margin: 0;"><i class="fas fa-pen-to-square" style="margin-right: 8px;"></i> Daily Scratchpad</h2>
+                    <p class="modal-subtitle" style="margin: 4px 0 0;">Auto-saves locally on every keystroke. Great for quick links, to-dos &amp; recs.</p>
+                </div>
+                <div id="scratchpadStats" style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">0 words</div>
+            </div>
+            <div class="scratchpad-field">
+                <textarea id="scratchpadInput" placeholder="Jot down quick movie ideas, links friends shared, or today's watchlist notes..."></textarea>
+            </div>
+            <div class="modal-actions" style="display: flex; justify-content: space-between; align-items: center; margin-top: 14px;">
+                <div style="display: flex; gap: 8px;">
+                    <button id="copyScratchpadBtn" class="btn secondary small"><i class="fas fa-copy"></i> Copy</button>
+                    <button id="clearScratchpadBtn" class="btn secondary small" style="color: var(--danger);"><i class="fas fa-trash"></i> Clear</button>
+                </div>
+                <button id="closeScratchpadBtn" class="btn primary small">Done</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Custom Quick Access Shortcut Modal -->
+    <div id="customTileModal" class="modal-overlay hidden">
+        <div class="modal-content border-panel" style="max-width: 480px;">
+            <h2>Add Quick Shortcut</h2>
+            <p class="modal-subtitle">Add your favorite daily sites to the quick access bar.</p>
+            <div class="edit-fields" style="margin-top: 16px;">
+                <div class="field">
+                    <label style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase;">Shortcut Title</label>
+                    <input type="text" id="customTileTitle" placeholder="e.g., GitHub, Netflix, Claude">
+                </div>
+                <div class="field" style="margin-top: 12px;">
+                    <label style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase;">URL</label>
+                    <input type="text" id="customTileUrl" placeholder="https://...">
+                </div>
+            </div>
+            <div class="modal-actions" style="margin-top: 20px;">
+                <button id="closeCustomTileModalBtn" class="btn secondary">Cancel</button>
+                <button id="saveCustomTileBtn" class="btn primary"><i class="fas fa-plus"></i> Add Shortcut</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Keyboard Shortcuts Cheat Sheet Modal -->
+    <div id="shortcutsModal" class="modal-overlay hidden">
+        <div class="modal-content border-panel shortcuts-modal-panel" style="max-width: 480px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                <h2 style="margin: 0;"><i class="fas fa-keyboard" style="margin-right: 8px;"></i> Keyboard Shortcuts</h2>
+                <button id="closeShortcutsModalBtn" class="btn icon-btn" style="color: var(--text-muted); font-size: 1.2rem;">×</button>
+            </div>
+            <div class="shortcuts-list">
+                <div class="shortcut-row">
+                    <span>Focus Search / Add Link</span>
+                    <kbd>/</kbd>
+                </div>
+                <div class="shortcut-row">
+                    <span>Surprise Pick (Random Watch)</span>
+                    <kbd>R</kbd>
+                </div>
+                <div class="shortcut-row">
+                    <span>Daily Scratchpad &amp; Notes</span>
+                    <kbd>N</kbd>
+                </div>
+                <div class="shortcut-row">
+                    <span>Toggle Light / Dark Theme</span>
+                    <kbd>T</kbd>
+                </div>
+                <div class="shortcut-row">
+                    <span>Close Any Open Modal</span>
+                    <kbd>Esc</kbd>
+                </div>
+                <div class="shortcut-row">
+                    <span>Show Keyboard Shortcuts Help</span>
+                    <kbd>?</kbd>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
-        if ('serviceWorker' in navigator) {
+        if ('serviceWorker' in navigator && window.location.protocol.startsWith('http')) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('sw.js').then(registration => {
                     console.log('ServiceWorker registration successful');
