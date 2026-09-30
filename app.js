@@ -15,6 +15,9 @@ class VidLinkApp {
         this.tempTags = []; 
         this.currentLinkTags = [];
         this.searchQuery = '';
+        this.currentSort = localStorage.getItem('sachin_sort') || 'newest';
+        this.viewMode = localStorage.getItem('sachin_view_mode') || 'grid';
+        this.deferredInstallPrompt = null;
 
         this.initElements();
         this.initEvents();
@@ -88,6 +91,16 @@ class VidLinkApp {
         this.lightboxFitToggleBtn = document.getElementById('lightboxFitToggleBtn');
         this.closeLightboxBtn = document.getElementById('closeLightboxBtn');
 
+        // New UI Elements
+        this.statsCount = document.getElementById('statsCount');
+        this.sortSelect = document.getElementById('sortSelect');
+        this.viewToggleBtn = document.getElementById('viewToggleBtn');
+        this.pwaInstallBtn = document.getElementById('pwaInstallBtn');
+        this.navAllBtn = document.getElementById('navAllBtn');
+        this.navMoviesBtn = document.getElementById('navMoviesBtn');
+        this.navSearchBtn = document.getElementById('navSearchBtn');
+        this.navScrollTopBtn = document.getElementById('navScrollTopBtn');
+
         this.searchCache = new Map();
         this.searchTimeout = null;
         this.suggestionAbortController = null;
@@ -150,7 +163,91 @@ class VidLinkApp {
 
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') this.closeAllModals();
+            // Press '/' to search if not already in an input
+            if (e.key === '/' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+                e.preventDefault();
+                if (this.searchInput) {
+                    this.searchInput.focus();
+                    this.searchInput.select();
+                }
+            }
         });
+
+        // PWA Install Prompt Listeners
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            this.deferredInstallPrompt = e;
+            if (this.pwaInstallBtn) this.pwaInstallBtn.classList.remove('hidden');
+        });
+
+        window.addEventListener('appinstalled', () => {
+            this.deferredInstallPrompt = null;
+            if (this.pwaInstallBtn) this.pwaInstallBtn.classList.add('hidden');
+            this.showToast('App installed successfully! Enjoy your streaming hub.', 'success');
+        });
+
+        if (this.pwaInstallBtn) {
+            this.pwaInstallBtn.addEventListener('click', async () => {
+                if (this.deferredInstallPrompt) {
+                    this.deferredInstallPrompt.prompt();
+                    const { outcome } = await this.deferredInstallPrompt.userChoice;
+                    if (outcome === 'accepted') {
+                        this.pwaInstallBtn.classList.add('hidden');
+                    }
+                    this.deferredInstallPrompt = null;
+                } else {
+                    this.showToast('To install: click the Install icon in your browser URL bar or Add to Home screen in menu.', 'info');
+                }
+            });
+        }
+
+        // Sort Control
+        if (this.sortSelect) {
+            this.sortSelect.value = this.currentSort;
+            this.sortSelect.addEventListener('change', (e) => {
+                this.currentSort = e.target.value;
+                localStorage.setItem('sachin_sort', this.currentSort);
+                this.render();
+            });
+        }
+
+        // View Mode Toggle (Grid vs Compact)
+        if (this.viewToggleBtn) {
+            this.viewToggleBtn.addEventListener('click', () => {
+                this.viewMode = this.viewMode === 'grid' ? 'compact' : 'grid';
+                localStorage.setItem('sachin_view_mode', this.viewMode);
+                this.render();
+            });
+        }
+
+        // Mobile Bottom Nav Dock
+        if (this.navAllBtn) {
+            this.navAllBtn.addEventListener('click', () => {
+                this.activeTag = 'all';
+                this.updateActiveNavPill('all');
+                this.render();
+            });
+        }
+        if (this.navMoviesBtn) {
+            this.navMoviesBtn.addEventListener('click', () => {
+                this.activeTag = 'movie';
+                this.updateActiveNavPill('movie');
+                this.render();
+            });
+        }
+        if (this.navSearchBtn) {
+            this.navSearchBtn.addEventListener('click', () => {
+                if (this.searchInput) {
+                    this.searchInput.focus();
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                }
+            });
+        }
+        if (this.navScrollTopBtn) {
+            this.navScrollTopBtn.addEventListener('click', () => {
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            });
+        }
 
         if (this.searchClearBtn) {
             this.searchClearBtn.addEventListener('click', () => {
@@ -1007,8 +1104,30 @@ class VidLinkApp {
             });
         }
 
-        // Sorting (Always Newest First)
-        filtered.sort((a, b) => (b.date || 0) - (a.date || 0));
+        // Sorting according to user choice
+        if (this.currentSort === 'newest') {
+            filtered.sort((a, b) => (b.date || 0) - (a.date || 0));
+        } else if (this.currentSort === 'oldest') {
+            filtered.sort((a, b) => (a.date || 0) - (b.date || 0));
+        } else if (this.currentSort === 'alpha') {
+            filtered.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+        }
+
+        // Update stats counter
+        if (this.statsCount) {
+            this.statsCount.textContent = this.links.length;
+        }
+
+        // Apply View Mode
+        if (this.linkGrid) {
+            if (this.viewMode === 'compact') {
+                this.linkGrid.classList.add('compact-view');
+                if (this.viewToggleBtn) this.viewToggleBtn.innerHTML = '<i class="fas fa-table-cells-large"></i>';
+            } else {
+                this.linkGrid.classList.remove('compact-view');
+                if (this.viewToggleBtn) this.viewToggleBtn.innerHTML = '<i class="fas fa-grip"></i>';
+            }
+        }
 
         if (filtered.length === 0) {
             const isFiltering = this.activeTag !== 'all' || this.searchQuery.trim();
@@ -1017,6 +1136,12 @@ class VidLinkApp {
                     <div class="empty-icon"><i class="${isFiltering ? 'fas fa-search' : 'fas fa-film'}"></i></div>
                     <div class="empty-title">${isFiltering ? 'No results found' : 'Watchlist is Empty'}</div>
                     <p class="empty-sub">${isFiltering ? 'Try searching for different keywords or tag filters.' : 'Paste any URL or search above to save movies & links.'}</p>
+                    ${!isFiltering ? `
+                    <div class="empty-starter-chips">
+                        <button class="starter-chip" onclick="window.vidLinkApp.addDemoItem('https://www.netflix.com', 'Netflix Streaming Hub', ['streaming', 'movie'])"><i class="fas fa-play"></i> + Netflix</button>
+                        <button class="starter-chip" onclick="window.vidLinkApp.addDemoItem('https://www.imdb.com/chart/top/', 'IMDb Top 250 Movies', ['movie'])"><i class="fas fa-film"></i> + Top 250 Movies</button>
+                        <button class="starter-chip" onclick="window.vidLinkApp.addDemoItem('https://music.youtube.com', 'YouTube Music Hub', ['music'])"><i class="fas fa-music"></i> + YT Music</button>
+                    </div>` : ''}
                 </div>`;
             return;
         }
@@ -1054,6 +1179,10 @@ class VidLinkApp {
                                 <button class="btn open-btn" onclick="window.open('${l.url}', '_blank')" title="Open">
                                     Open
                                 </button>
+                                ${isMovie ? `
+                                <button class="btn default-btn icon-only" onclick="window.vidLinkApp.quickTrailer('${escapedTitle}')" title="Watch Trailer">
+                                    <i class="fab fa-youtube"></i>
+                                </button>` : ''}
                                 <button class="btn default-btn icon-only" onclick="window.vidLinkApp.openLightbox('${escapedThumb}', '${escapedTitle}')" title="Fit to Screen Lightbox">
                                     <i class="fas fa-expand"></i>
                                 </button>
@@ -1326,6 +1455,57 @@ class VidLinkApp {
         }
 
         this.showModal(this.movieModal);
+    }
+
+    updateActiveNavPill(tag) {
+        if (this.tagFilter) {
+            this.tagFilter.querySelectorAll('.cat-pill').forEach(p => {
+                if (p.dataset.tag === tag) p.classList.add('active');
+                else p.classList.remove('active');
+            });
+        }
+        if (this.navAllBtn && this.navMoviesBtn) {
+            this.navAllBtn.classList.toggle('active', tag === 'all');
+            this.navMoviesBtn.classList.toggle('active', tag === 'movie');
+        }
+    }
+
+    addDemoItem(url, title, tags = ['movie']) {
+        const existing = this.links.find(l => l.url === url);
+        if (existing) {
+            this.showToast('Already in your watchlist', 'info');
+            return;
+        }
+        const item = {
+            id: 'l_' + Date.now(),
+            url: url,
+            thumb: 'star.svg',
+            title: title,
+            desc: `Quick launch link for ${title}`,
+            tags: tags,
+            date: Date.now()
+        };
+        this.links.unshift(item);
+        this.updateStorage();
+        this.render();
+        this.showToast(`Added ${title}!`, 'success');
+    }
+
+    async quickTrailer(title) {
+        this.showToast(`Finding trailer for "${title}"...`, 'info');
+        const vidId = await this.fetchTrailerId(title);
+        if (vidId && this.movieTrailerWrap && this.movieTrailerIframe) {
+            this.movieTrailerIframe.src = `https://www.youtube.com/embed/${vidId}?autoplay=1&rel=0`;
+            this.movieTrailerWrap.classList.remove('hidden');
+            if (this.movieModalTitle) this.movieModalTitle.textContent = title;
+            if (this.movieModalPoster) this.movieModalPoster.src = 'star.svg';
+            if (this.movieModalYear) this.movieModalYear.textContent = 'Official Trailer';
+            if (this.movieModalCast) this.movieModalCast.textContent = '';
+            if (this.movieModalType) this.movieModalType.textContent = 'Trailer';
+            this.showModal(this.movieModal);
+        } else {
+            window.open(`https://www.youtube.com/results?search_query=${encodeURIComponent(title + ' official trailer')}`, '_blank');
+        }
     }
 }
 

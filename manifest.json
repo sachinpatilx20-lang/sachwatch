@@ -1,27 +1,26 @@
 {
-  "name": "Sach.in Streaming",
+  "name": "Sach.in Streaming & Watchlist",
   "short_name": "Sach.in",
-  "description": "Minimalist personal streaming links and movie watchlist",
-  "start_url": "./",
+  "description": "Minimalist personal streaming hub, quick links, and movie watchlist",
+  "start_url": "./index.html",
   "display": "standalone",
-  "background_color": "#141414",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "orientation": "any",
+  "background_color": "#0e0f13",
   "theme_color": "#e50914",
-  "icons": [
+  "categories": ["entertainment", "video", "utilities"],
+  "shortcuts": [
     {
-      "src": "star.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "name": "Search & Add",
+      "short_name": "Search",
+      "description": "Search IMDb or add a link",
+      "url": "./index.html?action=search"
     },
     {
-      "src": "star.svg",
-      "sizes": "192x192",
-      "type": "image/svg+xml"
-    },
-    {
-      "src": "star.svg",
-      "sizes": "512x512",
-      "type": "image/svg+xml"
+      "name": "Movies Watchlist",
+      "short_name": "Movies",
+      "description": "View saved movies",
+      "url": "./index.html?filter=movie"
     }
   ]
 }

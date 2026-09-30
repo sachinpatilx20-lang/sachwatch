@@ -111,30 +111,24 @@ input, textarea, button {
     display: flex;
     align-items: center;
     justify-content: space-between;
+    position: relative;
 }
 
 .brand-logo {
     display: inline-flex;
     align-items: center;
-    gap: 9px;
+    gap: 8px;
     user-select: none;
     text-decoration: none;
+    transition: opacity 0.2s ease;
 }
 
-.brand-mark {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 28px;
-    height: 28px;
-    background: linear-gradient(135deg, #e50914, #b9090b);
-    color: #ffffff;
-    font-family: var(--font-heading);
-    font-size: 1.3rem;
-    font-weight: 900;
-    line-height: 1;
-    border-radius: var(--radius-sm);
-    box-shadow: 0 2px 8px rgba(229, 9, 20, 0.35);
+.brand-logo:hover {
+    opacity: 0.85;
+}
+
+.brand-star-svg {
+    display: block;
 }
 
 .brand-title {
@@ -144,6 +138,26 @@ input, textarea, button {
     color: var(--text-primary);
     line-height: 1;
     font-weight: 400;
+}
+
+.pwa-badge-btn {
+    background: var(--surface);
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.pwa-badge-btn:hover {
+    color: var(--text-primary);
+    border-color: var(--border-hover);
+    background: var(--surface-hover);
 }
 
 .theme-toggle-btn {
@@ -353,6 +367,7 @@ input::placeholder {
     justify-content: space-between;
     align-items: center;
     margin-bottom: 1.25rem;
+    gap: 12px;
 }
 
 .category-bar {
@@ -396,6 +411,53 @@ input::placeholder {
     color: var(--bg-main);
     border-color: var(--text-primary);
     font-weight: 600;
+}
+
+.watchlist-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.sort-select {
+    background: var(--surface);
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    padding: 5px 10px;
+    border-radius: var(--radius-full);
+    font-size: 0.78rem;
+    font-weight: 500;
+    cursor: pointer;
+    outline: none;
+    transition: var(--transition);
+}
+
+.sort-select:hover, .sort-select:focus {
+    color: var(--text-primary);
+    border-color: var(--border-hover);
+    background: var(--surface-hover);
+}
+
+.view-toggle-btn {
+    background: var(--surface);
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    width: 30px;
+    height: 30px;
+    border-radius: var(--radius-md);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 0.8rem;
+    transition: var(--transition);
+}
+
+.view-toggle-btn:hover {
+    color: var(--text-primary);
+    border-color: var(--border-hover);
+    background: var(--surface-hover);
 }
 
 /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1238,4 +1300,63 @@ textarea {
         border-color: var(--border-color);
         box-shadow: none;
     }
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   COMPACT VIEW & DEMO CHIPS
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+.link-grid.compact-view {
+    grid-template-columns: 1fr !important;
+    gap: 8px !important;
+}
+
+.link-grid.compact-view .card {
+    flex-direction: row !important;
+    height: auto !important;
+    align-items: center !important;
+}
+
+.link-grid.compact-view .card-img-wrapper {
+    width: 130px !important;
+    min-width: 130px !important;
+    height: 75px !important;
+    aspect-ratio: auto !important;
+    border-bottom: none !important;
+    border-right: 1px solid var(--border-color) !important;
+}
+
+.link-grid.compact-view .card-desc {
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.empty-starter-chips {
+    display: flex;
+    gap: 8px;
+    margin-top: 18px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.starter-chip {
+    background: var(--surface);
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    padding: 5px 12px;
+    border-radius: var(--radius-full);
+    font-size: 0.78rem;
+    font-weight: 500;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: var(--transition);
+}
+
+.starter-chip:hover {
+    color: var(--text-primary);
+    border-color: var(--border-hover);
+    background: var(--surface-hover);
 }
