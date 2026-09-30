@@ -4,22 +4,30 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-    <title>Sachflix — Minimalist Streaming &amp; Link Vault</title>
-    <meta name="description" content="Minimalist personal streaming links and movie vault">
+    <title>Sach.in</title>
+    <meta name="description" content="Minimalist personal streaming links and movie watchlist">
     <!-- Netflix Fonts: Bebas Neue for Brand Title & Inter for Body -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#141414">
+    <link rel="apple-touch-icon" href="star.svg">
 </head>
 
 <body class="dark-theme netflix-theme">
     <!-- Minimalist Brand Header -->
-    <div style="text-align: center; margin-top: 20px;">
-        <span >✦--</span>
-        <span class="brand-title">S💀ch.🖕🏻n --✦</span>
-            </div>
+    <header class="brand-header">
+        <div class="brand-container" style="position: relative;">
+            <div style="flex: 1;"></div>
+            <a href="#" class="brand-logo" style="position: absolute; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 8px;">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="#e50914">
+                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                </svg>
+                <span class="brand-title">S💀ch.🖕🏻n</span>
+            </a>
             <button id="themeToggle" class="theme-toggle-btn" title="Toggle Light/Dark Theme" aria-label="Toggle Theme">
                 <svg id="themeIcon" class="theme-icon" viewBox="0 0 24 24" width="17" height="17" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
                     <circle cx="12" cy="12" r="5"></circle>
@@ -55,23 +63,26 @@
             <div id="search-dropdown" class="topbar-dropdown hidden"></div>
         </div>
     </section>
-<div class="streaming-tiles-container">
-    <a href="https://www.youtube.com" target="_blank" rel="noopener noreferrer" class="tile"><i class="fab fa-youtube"></i> YouTube</a>
-    <a href="https://music.youtube.com" target="_blank" rel="noopener noreferrer" class="tile"><i class="fas fa-music"></i> YT Music</a>
-    <a href="https://www.primevideo.com" target="_blank" rel="noopener noreferrer" class="tile"><i class="fas fa-play"></i> Prime Video</a>
-    <a href="https://netflix.com" target="_blank" rel="noopener noreferrer" class="tile"><i class="fas fa-film"></i> Netflix</a>
-    <a href="https://www.hotstar.com" target="_blank" rel="noopener noreferrer" class="tile"><i class="fas fa-star"></i> JioHotstar</a>
-    <a href="https://www.sonyliv.com" target="_blank" rel="noopener noreferrer" class="tile"><i class="fas fa-tv"></i> SonyLIV</a>
-    <a href="https://www.zee5.com" target="_blank" rel="noopener noreferrer" class="tile"><i class="fas fa-play-circle"></i> ZEE5</a>
-    <a href="https://open.spotify.com" target="_blank" rel="noopener noreferrer" class="tile"><i class="fab fa-spotify"></i> Spotify</a>
-    <a href="https://www.instagram.com/reels" target="_blank" rel="noopener noreferrer" class="tile"><i class="fab fa-instagram"></i> Instagram</a>
-    <a href="https://web.whatsapp.com" target="_blank" rel="noopener noreferrer" class="tile"><i class="fab fa-whatsapp"></i> WhatsApp</a>
-    <a href="https://web.telegram.org" target="_blank" rel="noopener noreferrer" class="tile"><i class="fab fa-telegram"></i> Telegram</a>
-    <a href="https://www.reddit.com" target="_blank" rel="noopener noreferrer" class="tile"><i class="fab fa-reddit-alien"></i> Reddit</a>
-    <a href="https://www.x.com" target="_blank" rel="noopener noreferrer" class="tile"><i class="fab fa-x-twitter"></i> Twitter</a>
-    <a href="https://discord.com" target="_blank" rel="noopener noreferrer" class="tile"><i class="fab fa-discord"></i> Discord</a>
-    <a href="https://www.google.com" target="_blank" rel="noopener noreferrer" class="tile"><i class="fab fa-google"></i> Google</a>
-</div>
+    <div class="streaming-tiles-container">
+        <a href="https://www.youtube.com" target="_blank" rel="noopener noreferrer" class="tile"><i class="fab fa-youtube"></i> YouTube</a>
+        <a href="https://music.youtube.com" target="_blank" rel="noopener noreferrer" class="tile"><i class="fas fa-music"></i> YT Music</a>
+        <a href="https://www.primevideo.com" target="_blank" rel="noopener noreferrer" class="tile"><i class="fas fa-play"></i> Prime Video</a>
+        <a href="https://netflix.com" target="_blank" rel="noopener noreferrer" class="tile"><i class="fas fa-film"></i> Netflix</a>
+        <a href="https://www.hotstar.com" target="_blank" rel="noopener noreferrer" class="tile"><i class="fas fa-star"></i> JioHotstar</a>
+        <a href="https://www.sonyliv.com" target="_blank" rel="noopener noreferrer" class="tile"><i class="fas fa-tv"></i> SonyLIV</a>
+        <a href="https://www.zee5.com" target="_blank" rel="noopener noreferrer" class="tile"><i class="fas fa-play-circle"></i> ZEE5</a>
+        <a href="https://open.spotify.com" target="_blank" rel="noopener noreferrer" class="tile"><i class="fab fa-spotify"></i> Spotify</a>
+        <a href="https://www.instagram.com/reels" target="_blank" rel="noopener noreferrer" class="tile"><i class="fab fa-instagram"></i> Instagram</a>
+        <a href="https://web.whatsapp.com" target="_blank" rel="noopener noreferrer" class="tile"><i class="fab fa-whatsapp"></i> WhatsApp</a>
+        <a href="https://web.telegram.org" target="_blank" rel="noopener noreferrer" class="tile"><i class="fab fa-telegram"></i> Telegram</a>
+        <a href="https://www.reddit.com" target="_blank" rel="noopener noreferrer" class="tile"><i class="fab fa-reddit-alien"></i> Reddit</a>
+        <a href="https://www.x.com" target="_blank" rel="noopener noreferrer" class="tile"><i class="fab fa-x-twitter"></i> Twitter</a>
+        <a href="https://discord.com/channels/@me" target="_blank" rel="noopener noreferrer" class="tile"><i class="fab fa-discord"></i> Discord</a>
+        <a href="https://www.google.com" target="_blank" rel="noopener noreferrer" class="tile"><i class="fab fa-google"></i> Google</a>
+        <a href="https://yarrlists.net/live-tv-list" target="_blank" rel="noopener noreferrer" class="tile"><i class="fas fa-tv"></i>mPhg</a>
+        <a href="https://fmhy.net/video" target="_blank" rel="noopener noreferrer" class="tile"><i class="fas fa-tv"></i>mPhg</a>
+        <a href="https://www.dinotube.com/" target="_blank" rel="noopener noreferrer" class="tile"><i class="fas fa-tv"></i>Corn</a>
+    </div>
     <!-- Main Content Container -->
     <div class="app-container">
         <main>
@@ -87,7 +98,7 @@
             <div id="linkGrid" class="link-grid">
                 <div class="empty-state">
                     <div class="empty-icon"><i class="fas fa-film"></i></div>
-                    <div class="empty-title">Vault is Empty</div>
+                    <div class="empty-title">Empty</div>
                     <p class="empty-sub">Paste any URL or search above to save movies &amp; links.</p>
                 </div>
             </div>
@@ -181,7 +192,7 @@
             </div>
 
             <div class="modal-actions" style="display: flex; gap: 10px; flex-wrap: wrap;">
-                <button id="saveMovieToVaultBtn" class="btn primary" style="flex: 1;"><i class="fas fa-plus"></i> Add</button>
+                <button id="saveMovieToWatchlistBtn" class="btn primary" style="flex: 1;"><i class="fas fa-plus"></i> Add</button>
                 <a id="openImdbPageBtn" href="#" target="_blank" rel="noopener noreferrer" class="btn secondary" style="flex: 1; text-align: center; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; gap: 6px; background: rgba(245, 197, 24, 0.12); color: #f5c518; border: 1px solid rgba(245, 197, 24, 0.25);">
                     <i class="fab fa-imdb"></i> IMDb
                 </a>
@@ -201,6 +212,17 @@
             <img id="lightboxImg" src="" alt="Preview" class="fit-contain">
         </div>
     </div>
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js').then(registration => {
+                    console.log('ServiceWorker registration successful');
+                }).catch(error => {
+                    console.log('ServiceWorker registration failed: ', error);
+                });
+            });
+        }
+    </script>
     <script src="app.js"></script>
 </body>
 

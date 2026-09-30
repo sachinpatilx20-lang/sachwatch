@@ -1,5 +1,5 @@
 /**
- * SachTube Premium Links Vault
+ * SachTube Premium Links Watchlist
  * YouTube-style Minimalist Layout, Dynamic Favicons, Real-time Search
  */
 class VidLinkApp {
@@ -78,7 +78,7 @@ class VidLinkApp {
         this.movieModalCast = document.getElementById('movieModalCast');
         this.movieTrailerWrap = document.getElementById('movieTrailerWrap');
         this.movieTrailerIframe = document.getElementById('movieTrailerIframe');
-        this.saveMovieToVaultBtn = document.getElementById('saveMovieToVaultBtn');
+        this.saveMovieToWatchlistBtn = document.getElementById('saveMovieToWatchlistBtn');
         this.openImdbPageBtn = document.getElementById('openImdbPageBtn');
         this.closeMovieModalBtn = document.getElementById('closeMovieModal');
 
@@ -197,11 +197,11 @@ class VidLinkApp {
             });
         });
 
-        if (this.exportBtn) this.exportBtn.addEventListener('click', () => this.exportVault());
+        if (this.exportBtn) this.exportBtn.addEventListener('click', () => this.exportWatchlist());
         if (this.importBtn) this.importBtn.addEventListener('click', () => {
             if (this.importFileInput) this.importFileInput.click();
         });
-        if (this.importFileInput) this.importFileInput.addEventListener('change', (e) => this.importVault(e));
+        if (this.importFileInput) this.importFileInput.addEventListener('change', (e) => this.importWatchlist(e));
 
         const handleTagSelect = (tag) => {
             this.activeTag = tag;
@@ -886,7 +886,7 @@ class VidLinkApp {
         navigator.clipboard.writeText(url).then(() => this.showToast('Copied'));
     }
 
-    exportVault() {
+    exportWatchlist() {
         if (this.links.length === 0) return this.showToast('Empty', 'error');
         
         try {
@@ -909,7 +909,7 @@ class VidLinkApp {
         }
     }
 
-    importVault(e) {
+    importWatchlist(e) {
         const file = e.target.files[0];
         if (!file) return;
 
@@ -1015,7 +1015,7 @@ class VidLinkApp {
             this.linkGrid.innerHTML = `
                 <div class="empty-state">
                     <div class="empty-icon"><i class="${isFiltering ? 'fas fa-search' : 'fas fa-film'}"></i></div>
-                    <div class="empty-title">${isFiltering ? 'No results found' : 'Vault is Empty'}</div>
+                    <div class="empty-title">${isFiltering ? 'No results found' : 'Watchlist is Empty'}</div>
                     <p class="empty-sub">${isFiltering ? 'Try searching for different keywords or tag filters.' : 'Paste any URL or search above to save movies & links.'}</p>
                 </div>`;
             return;
@@ -1289,8 +1289,8 @@ class VidLinkApp {
         this.movieModalCast.textContent = `Cast: ${movie.actors}`;
         this.openImdbPageBtn.href = `https://www.imdb.com/title/${movie.imdbId}/`;
 
-        // Save Movie to Vault Callback
-        this.saveMovieToVaultBtn.onclick = () => {
+        // Save Movie to Watchlist Callback
+        this.saveMovieToWatchlistBtn.onclick = () => {
             const movieUrl = `https://www.imdb.com/title/${movie.imdbId}/`;
             const existing = this.links.find(l => l.url === movieUrl);
             if (existing) {
