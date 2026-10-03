@@ -1,4 +1,4 @@
-const CACHE_NAME = 'sachin-hub-v7';
+const CACHE_NAME = 'sachin-hub-v8';
 
 // Core local assets to pre-cache on install
 const CORE_ASSETS = [
@@ -59,9 +59,13 @@ self.addEventListener('fetch', event => {
   // 1. Bypass external dynamic APIs (IMDb search JSONP, YouTube trailers, screenshot generators, favicons)
   const isDynamicApi = url.hostname.includes('imdb.com') ||
                         url.hostname.includes('youtube.com') ||
+                        url.hostname.includes('youtube-nocookie.com') ||
+                        url.hostname.includes('cinemeta-catalogs.strem.io') ||
                         url.hostname.includes('allorigins') ||
                         url.hostname.includes('wordpress.com') ||
-                        url.hostname.includes('google.com/s2/favicons');
+                        url.href.includes('google.com/s2/favicons') ||
+                        url.hostname.includes('vidsrc') ||
+                        url.hostname.includes('2embed');
 
   if (isDynamicApi) {
     return; // Pass through directly to network

@@ -3,42 +3,31 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-    <title>Sach.in</title>
-    <meta name="description" content="Minimalist personal streaming links and movie watchlist">
-    <!-- Netflix Fonts: Bebas Neue for Brand Title & Inter for Body -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Sach.in — Streaming Hub &amp; Cinema Watchlist</title>
+    <meta name="description" content="Personal streaming launcher and minimalist cinema watchlist with trailer playback, IMDb search, and auto metadata extraction.">
+    <meta name="referrer" content="no-referrer">
+    <!-- Google Fonts: Outfit, Inter & JetBrains Mono -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link rel="stylesheet" href="style.css">
     <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#e50914">
+    <meta name="theme-color" content="#0c0c0e">
     <link rel="icon" type="image/svg+xml" href="icon.svg">
     <link rel="apple-touch-icon" href="icon.svg">
 </head>
 
-<body class="dark-theme netflix-theme">
-    <!-- Minimalist Brand Header -->
+<body class="dark-theme">
+    <!-- Clean Minimalist Header -->
     <header class="brand-header">
         <div class="brand-container">
-            <div style="flex: 1;"></div>
-            <a href="#" class="brand-logo" aria-label="Sach.in Home">
+            <a href="#" class="brand-logo" aria-label="Sach.in">
                 <span class="brand-title">✦-- S💀ch.🖕🏻n --✦</span>
             </a>
-            <div class="header-right-actions" style="flex: 1; display: flex; justify-content: flex-end; align-items: center; gap: 8px;">
-                <button id="headerSurpriseBtn" class="btn icon-btn header-tool-btn" title="Surprise Me (Roll Random Watch) [R]">
-                    <i class="fas fa-dice"></i>
-                </button>
-                <button id="headerNotesBtn" class="btn icon-btn header-tool-btn" title="Daily Scratchpad & Quick Notes [N]">
-                    <i class="fas fa-pen-to-square"></i>
-                </button>
-                <button id="headerShortcutsBtn" class="btn icon-btn header-tool-btn" title="Keyboard Shortcuts [?]">
-                    <i class="fas fa-keyboard"></i>
-                </button>
-                <button id="pwaInstallBtn" class="btn icon-btn pwa-badge-btn hidden" title="Install App to Device">
-                    <i class="fas fa-download"></i>
-                </button>
-                <button id="themeToggle" class="theme-toggle-btn" title="Toggle Light/Dark Theme" aria-label="Toggle Theme">
+            <div class="header-right-actions">
+                <button id="themeToggle" class="theme-toggle-btn" title="Toggle Light / Dark Theme [T]" aria-label="Toggle Theme">
                     <svg id="themeIcon" class="theme-icon" viewBox="0 0 24 24" width="17" height="17" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
                         <circle cx="12" cy="12" r="5"></circle>
                         <line x1="12" y1="1" x2="12" y2="3"></line>
@@ -55,7 +44,6 @@
         </div>
     </header>
 
-
     <!-- Global Loader Overlay -->
     <div id="loader" class="loader-overlay hidden">
         <div class="loader-spinner"></div>
@@ -64,20 +52,21 @@
     <!-- Toast Notification Container -->
     <div id="toast-container" class="toast-container"></div>
 
+    <!-- Search & Quick Save Bar -->
     <section class="top-bar-section">
         <div class="search-box-container" style="position: relative;">
             <div class="search-input-wrapper">
                 <i class="fas fa-search search-icon"></i>
-                <input type="text" id="searchInput" placeholder="Search or paste URL... (Press '/' to focus)" autocomplete="off">
-                <button id="searchClearBtn" class="search-clear-btn hidden" title="Clear">×</button>
-                <button id="addBtn" class="btn primary small-save-btn" title="Save Link"><i class="fas fa-plus"></i> Save</button>
+                <input type="text" id="searchInput" placeholder="Search or paste URL to save..." autocomplete="off">
+                <button id="searchClearBtn" class="search-clear-btn hidden" title="Clear Search" aria-label="Clear Search">×</button>
+                <button id="addBtn" class="btn primary small-save-btn" title="Save Link or Search"><i class="fas fa-plus"></i> Save</button>
             </div>
             <!-- Floating IMDb Search Dropdown -->
             <div id="search-dropdown" class="topbar-dropdown hidden"></div>
         </div>
     </section>
 
-    <!-- Quick Access Hub -->
+    <!-- Quick Access Streaming Hub -->
     <div class="streaming-tiles-container" id="quickTilesContainer">
         <!-- Rendered dynamically with customizable tiles & + Add Shortcut -->
     </div>
@@ -95,9 +84,7 @@
                     <button class="cat-pill" data-tag="watched"><i class="fas fa-check-circle" style="color: #22c55e;"></i> Watched</button>
                 </div>
                 <div class="watchlist-toolbar">
-                    <button id="surpriseMeBtn" class="btn surprise-pill-btn" title="Surprise Me (Roll Random Watch) [R]">
-                        <i class="fas fa-dice"></i> <span>Surprise Pick</span>
-                    </button>
+                    <span class="stats-counter-badge" title="Total saved items"><i class="fas fa-layer-group"></i> <span id="statsCount">0</span> items</span>
                     <div class="sort-wrapper">
                         <select id="sortSelect" class="sort-select" title="Sort watchlist">
                             <option value="newest">Newest</option>
@@ -106,13 +93,13 @@
                             <option value="fav">Starred First</option>
                         </select>
                     </div>
-                    <button id="viewToggleBtn" class="btn view-toggle-btn" title="Toggle Grid or Compact View">
+                    <button id="viewToggleBtn" class="btn view-toggle-btn" title="Toggle Grid or Compact View" aria-label="Toggle View Mode">
                         <i class="fas fa-grip"></i>
                     </button>
                 </div>
             </div>
 
-            <!-- Netflix Movie & Link Grid -->
+            <!-- Movie & Link Grid -->
             <div id="linkGrid" class="link-grid">
                 <div class="empty-state">
                     <div class="empty-icon"><i class="fas fa-film"></i></div>
@@ -122,11 +109,11 @@
             </div>
         </main>
 
-        <!-- Netflix App Footer -->
+        <!-- Minimal App Footer -->
         <footer class="app-footer">
             <div class="footer-actions">
-                <button id="exportBtn" class="btn secondary"><i class="fas fa-file-export"></i> Export</button>
-                <button id="importBtn" class="btn secondary"><i class="fas fa-file-import"></i> Import</button>
+                <button id="exportBtn" class="btn secondary"><i class="fas fa-file-export"></i> Export JSON</button>
+                <button id="importBtn" class="btn secondary"><i class="fas fa-file-import"></i> Import JSON</button>
                 <input type="file" id="importFileInput" accept=".json" style="display: none;">
             </div>
         </footer>
@@ -154,22 +141,26 @@
     <!-- Edit Link Modal -->
     <div id="editModal" class="modal-overlay hidden">
         <div class="modal-content border-panel">
-            <h2>Edit</h2>
+            <h2>Edit Link</h2>
             <div class="edit-fields">
                 <div class="field">
+                    <label for="editTitle">Title</label>
                     <input type="text" id="editTitle" placeholder="Title">
                 </div>
                 <div class="field">
+                    <label for="editDesc">Notes</label>
                     <textarea id="editDesc" placeholder="Notes..."></textarea>
                 </div>
                 <div class="field">
+                    <label for="editTags">Tags</label>
                     <div class="tag-input-wrapper">
-                        <input type="text" id="editTags" placeholder="Tag">
-                        <button id="editTagBtn" class="btn icon-btn" type="button">+</button>
+                        <input type="text" id="editTags" placeholder="Add tag (e.g. sci-fi, streaming)...">
+                        <button id="editTagBtn" class="btn icon-btn" type="button" aria-label="Add Tag">+</button>
                     </div>
                     <div id="editTagsList" class="form-tag-list"></div>
                 </div>
                 <div class="thumbnail-section">
+                    <label>Choose Cover</label>
                     <div id="editThumbPicker" class="thumb-picker"></div>
                     <div class="screenshot-tools">
                         <div class="crop-presets">
@@ -185,21 +176,21 @@
             </div>
             <div class="modal-actions">
                 <button id="closeEditModal" class="btn secondary">Cancel</button>
-                <button id="saveEditBtn" class="btn primary">Save</button>
+                <button id="saveEditBtn" class="btn primary">Save Changes</button>
             </div>
         </div>
     </div>
 
     <!-- IMDb Movie Details & Trailer Modal -->
     <div id="movieModal" class="modal-overlay hidden">
-        <div class="modal-content border-panel movie-modal-panel" style="max-width: 640px;">
-            <div style="display: flex; gap: 18px; margin-bottom: 18px;">
-                <img id="movieModalPoster" src="" alt="Poster" style="width: 120px; height: 175px; object-fit: cover; border-radius: var(--radius-md); flex-shrink: 0; background: var(--surface-hover); box-shadow: var(--shadow-md);">
+        <div class="modal-content border-panel movie-modal-panel">
+            <div class="movie-modal-header-row">
+                <img id="movieModalPoster" src="" alt="Poster" class="movie-modal-poster">
                 <div style="flex: 1; min-width: 0;">
                     <div style="display: inline-flex; align-items: center; gap: 6px; background: #f5c518; color: #000; font-size: 0.72rem; font-weight: 800; padding: 3px 8px; border-radius: var(--radius-sm); margin-bottom: 8px;">
                         <i class="fab fa-imdb"></i> <span id="movieModalType">Movie</span>
                     </div>
-                    <h2 id="movieModalTitle" style="font-family: var(--font-heading); font-size: 2rem; letter-spacing: 0.5px; font-weight: 400; line-height: 1; margin-bottom: 6px; border: none; padding: 0; color: var(--text-primary);"></h2>
+                    <h2 id="movieModalTitle" class="movie-modal-title"></h2>
                     <p id="movieModalYear" style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 10px;"></p>
                     <p id="movieModalCast" style="font-size: 0.85rem; line-height: 1.4; color: var(--text-secondary);"></p>
                 </div>
@@ -210,7 +201,7 @@
             </div>
 
             <div class="modal-actions" style="display: flex; gap: 10px; flex-wrap: wrap;">
-                <button id="saveMovieToWatchlistBtn" class="btn primary" style="flex: 1;"><i class="fas fa-plus"></i> Add</button>
+                <button id="saveMovieToWatchlistBtn" class="btn primary" style="flex: 1;"><i class="fas fa-plus"></i> Add to Watchlist</button>
                 <a id="openImdbPageBtn" href="#" target="_blank" rel="noopener noreferrer" class="btn secondary" style="flex: 1; text-align: center; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; gap: 6px; background: rgba(245, 197, 24, 0.12); color: #f5c518; border: 1px solid rgba(245, 197, 24, 0.25);">
                     <i class="fab fa-imdb"></i> IMDb
                 </a>
@@ -218,72 +209,35 @@
             </div>
         </div>
     </div>
+
     <!-- Fullscreen Fit Lightbox Modal -->
     <div id="lightboxModal" class="lightbox-overlay hidden">
         <div class="lightbox-toolbar">
             <span class="lightbox-title" id="lightboxTitle">Preview</span>
             <div class="lightbox-actions">
-                <button id="closeLightboxBtn" class="btn icon-btn" style="color: #fff;" title="Close">×</button>
+                <button id="lightboxFitToggleBtn" class="btn icon-btn" style="color: #fff;" title="Toggle Contain / Cover Fit" aria-label="Toggle Fit Mode">
+                    <i class="fas fa-expand"></i>
+                </button>
+                <button id="closeLightboxBtn" class="btn icon-btn" style="color: #fff;" title="Close [Esc]" aria-label="Close Preview">×</button>
             </div>
         </div>
         <div class="lightbox-body">
-            <img id="lightboxImg" src="" alt="Preview" class="fit-contain">
-        </div>
-    </div>
-    <!-- Surprise Me / What to Watch Randomizer Modal -->
-    <div id="surpriseModal" class="modal-overlay hidden">
-        <div class="modal-content border-panel surprise-modal-panel" style="max-width: 580px;">
-            <div class="surprise-modal-header">
-                <div class="surprise-badge"><i class="fas fa-dice"></i> Daily Decision Maker</div>
-                <h2>What To Watch Today</h2>
-                <p class="modal-subtitle">Can't decide? Here is your personalized pick from your watchlist:</p>
-            </div>
-            <div id="surpriseCardContainer" class="surprise-card-box">
-                <!-- Populated dynamically -->
-            </div>
-            <div class="modal-actions" style="display: flex; gap: 10px; margin-top: 20px;">
-                <button id="surpriseRollAgainBtn" class="btn secondary" style="flex: 1;"><i class="fas fa-rotate"></i> Roll Again</button>
-                <button id="surpriseOpenBtn" class="btn primary" style="flex: 1;"><i class="fas fa-play"></i> Open Now</button>
-                <button id="closeSurpriseModalBtn" class="btn secondary">Close</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Daily Scratchpad & Quick Notes Modal -->
-    <div id="scratchpadModal" class="modal-overlay hidden">
-        <div class="modal-content border-panel scratchpad-panel" style="max-width: 680px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                <div>
-                    <h2 style="margin: 0;"><i class="fas fa-pen-to-square" style="margin-right: 8px;"></i> Daily Scratchpad</h2>
-                    <p class="modal-subtitle" style="margin: 4px 0 0;">Auto-saves locally on every keystroke. Great for quick links, to-dos &amp; recs.</p>
-                </div>
-                <div id="scratchpadStats" style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">0 words</div>
-            </div>
-            <div class="scratchpad-field">
-                <textarea id="scratchpadInput" placeholder="Jot down quick movie ideas, links friends shared, or today's watchlist notes..."></textarea>
-            </div>
-            <div class="modal-actions" style="display: flex; justify-content: space-between; align-items: center; margin-top: 14px;">
-                <div style="display: flex; gap: 8px;">
-                    <button id="copyScratchpadBtn" class="btn secondary small"><i class="fas fa-copy"></i> Copy</button>
-                    <button id="clearScratchpadBtn" class="btn secondary small" style="color: var(--danger);"><i class="fas fa-trash"></i> Clear</button>
-                </div>
-                <button id="closeScratchpadBtn" class="btn primary small">Done</button>
-            </div>
+            <img id="lightboxImg" src="" alt="Preview" class="fit-contain" title="Click to toggle fit">
         </div>
     </div>
 
     <!-- Add Custom Quick Access Shortcut Modal -->
     <div id="customTileModal" class="modal-overlay hidden">
-        <div class="modal-content border-panel" style="max-width: 480px;">
+        <div class="modal-content border-panel">
             <h2>Add Quick Shortcut</h2>
-            <p class="modal-subtitle">Add your favorite daily sites to the quick access bar.</p>
+            <p class="modal-subtitle">Add your favorite site to the quick access bar.</p>
             <div class="edit-fields" style="margin-top: 16px;">
                 <div class="field">
-                    <label style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase;">Shortcut Title</label>
-                    <input type="text" id="customTileTitle" placeholder="e.g., GitHub, Netflix, Claude">
+                    <label for="customTileTitle">Shortcut Title</label>
+                    <input type="text" id="customTileTitle" placeholder="e.g., Netflix, YouTube, Prime">
                 </div>
                 <div class="field" style="margin-top: 12px;">
-                    <label style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase;">URL</label>
+                    <label for="customTileUrl">URL</label>
                     <input type="text" id="customTileUrl" placeholder="https://...">
                 </div>
             </div>
@@ -294,41 +248,10 @@
         </div>
     </div>
 
-    <!-- Keyboard Shortcuts Cheat Sheet Modal -->
-    <div id="shortcutsModal" class="modal-overlay hidden">
-        <div class="modal-content border-panel shortcuts-modal-panel" style="max-width: 480px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-                <h2 style="margin: 0;"><i class="fas fa-keyboard" style="margin-right: 8px;"></i> Keyboard Shortcuts</h2>
-                <button id="closeShortcutsModalBtn" class="btn icon-btn" style="color: var(--text-muted); font-size: 1.2rem;">×</button>
-            </div>
-            <div class="shortcuts-list">
-                <div class="shortcut-row">
-                    <span>Focus Search / Add Link</span>
-                    <kbd>/</kbd>
-                </div>
-                <div class="shortcut-row">
-                    <span>Surprise Pick (Random Watch)</span>
-                    <kbd>R</kbd>
-                </div>
-                <div class="shortcut-row">
-                    <span>Daily Scratchpad &amp; Notes</span>
-                    <kbd>N</kbd>
-                </div>
-                <div class="shortcut-row">
-                    <span>Toggle Light / Dark Theme</span>
-                    <kbd>T</kbd>
-                </div>
-                <div class="shortcut-row">
-                    <span>Close Any Open Modal</span>
-                    <kbd>Esc</kbd>
-                </div>
-                <div class="shortcut-row">
-                    <span>Show Keyboard Shortcuts Help</span>
-                    <kbd>?</kbd>
-                </div>
-            </div>
-        </div>
-    </div>
+    <!-- Dormant Hidden Containers for JS Safety -->
+    <div id="surpriseModal" class="hidden"></div>
+    <div id="scratchpadModal" class="hidden"></div>
+    <div id="shortcutsModal" class="hidden"></div>
 
     <script>
         if ('serviceWorker' in navigator && window.location.protocol.startsWith('http')) {

@@ -1,3 +1,8 @@
+/**
+ * NOTE: Legacy script from cinematic-vault prototype.
+ * Active application logic for Sach.in is in app.js.
+ */
+
 // --- System State ---
 function normalizeMovie(m) {
     if (!m) return null;
@@ -637,7 +642,75 @@ function loadFromSync() {
 let linkSelectedThumb = '';
 let linkCurrentMeta = null;
 
+function sanitizeLinkImg(rawUrl, baseUrl) {
+    if (!rawUrl || typeof rawUrl !== 'string') return '';
+    let u = rawUrl.trim().replace(/^['"]+|['"]+$/g, '').replace(/\\\//g, '/').replace(/&amp;/g, '&');
+    if (u.startsWith('//')) u = 'https:' + u;
+    try { u = new URL(u, baseUrl).href; } catch (e) { return ''; }
+    if (!u.startsWith('http://') && !u.startsWith('https://') && !u.startsWith('data:image/')) return '';
+    const l = u.toLowerCase();
+    if (l.includes('1x1') || l.includes('spacer.gif') || l.includes('blank.gif') || l.includes('pixel.gif') || l.includes('beacon') || l.includes('ad.doubleclick')) return '';
+    return u;
+}
+
+function extractDocImages(doc, baseUrl) {
+    if (!doc) return [];
+    const imgs = [];
+    const seen = new Set();
+    const add = (r) => {
+        const c = sanitizeLinkImg(r, baseUrl);
+        if (c && !seen.has(c)) { seen.add(c); imgs.push(c); }
+    };
+
+    // All meta images
+    [
+        'meta[property="og:image"]', 'meta[property="og:image:url"]', 'meta[property="og:image:secure_url"]',
+        'meta[name="og:image"]', 'meta[name="twitter:image"]', 'meta[name="twitter:image:src"]',
+        'meta[property="twitter:image"]', 'meta[itemprop="image"]', 'meta[name="thumbnail"]', 'meta[name="image"]'
+    ].forEach(sel => {
+        try { doc.querySelectorAll(sel).forEach(el => add(el.getAttribute('content'))); } catch(e) {}
+    });
+
+    // Icons
+    try {
+        doc.querySelectorAll('link[rel="image_src"], link[rel*="icon"], link[rel*="apple-touch-icon"]').forEach(el => add(el.getAttribute('href')));
+    } catch(e) {}
+
+    // JSON-LD
+    try {
+        doc.querySelectorAll('script[type="application/ld+json"]').forEach(s => {
+            try {
+                const walk = (n) => {
+                    if (!n) return;
+                    if (typeof n === 'string' && (n.startsWith('http') || /\.(jpe?g|png|webp|gif)/i.test(n))) add(n);
+                    else if (Array.isArray(n)) n.forEach(walk);
+                    else if (typeof n === 'object') {
+                        ['image', 'images', 'thumbnailUrl', 'primaryImageOfPage', 'photo', 'logo'].forEach(k => {
+                            if (n[k]) walk(n[k]);
+                        });
+                        if (n.url && typeof n.url === 'string' && /\.(jpe?g|png|webp)/i.test(n.url)) add(n.url);
+                        if (n['@graph']) walk(n['@graph']);
+                    }
+                };
+                walk(JSON.parse(s.textContent.trim()));
+            } catch(e) {}
+        });
+    } catch(e) {}
+
+    // Semantic content images
+    try {
+        doc.querySelectorAll('article img, main img, [class*="poster"] img, [class*="cover"] img, [class*="thumb"] img, [class*="hero"] img').forEach(img => {
+            add(img.getAttribute('src') || img.getAttribute('data-src'));
+        });
+    } catch(e) {}
+
+    return imgs;
+}
+
 async function fetchLinkMetadata(url) {
+    let hostname = '';
+    try { hostname = new URL(url).hostname; } catch(e) {}
+
     let results = {
         title: url,
         description: '',
@@ -645,82 +718,138 @@ async function fetchLinkMetadata(url) {
         url: url
     };
 
-    const resolveUrl = (relative) => {
-        try { return new URL(relative, url).href; } catch (e) { return relative; }
+    const candidateImages = [];
+    const seen = new Set();
+    const addImage = (raw) => {
+        const c = sanitizeLinkImg(raw, url);
+        if (c && !seen.has(c)) {
+            seen.add(c);
+            candidateImages.push(c);
+        }
     };
 
     // YouTube fast path
-    if (url.includes('youtube.com/watch') || url.includes('youtu.be/')) {
+    const ytMatch = url.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=|shorts\/|live\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/i);
+    if (ytMatch && ytMatch[1]) {
+        const vidId = ytMatch[1];
         try {
-            let ytUrl = url;
-            if (url.includes('youtu.be/')) {
-                const id = url.split('youtu.be/')[1].split('?')[0];
-                ytUrl = `https://www.youtube.com/watch?v=${id}`;
-            }
-            const res = await fetch(`https://www.youtube.com/oembed?url=${encodeURIComponent(ytUrl)}&format=json`);
-            const data = await res.json();
-            if (data.title) {
-                results.title = data.title;
-                results.description = `YouTube · ${data.author_name}`;
-                if (data.thumbnail_url) results.images.push(data.thumbnail_url);
+            const res = await fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${vidId}&format=json`);
+            if (res.ok) {
+                const data = await res.json();
+                if (data.title) results.title = data.title;
+                if (data.author_name) results.description = `YouTube · ${data.author_name}`;
+                if (data.thumbnail_url) addImage(data.thumbnail_url);
             }
         } catch (e) {}
+
+        addImage(`https://i.ytimg.com/vi/${vidId}/maxresdefault.jpg`);
+        addImage(`https://i.ytimg.com/vi/${vidId}/hqdefault.jpg`);
+        addImage(`https://i.ytimg.com/vi/${vidId}/sddefault.jpg`);
+        addImage(`https://i.ytimg.com/vi/${vidId}/mqdefault.jpg`);
+        addImage(`https://i.ytimg.com/vi/${vidId}/1.jpg`);
+        addImage(`https://i.ytimg.com/vi/${vidId}/2.jpg`);
+        addImage(`https://i.ytimg.com/vi/${vidId}/3.jpg`);
+        results.images = candidateImages;
+        return results;
     }
 
-    // Parallel fetchers for max coverage
-    await Promise.allSettled([
-        fetch(`https://noembed.com/embed?url=${encodeURIComponent(url)}`)
-            .then(res => res.json())
-            .then(data => {
-                if (data.title && results.title === url) results.title = data.title;
-                if (data.author_name && !results.description) results.description = `By ${data.author_name}`;
-                if (data.thumbnail_url) results.images.push(data.thumbnail_url);
-            }),
-        fetch(`https://api.microlink.io/?url=${encodeURIComponent(url)}`)
-            .then(res => res.json())
-            .then(data => {
-                if (data.status === 'success') {
-                    const m = data.data;
-                    if (m.title && results.title === url) results.title = m.title;
-                    if (m.description && !results.description) results.description = m.description;
-                    if (m.image?.url) results.images.push(m.image.url);
-                    if (m.logo?.url) results.images.push(m.logo.url);
+    // Direct image check
+    if (/\.(jpe?g|png|webp|gif|avif|svg)(\?.*)?$/i.test(url)) {
+        addImage(url);
+        try {
+            const pathname = new URL(url).pathname;
+            const filename = pathname.split('/').pop().replace(/\.[^/.]+$/, '');
+            results.title = decodeURIComponent(filename) || hostname;
+        } catch(e) {
+            results.title = hostname;
+        }
+        results.images = candidateImages;
+        return results;
+    }
+
+    // Parallel multi-engine fetchers
+    const jinaPromise = fetch(`https://r.jina.ai/${url}`, { headers: { 'Accept': 'application/json' } })
+        .then(res => res.json())
+        .then(json => {
+            const d = json?.data;
+            if (d) {
+                if (d.title && results.title === url) results.title = d.title;
+                if (d.description && !results.description) results.description = d.description;
+                if (d.metadata && typeof d.metadata === 'object') {
+                    Object.entries(d.metadata).forEach(([k, v]) => {
+                        if (/image|poster|thumb|logo|photo|banner|cover|avatar|art|tile|preview/i.test(k)) {
+                            if (typeof v === 'string') addImage(v);
+                            else if (Array.isArray(v)) v.forEach(item => typeof item === 'string' ? addImage(item) : (item?.url && addImage(item.url)));
+                            else if (v && typeof v === 'object' && v.url) addImage(v.url);
+                        }
+                    });
                 }
-            }),
-        fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`)
-            .then(res => res.json())
-            .then(data => {
-                const doc = new DOMParser().parseFromString(data.contents, 'text/html');
-                const getM = (s) => doc.querySelector(`meta[property="${s}"], meta[name="${s}"]`)?.getAttribute('content');
+                if (d.external && typeof d.external === 'object') {
+                    Object.values(d.external).forEach(extObj => {
+                        if (extObj && typeof extObj === 'object') Object.keys(extObj).forEach(addImage);
+                    });
+                }
+                if (d.content) {
+                    const mdRegex = /!\[.*?\]\(\s*<?(https?:\/\/[^\s\)>"]+)>?/g;
+                    let m;
+                    while ((m = mdRegex.exec(d.content)) !== null) addImage(m[1]);
+                    const rawImgRegex = /https?:\/\/[^\s\)"'<>]+\.(?:jpe?g|png|webp|gif|avif)(?:\?[^\s\)"'<>]*)?/gi;
+                    while ((m = rawImgRegex.exec(d.content)) !== null) addImage(m[0]);
+                }
+                if (d.html) {
+                    const doc = new DOMParser().parseFromString(d.html, 'text/html');
+                    extractDocImages(doc, url).forEach(addImage);
+                }
+            }
+        }).catch(() => {
+            // Text fallback
+            return fetch(`https://r.jina.ai/${url}`).then(r => r.text()).then(t => {
+                if (t) {
+                    const mdRegex = /!\[.*?\]\(\s*<?(https?:\/\/[^\s\)>"]+)>?/g;
+                    let m;
+                    while ((m = mdRegex.exec(t)) !== null) addImage(m[1]);
+                }
+            }).catch(() => {});
+        });
 
-                const title = getM('og:title') || getM('twitter:title') || doc.title;
-                if (title && results.title === url) results.title = title;
+    const noembedPromise = fetch(`https://noembed.com/embed?url=${encodeURIComponent(url)}`)
+        .then(res => res.json())
+        .then(data => {
+            if (data.title && results.title === url) results.title = data.title;
+            if (data.author_name && !results.description) results.description = `By ${data.author_name}`;
+            if (data.thumbnail_url) addImage(data.thumbnail_url);
+        }).catch(() => {});
 
-                const desc = getM('og:description') || getM('twitter:description') || getM('description');
-                if (desc && !results.description) results.description = desc;
+    const microlinkPromise = fetch(`https://api.microlink.io/?url=${encodeURIComponent(url)}`)
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'success') {
+                const m = data.data;
+                if (m.title && results.title === url) results.title = m.title;
+                if (m.description && !results.description) results.description = m.description;
+                if (m.image?.url) addImage(m.image.url);
+                if (Array.isArray(m.images)) m.images.forEach(img => addImage(typeof img === 'string' ? img : img?.url));
+                if (m.logo?.url) addImage(m.logo.url);
+            }
+        }).catch(() => {});
 
-                const og = getM('og:image') || getM('twitter:image');
-                if (og) results.images.push(resolveUrl(og));
+    await Promise.allSettled([jinaPromise, noembedPromise, microlinkPromise]);
 
-                // Grab icons too
-                ['apple-touch-icon', 'icon', 'shortcut icon'].forEach(rel => {
-                    const href = doc.querySelector(`link[rel="${rel}"]`)?.getAttribute('href');
-                    if (href) results.images.push(resolveUrl(href));
-                });
-            })
-    ]).catch(err => console.warn('Parallel fetch error:', err));
-
-    // Fallback title
-    if (results.title === url) {
-        try { results.title = new URL(url).hostname; } catch (e) {}
+    if (results.title === url && hostname) {
+        results.title = hostname.replace(/^www\./, '');
     }
 
-    // Dedupe images
-    results.images = [...new Set(results.images.filter(Boolean))];
+    if (hostname) {
+        addImage(`https://www.google.com/s2/favicons?sz=256&domain=${hostname}`);
+        addImage(`https://icons.duckduckgo.com/ip3/${hostname}.ico`);
+    }
 
-    // Fallback screenshot
+    results.images = candidateImages;
     if (results.images.length === 0) {
-        results.images.push(`https://s.wordpress.com/mshots/v1/${encodeURIComponent(url)}?w=1200`);
+        results.images = [
+            `https://www.google.com/s2/favicons?sz=256&domain=${hostname}`,
+            `https://s.wordpress.com/mshots/v1/${encodeURIComponent(url)}?w=1200`
+        ];
     }
 
     return results;
@@ -731,42 +860,62 @@ async function fetchFromLink(url) {
 
     const loading = document.getElementById('link-loading');
     const preview = document.getElementById('link-preview');
-    preview.classList.add('hidden');
-    loading.classList.remove('hidden');
+    if (preview) preview.classList.add('hidden');
+    if (loading) loading.classList.remove('hidden');
 
     try {
         const meta = await fetchLinkMetadata(url);
         linkCurrentMeta = meta;
-        loading.classList.add('hidden');
+        if (loading) loading.classList.add('hidden');
 
         // Show preview
-        document.getElementById('link-preview-title').textContent = meta.title;
-        document.getElementById('link-preview-desc').textContent = meta.description || 'No description available';
+        const titleEl = document.getElementById('link-preview-title');
+        const descEl = document.getElementById('link-preview-desc');
+        if (titleEl) titleEl.textContent = meta.title;
+        if (descEl) descEl.textContent = meta.description || 'No description available';
 
         // Thumbnail picker
         const picker = document.getElementById('link-thumb-picker');
         const status = document.getElementById('link-thumb-status');
-        picker.innerHTML = '';
+        if (picker) {
+            picker.innerHTML = '';
 
-        if (meta.images.length === 1 && meta.images[0].includes('mshots')) {
-            status.textContent = 'No images found — using screenshot:';
-        } else {
-            status.textContent = `Select a thumbnail (${meta.images.length} found):`;
+            const allImgs = (meta.images || []).filter(Boolean);
+            if (status) {
+                status.textContent = `Select cover image (${allImgs.length} available):`;
+            }
+
+            linkSelectedThumb = allImgs[0] || '';
+
+            allImgs.forEach((img, i) => {
+                const div = document.createElement('div');
+                div.className = 'link-thumb-option' + (i === 0 ? ' selected' : '');
+                div.innerHTML = `<img src="${img}" loading="lazy" referrerpolicy="no-referrer">`;
+                
+                const imgEl = div.querySelector('img');
+                imgEl.onerror = () => {
+                    if (img.includes('maxresdefault.jpg')) {
+                        imgEl.src = img.replace('maxresdefault.jpg', 'hqdefault.jpg');
+                        return;
+                    }
+                    div.remove();
+                    if (!linkSelectedThumb || linkSelectedThumb === img) {
+                        const next = picker.querySelector('.link-thumb-option img');
+                        if (next) {
+                            next.parentElement.classList.add('selected');
+                            linkSelectedThumb = next.src;
+                        }
+                    }
+                };
+
+                div.onclick = () => {
+                    picker.querySelectorAll('.link-thumb-option').forEach(o => o.classList.remove('selected'));
+                    div.classList.add('selected');
+                    linkSelectedThumb = img;
+                };
+                picker.appendChild(div);
+            });
         }
-
-        linkSelectedThumb = meta.images[0] || '';
-
-        meta.images.forEach((img, i) => {
-            const div = document.createElement('div');
-            div.className = 'link-thumb-option' + (i === 0 ? ' selected' : '');
-            div.innerHTML = `<img src="${img}" onerror="this.parentElement.remove()">`;
-            div.onclick = () => {
-                picker.querySelectorAll('.link-thumb-option').forEach(o => o.classList.remove('selected'));
-                div.classList.add('selected');
-                linkSelectedThumb = img;
-            };
-            picker.appendChild(div);
-        });
 
         // Confirm button
         const confirmBtn = document.getElementById('link-confirm-btn');

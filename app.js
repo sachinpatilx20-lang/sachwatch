@@ -1,10 +1,34 @@
 /**
- * SachTube Premium Links Watchlist
- * YouTube-style Minimalist Layout, Dynamic Favicons, Real-time Search
+ * Sach.in Cinema Vault & Minimalist Watchlist
+ * Apple TV+ & Spotify Minimalist Layout, Dynamic Favicons, Real-time Search
  */
 class VidLinkApp {
     constructor() {
-        this.links = JSON.parse(localStorage.getItem('vidlinks')) || [];
+        const safeGet = (key, fallback) => {
+            try {
+                const v = localStorage.getItem(key);
+                return v ? JSON.parse(v) : fallback;
+            } catch (e) {
+                return fallback;
+            }
+        };
+
+        const rawLinks = safeGet('vidlinks', []);
+        this.links = (Array.isArray(rawLinks) ? rawLinks : []).map(l => {
+            if (!l) return null;
+            return {
+                id: l.id || ('l_' + Date.now() + Math.random().toString(36).substr(2, 4)),
+                url: l.url || '',
+                thumb: l.thumb || '',
+                title: l.title || 'Untitled',
+                desc: l.desc || '',
+                tags: Array.isArray(l.tags) ? l.tags : (Array.isArray(l.actors) ? l.actors : (l.category ? [l.category] : [])),
+                date: l.date || Date.now(),
+                isFavorite: !!l.isFavorite,
+                isWatched: !!l.isWatched
+            };
+        }).filter(Boolean);
+
         this.currentUrl = '';
         this.currentMetadata = null;
         this.selectedThumb = '';
@@ -58,12 +82,13 @@ class VidLinkApp {
             { name: "Discord", url: "https://discord.com/channels/@me", icon: "fab fa-discord" },
             { name: "Google", url: "https://www.google.com", icon: "fab fa-google" },
             { name: "IMDb", url: "https://www.imdb.com", icon: "fab fa-imdb" },
-            { name: "mPhg", url: "https://yarrlists.net/movies-and-tv-shows", icon: "fas fa-film" },
+            { name: "YarrLists", url: "https://yarrlists.net/movies-and-tv-shows", icon: "fas fa-film" },
             { name: "FMHY", url: "https://fmhy.net/video", icon: "fas fa-clapperboard" }
         ];
-        this.customTiles = (JSON.parse(localStorage.getItem('sachin_custom_tiles')) || DEFAULT_TILES)
+        this.customTiles = (safeGet('sachin_custom_tiles', DEFAULT_TILES))
             .filter(t => !t.url.includes('twitch.tv') && !t.url.includes('crunchyroll.com'))
             .map(t => {
+                if (t.name === 'mPhg') t.name = 'YarrLists';
                 if (t.icon === 'fab fa-popcorn' || !t.icon) t.icon = 'fas fa-film';
                 return t;
             });
@@ -75,6 +100,7 @@ class VidLinkApp {
         this.initDailyWidgets();
         this.renderQuickTiles();
         this.initScratchpad();
+        this.initUrlParams();
         this.render();
     }
 
@@ -184,6 +210,14 @@ class VidLinkApp {
         this.sortSelect = document.getElementById('sortSelect');
         this.viewToggleBtn = document.getElementById('viewToggleBtn');
         this.pwaInstallBtn = document.getElementById('pwaInstallBtn');
+
+        // Mobile Bottom Nav Dock Elements
+        this.navAllBtn = document.getElementById('navAllBtn');
+        this.navMoviesBtn = document.getElementById('navMoviesBtn');
+        this.navSurpriseBtn = document.getElementById('navSurpriseBtn');
+        this.navNotesBtn = document.getElementById('navNotesBtn');
+        this.navSearchBtn = document.getElementById('navSearchBtn');
+        this.navScrollTopBtn = document.getElementById('navScrollTopBtn');
 
         this.searchCache = new Map();
         this.searchTimeout = null;
@@ -373,7 +407,7 @@ class VidLinkApp {
             });
         }
 
-        // Mobile Bottom Nav Dock
+        // Mobile Bottom Nav Dock Listeners
         if (this.navAllBtn) {
             this.navAllBtn.addEventListener('click', () => {
                 this.activeTag = 'all';
@@ -387,6 +421,12 @@ class VidLinkApp {
                 this.updateActiveNavPill('movie');
                 this.render();
             });
+        }
+        if (this.navSurpriseBtn) {
+            this.navSurpriseBtn.addEventListener('click', () => this.rollSurprisePick());
+        }
+        if (this.navNotesBtn) {
+            this.navNotesBtn.addEventListener('click', () => this.openScratchpad());
         }
         if (this.navSearchBtn) {
             this.navSearchBtn.addEventListener('click', () => {
@@ -414,10 +454,19 @@ class VidLinkApp {
             });
         }
 
-        // Close dropdown when clicking outside
+        // Close dropdown when clicking outside the search box
         document.addEventListener('click', (e) => {
-            if (this.searchDropdown && !e.target.closest('.add-section')) {
+            if (this.searchDropdown && !e.target.closest('.search-box-container')) {
                 this.searchDropdown.classList.add('hidden');
+            }
+        });
+
+        // Close modal when clicking directly on backdrop
+        [this.thumbModal, this.editModal, this.movieModal, this.surpriseModal, this.scratchpadModal, this.customTileModal, this.shortcutsModal].forEach(m => {
+            if (m) {
+                m.addEventListener('click', (e) => {
+                    if (e.target === m) this.hideModal(m);
+                });
             }
         });
 
@@ -593,6 +642,242 @@ class VidLinkApp {
         return t.trim() || title;
     }
 
+    sanitizeImageUrl(rawUrl, baseUrl) {
+        if (!rawUrl || typeof rawUrl !== 'string') return '';
+        let u = rawUrl.trim();
+        if (!u) return '';
+
+        // Unescape quotes, backslashes, and HTML entities
+        u = u.replace(/^['"]+|['"]+$/g, '')
+             .replace(/\\\//g, '/')
+             .replace(/&amp;/g, '&')
+             .replace(/&#38;/g, '&');
+
+        if (u.startsWith('//')) {
+            u = 'https:' + u;
+        }
+
+        try {
+            u = new URL(u, baseUrl).href;
+        } catch (e) {
+            return '';
+        }
+
+        if (!u.startsWith('http://') && !u.startsWith('https://') && !u.startsWith('data:image/')) {
+            return '';
+        }
+
+        // Clean tracking query params like utm_source, utm_medium, utm_campaign
+        try {
+            const parsed = new URL(u);
+            let cleaned = false;
+            ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term'].forEach(p => {
+                if (parsed.searchParams.has(p)) {
+                    parsed.searchParams.delete(p);
+                    cleaned = true;
+                }
+            });
+            if (cleaned) u = parsed.href;
+        } catch(e) {}
+
+        const lower = u.toLowerCase();
+
+        // Reject non-image web pages accidentally captured
+        if (/\.(html?|php|asp|aspx|jsp)(\?.*)?$/i.test(u) && !/\.(jpe?g|png|webp|gif|avif|svg)/i.test(u)) {
+            return '';
+        }
+        if (/youtube\.com\/watch|youtu\.be\/|vimeo\.com\/\d+$|reddit\.com\/r\//i.test(u)) {
+            return '';
+        }
+
+        // Reject tracking pixels and spacer images (without blocking soundtrack, tracker, etc.)
+        if (
+            lower.includes('1x1') ||
+            lower.includes('spacer') ||
+            lower.includes('blank.gif') ||
+            lower.includes('pixel') ||
+            lower.includes('cleardot') ||
+            lower.includes('beacon') ||
+            lower.includes('/s.gif') ||
+            lower.includes('ad.doubleclick') ||
+            /(?:^|\/|\?|&)tr(?:ack(?:ing)?)?\.(?:gif|png|jpe?g)/i.test(u)
+        ) {
+            return '';
+        }
+
+        return u;
+    }
+
+    extractImagesFromDoc(doc, baseUrl) {
+        if (!doc) return [];
+        const images = [];
+        const seen = new Set();
+
+        const addImg = (raw) => {
+            const clean = this.sanitizeImageUrl(raw, baseUrl);
+            if (clean && !seen.has(clean)) {
+                seen.add(clean);
+                images.push(clean);
+            }
+        };
+
+        // 1. Meta image tags (collect all occurrences)
+        const metaSelectors = [
+            'meta[property="og:image"]',
+            'meta[property="og:image:url"]',
+            'meta[property="og:image:secure_url"]',
+            'meta[name="og:image"]',
+            'meta[name="twitter:image"]',
+            'meta[name="twitter:image:src"]',
+            'meta[property="twitter:image"]',
+            'meta[itemprop="image"]',
+            'meta[name="image"]',
+            'meta[name="thumbnail"]',
+            'meta[name="sailthru.image"]',
+            'meta[name="parsely-image-url"]',
+            'meta[name="msapplication-TileImage"]'
+        ];
+
+        metaSelectors.forEach(sel => {
+            try {
+                doc.querySelectorAll(sel).forEach(el => {
+                    const c = el.getAttribute('content') || el.getAttribute('value');
+                    if (c) addImg(c);
+                });
+            } catch (e) {}
+        });
+
+        // 2. Link image / icon tags
+        const linkSelectors = [
+            'link[rel="image_src"]',
+            'link[rel="apple-touch-icon"]',
+            'link[rel="apple-touch-icon-precomposed"]',
+            'link[rel="fluid-icon"]',
+            'link[rel="icon"]',
+            'link[rel="shortcut icon"]'
+        ];
+        linkSelectors.forEach(sel => {
+            try {
+                doc.querySelectorAll(sel).forEach(el => {
+                    const h = el.getAttribute('href');
+                    if (h) addImg(h);
+                });
+            } catch (e) {}
+        });
+
+        // 3. JSON-LD scripts
+        try {
+            doc.querySelectorAll('script[type="application/ld+json"]').forEach(s => {
+                const text = s.textContent ? s.textContent.trim() : '';
+                if (!text) return;
+                try {
+                    const parsed = JSON.parse(text);
+                    this.extractImagesFromJsonLd(parsed, addImg);
+                } catch (e) {
+                    try {
+                        const sanitized = text.replace(/\\"/g, '"').replace(/[\r\n\t]/g, ' ');
+                        this.extractImagesFromJsonLd(JSON.parse(sanitized), addImg);
+                    } catch (err) {}
+                }
+            });
+        } catch (e) {}
+
+        // 4. Semantic / prominent page images
+        try {
+            const semanticSelectors = [
+                '[class*="poster"] img',
+                '[class*="cover"] img',
+                '[class*="thumb"] img',
+                '[class*="hero"] img',
+                '[class*="featured"] img',
+                '[class*="banner"] img',
+                '[id*="poster"] img',
+                '[id*="cover"] img',
+                'article img',
+                'main img',
+                'figure img'
+            ];
+            semanticSelectors.forEach(sel => {
+                doc.querySelectorAll(sel).forEach(img => {
+                    this.extractFromImgElement(img, addImg, baseUrl);
+                });
+            });
+
+            // 5. General img tags on the page (up to 25 candidates)
+            const allImgs = Array.from(doc.querySelectorAll('img'));
+            for (const img of allImgs) {
+                if (images.length >= 30) break;
+                this.extractFromImgElement(img, addImg, baseUrl);
+            }
+        } catch (e) {}
+
+        return images;
+    }
+
+    extractFromImgElement(img, addImg, baseUrl) {
+        if (!img) return;
+        const src = img.getAttribute('src');
+        const dataSrc = img.getAttribute('data-src') || img.getAttribute('data-original') || img.getAttribute('data-lazy-src') || img.getAttribute('data-high-res-src');
+        const srcset = img.getAttribute('srcset') || img.getAttribute('data-srcset');
+
+        if (dataSrc) addImg(dataSrc);
+        if (src && !src.startsWith('data:image/svg')) addImg(src);
+
+        if (srcset) {
+            try {
+                const parts = srcset.split(',').map(s => s.trim().split(/\s+/)[0]).filter(Boolean);
+                if (parts.length > 0) {
+                    addImg(parts[parts.length - 1]);
+                }
+            } catch (e) {}
+        }
+    }
+
+    extractImagesFromJsonLd(node, addImg) {
+        if (!node) return;
+        if (typeof node === 'string') {
+            if (node.startsWith('http') || /\.(jpe?g|png|webp|gif|avif)($|\?)/i.test(node)) {
+                addImg(node);
+            }
+            return;
+        }
+        if (Array.isArray(node)) {
+            node.forEach(item => this.extractImagesFromJsonLd(item, addImg));
+            return;
+        }
+        if (typeof node === 'object') {
+            const keys = ['image', 'images', 'thumbnailUrl', 'thumbnail', 'primaryImageOfPage', 'photo', 'photos', 'screenshot', 'logo', 'contentUrl', 'embedUrl', 'banner'];
+            for (const k of keys) {
+                if (node[k]) {
+                    if (typeof node[k] === 'string') addImg(node[k]);
+                    else if (Array.isArray(node[k])) this.extractImagesFromJsonLd(node[k], addImg);
+                    else if (typeof node[k] === 'object') {
+                        if (node[k].url) addImg(node[k].url);
+                        if (node[k].contentUrl) addImg(node[k].contentUrl);
+                    }
+                }
+            }
+            if (node['@graph']) {
+                this.extractImagesFromJsonLd(node['@graph'], addImg);
+            }
+        }
+    }
+
+    extractImagesFromMarkdown(text, addImg) {
+        if (!text || typeof text !== 'string') return;
+        // 1. Markdown syntax: ![alt](url)
+        const mdImgRegex = /!\[.*?\]\(\s*<?(https?:\/\/[^\s\)>"]+)>?/g;
+        let match;
+        while ((match = mdImgRegex.exec(text)) !== null) {
+            if (match[1]) addImg(match[1]);
+        }
+        // 2. Direct image URLs embedded in markdown text
+        const rawImgRegex = /https?:\/\/[^\s\)"'<>]+\.(?:jpe?g|png|webp|gif|avif)(?:\?[^\s\)"'<>]*)?/gi;
+        while ((match = rawImgRegex.exec(text)) !== null) {
+            if (match[0]) addImg(match[0]);
+        }
+    }
+
     async handleAddLink() {
         let url = this.urlInput ? this.urlInput.value.trim() : '';
         if (!url) return;
@@ -687,9 +972,10 @@ class VidLinkApp {
     }
 
     async fetchMetadata(url) {
+        const hostname = this.getHostname(url);
         let results = {
             title: url,
-            description: 'Fetching metadata...',
+            description: '',
             images: [],
             fallback: `https://s.wordpress.com/mshots/v1/${encodeURIComponent(url)}?w=1200`,
             url: url,
@@ -697,12 +983,34 @@ class VidLinkApp {
             isScreenshot: false
         };
 
-        const resolveUrl = (relative) => {
-            try { return new URL(relative, url).href; } catch (e) { return relative; }
+        const candidateImages = [];
+        const seenImages = new Set();
+        const addImage = (raw) => {
+            const clean = this.sanitizeImageUrl(raw, url);
+            if (clean && !seenImages.has(clean)) {
+                seenImages.add(clean);
+                candidateImages.push(clean);
+            }
         };
 
+        // 0. Direct Image URL
+        if (/\.(jpe?g|png|webp|gif|avif|svg)(\?.*)?$/i.test(url)) {
+            addImage(url);
+            try {
+                const pathname = new URL(url).pathname;
+                const filename = pathname.split('/').pop().replace(/\.[^/.]+$/, '');
+                results.title = decodeURIComponent(filename) || hostname;
+            } catch(e) {
+                results.title = hostname;
+            }
+            results.description = `Direct image link from ${hostname}`;
+            results.tags = ['image'];
+            results.images = candidateImages;
+            return results;
+        }
+
         // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        // 1. DEDICATED EXTRACTORS (Zero-CORS, Fast, High Precision)
+        // 1. DEDICATED EXTRACTORS (High Precision, Specialized Media)
         // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
         // A. YouTube (Videos, Shorts, Live, Music, Embeds)
@@ -715,52 +1023,95 @@ class VidLinkApp {
                     const data = await oembedRes.json();
                     if (data.title) results.title = this.cleanTitle(data.title, 'YouTube');
                     if (data.author_name) results.description = `YouTube Video by ${data.author_name}`;
+                    if (data.thumbnail_url) addImage(data.thumbnail_url);
                 }
             } catch (e) {}
 
-            results.images = [
-                `https://i.ytimg.com/vi/${vidId}/maxresdefault.jpg`,
-                `https://i.ytimg.com/vi/${vidId}/sddefault.jpg`,
-                `https://i.ytimg.com/vi/${vidId}/hqdefault.jpg`,
-                `https://i.ytimg.com/vi/${vidId}/mqdefault.jpg`
-            ];
+            addImage(`https://i.ytimg.com/vi/${vidId}/maxresdefault.jpg`);
+            addImage(`https://i.ytimg.com/vi/${vidId}/hqdefault.jpg`);
+            addImage(`https://i.ytimg.com/vi/${vidId}/sddefault.jpg`);
+            addImage(`https://i.ytimg.com/vi/${vidId}/mqdefault.jpg`);
+            addImage(`https://i.ytimg.com/vi/${vidId}/1.jpg`);
+            addImage(`https://i.ytimg.com/vi/${vidId}/2.jpg`);
+            addImage(`https://i.ytimg.com/vi/${vidId}/3.jpg`);
             results.tags = ['video', 'youtube'];
+            results.images = candidateImages;
             return results;
         }
 
-        // B. IMDb Movie/TV Series Direct JSONP Extractor
+        // B. IMDb Movie/TV Series Direct Cinemeta + JSONP Extractor
         const imdbMatch = url.match(/imdb\.com\/title\/(tt\d+)/i);
         if (imdbMatch && imdbMatch[1]) {
             const ttId = imdbMatch[1];
-            try {
-                const imdbData = await new Promise((resolve, reject) => {
-                    const callbackName = `imdb$${ttId}`;
-                    const script = document.createElement('script');
-                    script.src = `https://sg.media-imdb.com/suggests/${ttId.charAt(0)}/${ttId}.json`;
-                    script.async = true;
-                    const timer = setTimeout(() => { cleanup(); reject(new Error('IMDb timeout')); }, 4500);
-                    window[callbackName] = (data) => { cleanup(); resolve(data); };
-                    script.onerror = () => { cleanup(); reject(new Error('IMDb script error')); };
-                    function cleanup() {
-                        clearTimeout(timer);
-                        if (script.parentNode) script.parentNode.removeChild(script);
-                        delete window[callbackName];
-                    }
-                    document.head.appendChild(script);
-                });
+            results.tags = ['movie'];
 
-                if (imdbData?.d && imdbData.d.length > 0) {
-                    const item = imdbData.d[0];
-                    const year = item.y || item.tl || '';
-                    results.title = year ? `${item.l} (${year})` : item.l;
-                    results.description = item.s ? `Starring: ${item.s}` : 'IMDb Title';
-                    if (item.i && item.i[0]) results.images.push(item.i[0]);
-                    results.tags = ['movie'];
-                    return results;
+            // Cinemeta public Stremio API (fast, high-res posters, backdrop art, logo, trailers)
+            const cinemetaPromise = (async () => {
+                try {
+                    let res = await this.fetchWithTimeout(`https://v3-cinemeta.strem.io/meta/movie/${ttId}.json`, {}, 4500);
+                    let data = res.ok ? await res.json() : null;
+                    if (!data?.meta) {
+                        res = await this.fetchWithTimeout(`https://v3-cinemeta.strem.io/meta/series/${ttId}.json`, {}, 4500);
+                        data = res.ok ? await res.json() : null;
+                    }
+                    if (data?.meta) {
+                        const m = data.meta;
+                        if (m.name) results.title = m.year ? `${m.name} (${m.year})` : m.name;
+                        if (m.description) results.description = m.description;
+                        if (m.poster) addImage(m.poster);
+                        addImage(`https://images.metahub.space/poster/medium/${ttId}/img`);
+                        addImage(`https://images.metahub.space/poster/large/${ttId}/img`);
+                        if (m.background) addImage(m.background);
+                        if (m.logo) addImage(m.logo);
+                        if (Array.isArray(m.trailers)) {
+                            m.trailers.forEach(tr => {
+                                const yid = tr.source || tr.ytId;
+                                if (yid) addImage(`https://i.ytimg.com/vi/${yid}/hqdefault.jpg`);
+                            });
+                        }
+                        if (Array.isArray(m.genres)) {
+                            m.genres.forEach(g => {
+                                const gl = g.toLowerCase();
+                                if (!results.tags.includes(gl)) results.tags.push(gl);
+                            });
+                        }
+                    }
+                } catch (e) {}
+            })();
+
+            // IMDb JSONP Suggest Autosuggest API
+            const imdbJsonpPromise = new Promise((resolve) => {
+                const callbackName = `imdb$${ttId}`;
+                const script = document.createElement('script');
+                script.src = `https://sg.media-imdb.com/suggests/${ttId.charAt(0)}/${ttId}.json`;
+                script.async = true;
+                const timer = setTimeout(() => { cleanup(); resolve(); }, 4000);
+                window[callbackName] = (data) => {
+                    cleanup();
+                    if (data?.d && data.d.length > 0) {
+                        const item = data.d[0];
+                        if (!results.title || results.title === url) {
+                            const year = item.y || item.tl || '';
+                            results.title = year ? `${item.l} (${year})` : item.l;
+                        }
+                        if (!results.description) {
+                            results.description = item.s ? `Starring: ${item.s}` : 'IMDb Title';
+                        }
+                        if (item.i && item.i[0]) addImage(item.i[0]);
+                    }
+                    resolve();
+                };
+                script.onerror = () => { cleanup(); resolve(); };
+                function cleanup() {
+                    clearTimeout(timer);
+                    if (script.parentNode) script.parentNode.removeChild(script);
+                    delete window[callbackName];
                 }
-            } catch (e) {
-                console.warn('IMDb direct extract error:', e);
-            }
+                document.head.appendChild(script);
+            });
+
+            await Promise.allSettled([cinemetaPromise, imdbJsonpPromise]);
+            // Do NOT return early here: let Jina AI run below to fetch dozens of scene stills and photos!
         }
 
         // C. Spotify (Tracks, Albums, Playlists, Artists, Shows, Episodes)
@@ -771,9 +1122,8 @@ class VidLinkApp {
                     const data = await res.json();
                     if (data.title) results.title = this.cleanTitle(data.title, 'Spotify');
                     results.description = `${data.provider_name || 'Spotify'} • Music`;
-                    if (data.thumbnail_url) results.images.push(data.thumbnail_url);
+                    if (data.thumbnail_url) addImage(data.thumbnail_url);
                     results.tags = ['music', 'spotify'];
-                    return results;
                 }
             } catch (e) {}
         }
@@ -786,37 +1136,80 @@ class VidLinkApp {
                     const data = await res.json();
                     if (data.title) results.title = this.cleanTitle(data.title, 'SoundCloud');
                     results.description = data.description || (data.author_name ? `SoundCloud track by ${data.author_name}` : 'SoundCloud Audio');
-                    if (data.thumbnail_url) results.images.push(data.thumbnail_url);
+                    if (data.thumbnail_url) addImage(data.thumbnail_url);
                     results.tags = ['music', 'audio'];
-                    return results;
                 }
             } catch (e) {}
         }
 
-        // E. Wikipedia REST Summary API
+        // E. Reddit
+        if (/reddit\.com\/r\/|redd\.it\//i.test(url)) {
+            try {
+                results.tags = ['social', 'reddit'];
+                const oembedRes = await this.fetchWithTimeout(`https://www.reddit.com/oembed?url=${encodeURIComponent(url)}`, {}, 4000);
+                if (oembedRes.ok) {
+                    const data = await oembedRes.json();
+                    if (data.title) results.title = this.cleanTitle(data.title, 'Reddit');
+                    if (data.author_name) results.description = `Reddit post by ${data.author_name}`;
+                    if (data.thumbnail_url) addImage(data.thumbnail_url);
+                }
+            } catch (e) {}
+        }
+
+        // F. Vimeo
+        if (/vimeo\.com\/\d+/i.test(url)) {
+            try {
+                const res = await this.fetchWithTimeout(`https://vimeo.com/api/oembed.json?url=${encodeURIComponent(url)}`, {}, 4000);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.title) results.title = this.cleanTitle(data.title, 'Vimeo');
+                    if (data.description) results.description = data.description;
+                    if (data.thumbnail_url) addImage(data.thumbnail_url);
+                    if (data.thumbnail_url_with_play_button) addImage(data.thumbnail_url_with_play_button);
+                    results.tags = ['video', 'vimeo'];
+                }
+            } catch (e) {}
+        }
+
+        // G. Wikipedia REST Summary & Media-List API
         const wikiMatch = url.match(/([a-z]+)\.wikipedia\.org\/wiki\/([^?#]+)/i);
         if (wikiMatch) {
             const [, lang, pageSlug] = wikiMatch;
+            results.tags = ['wiki', 'article'];
             try {
                 const res = await this.fetchWithTimeout(`https://${lang}.wikipedia.org/api/rest_v1/page/summary/${pageSlug}`, {}, 4500);
                 if (res.ok) {
                     const data = await res.json();
                     if (data.title) results.title = data.title;
                     if (data.extract) results.description = data.extract;
-                    if (data.originalimage?.source) results.images.push(data.originalimage.source);
-                    if (data.thumbnail?.source) results.images.push(data.thumbnail.source);
-                    results.tags = ['wiki', 'article'];
-                    return results;
+                    if (data.originalimage?.source) addImage(data.originalimage.source);
+                    if (data.thumbnail?.source) addImage(data.thumbnail.source);
+                }
+            } catch (e) {}
+
+            try {
+                const mediaRes = await this.fetchWithTimeout(`https://${lang}.wikipedia.org/api/rest_v1/page/media-list/${pageSlug}`, {}, 4500);
+                if (mediaRes.ok) {
+                    const mediaData = await mediaRes.json();
+                    if (Array.isArray(mediaData.items)) {
+                        mediaData.items.forEach(item => {
+                            if (item.srcset && item.srcset.length > 0) {
+                                const highest = item.srcset[item.srcset.length - 1]?.src;
+                                if (highest) addImage(highest);
+                            }
+                        });
+                    }
                 }
             } catch (e) {}
         }
 
-        // F. GitHub Repositories
+        // H. GitHub Repositories
         const ghMatch = url.match(/github\.com\/([a-zA-Z0-9_-]+)\/([a-zA-Z0-9_.-]+)/i);
         if (ghMatch) {
             const [, owner, repo] = ghMatch;
             const cleanRepo = repo.replace(/\.git$/i, '');
-            results.images.push(`https://opengraph.githubassets.com/1/${owner}/${cleanRepo}`);
+            addImage(`https://opengraph.githubassets.com/1/${owner}/${cleanRepo}`);
+            addImage(`https://github.com/${owner}.png?size=400`);
             try {
                 const res = await this.fetchWithTimeout(`https://api.github.com/repos/${owner}/${cleanRepo}`, {
                     headers: { 'Accept': 'application/vnd.github.v3+json' }
@@ -825,109 +1218,139 @@ class VidLinkApp {
                     const data = await res.json();
                     results.title = data.full_name || `${owner}/${cleanRepo}`;
                     results.description = data.description || 'GitHub Repository';
-                    if (data.owner?.avatar_url) results.images.push(data.owner.avatar_url);
+                    if (data.owner?.avatar_url) addImage(data.owner.avatar_url);
                 }
             } catch (e) {}
             results.tags = ['code', 'github'];
-            return results;
         }
 
         // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        // 2. PARALLEL UNIVERSAL ENGINES (For Any Web Page)
+        // 2. PARALLEL UNIVERSAL ENGINES (Zero-Failure Multi-Proxy)
         // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-        // 1. Microlink Open Graph Engine
-        const microlinkPromise = this.fetchWithTimeout(`https://api.microlink.io/?url=${encodeURIComponent(url)}`, {}, 5000)
-            .then(res => res.json())
-            .then(data => {
-                if (data.status === 'success' && data.data) {
-                    const m = data.data;
-                    if (m.title && results.title === url) results.title = this.cleanTitle(m.title);
-                    if (m.description && (!results.description || results.description === 'Fetching metadata...')) {
-                        results.description = this.decodeHtml(m.description);
-                    }
-                    if (m.image?.url) results.images.push(m.image.url);
-                    if (m.logo?.url) results.images.push(m.logo.url);
-                }
-            }).catch(() => {});
-
-        // 2. Jina AI Fast Reader Engine
-        const jinaPromise = this.fetchWithTimeout(`https://r.jina.ai/${url}`, {
-            headers: { 'Accept': 'application/json' }
-        }, 5000)
-            .then(res => res.json())
-            .then(res => {
-                const data = res?.data;
-                if (data) {
-                    if (data.title && results.title === url) results.title = this.cleanTitle(data.title);
-                    if (data.description && (!results.description || results.description === 'Fetching metadata...')) {
-                        results.description = this.decodeHtml(data.description);
-                    }
-                }
-            }).catch(() => {});
-
-        // 3. NoEmbed Generic oEmbed Provider
-        const noembedPromise = this.fetchWithTimeout(`https://noembed.com/embed?url=${encodeURIComponent(url)}`, {}, 4000)
-            .then(res => res.json())
-            .then(data => {
-                if (data.title && results.title === url) results.title = this.cleanTitle(data.title);
-                if (data.author_name && (!results.description || results.description === 'Fetching metadata...')) {
-                    results.description = `By ${data.author_name}`;
-                }
-                if (data.thumbnail_url) results.images.push(data.thumbnail_url);
-            }).catch(() => {});
-
-        // 4. AllOrigins HTML Parser (Deep JSON-LD & OG tags)
-        const alloriginsPromise = this.fetchWithTimeout(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`, {}, 5000)
-            .then(res => res.json())
-            .then(data => {
-                if (!data?.contents) return;
-                const doc = new DOMParser().parseFromString(data.contents, 'text/html');
-                const getM = (s) => doc.querySelector(`meta[property="${s}"], meta[name="${s}"]`)?.getAttribute('content');
-
-                // JSON-LD Structured Data
-                try {
-                    const ldScripts = doc.querySelectorAll('script[type="application/ld+json"]');
-                    for (const s of ldScripts) {
-                        const parsed = JSON.parse(s.textContent.trim());
-                        const item = Array.isArray(parsed) ? parsed[0] : (parsed['@graph'] ? parsed['@graph'][0] : parsed);
-                        if (item) {
-                            const ldTitle = item.headline || item.name;
-                            const ldDesc = item.description;
-                            const ldImg = typeof item.image === 'string' ? item.image : (item.image?.url || item.thumbnailUrl);
-                            if (ldTitle && results.title === url) results.title = this.cleanTitle(ldTitle);
-                            if (ldDesc && (!results.description || results.description === 'Fetching metadata...')) {
-                                results.description = this.decodeHtml(ldDesc);
+        // Engine 1: Jina AI (Full Rendered HTML + Rich JSON Metadata & Markdown)
+        const jinaPromise = (async () => {
+            try {
+                const res = await this.fetchWithTimeout(`https://r.jina.ai/${url}`, {
+                    headers: { 'Accept': 'application/json' }
+                }, 7000);
+                
+                if (res.ok) {
+                    const contentType = res.headers.get('content-type') || '';
+                    if (contentType.includes('application/json')) {
+                        const json = await res.json();
+                        const data = json?.data;
+                        if (data) {
+                            if (data.title && (results.title === url || !results.title)) {
+                                results.title = this.cleanTitle(data.title);
                             }
-                            if (ldImg) results.images.push(resolveUrl(ldImg));
-                            if (results.title !== url) break;
+                            if (data.description && !results.description) {
+                                results.description = this.decodeHtml(data.description);
+                            }
+                            
+                            // Comprehensive extraction from metadata
+                            if (data.metadata && typeof data.metadata === 'object') {
+                                Object.entries(data.metadata).forEach(([k, v]) => {
+                                    if (/image|poster|thumb|logo|photo|banner|cover|avatar|art|tile|preview/i.test(k)) {
+                                        if (typeof v === 'string') addImage(v);
+                                        else if (Array.isArray(v)) v.forEach(item => typeof item === 'string' ? addImage(item) : (item?.url && addImage(item.url)));
+                                        else if (v && typeof v === 'object' && v.url) addImage(v.url);
+                                    }
+                                });
+                            }
+
+                            // Extract from external links / icons
+                            if (data.external && typeof data.external === 'object') {
+                                Object.values(data.external).forEach(extObj => {
+                                    if (extObj && typeof extObj === 'object') {
+                                        Object.keys(extObj).forEach(addImage);
+                                    }
+                                });
+                            }
+
+                            // Extract all images from page markdown content
+                            if (data.content) {
+                                this.extractImagesFromMarkdown(data.content, addImage);
+                            }
+
+                            // If data.html is returned, parse it with DOMParser as well
+                            if (data.html) {
+                                const doc = new DOMParser().parseFromString(data.html, 'text/html');
+                                this.extractImagesFromDoc(doc, url).forEach(addImage);
+                            }
+                        }
+                    } else {
+                        // Plain text markdown response
+                        const text = await res.text();
+                        if (text) {
+                            const titleMatch = text.match(/^Title:\s*(.+)$/m);
+                            if (titleMatch && (results.title === url || !results.title)) {
+                                results.title = this.cleanTitle(titleMatch[1]);
+                            }
+                            this.extractImagesFromMarkdown(text, addImage);
                         }
                     }
-                } catch(e) {}
-
-                const title = getM('og:title') || getM('twitter:title') || doc.querySelector('[itemprop="name"]')?.getAttribute('content') || doc.title;
-                if (title && results.title === url) results.title = this.cleanTitle(title);
-
-                const desc = getM('og:description') || getM('twitter:description') || doc.querySelector('[itemprop="description"]')?.getAttribute('content') || getM('description');
-                if (desc && (!results.description || results.description === 'Fetching metadata...')) {
-                    results.description = this.decodeHtml(desc);
                 }
+            } catch (e) {
+                // Engine 1 Fallback: direct text fetch if JSON request was rejected
+                try {
+                    const textRes = await this.fetchWithTimeout(`https://r.jina.ai/${url}`, {}, 5000);
+                    if (textRes.ok) {
+                        const text = await textRes.text();
+                        if (text) {
+                            const titleMatch = text.match(/^Title:\s*(.+)$/m);
+                            if (titleMatch && (results.title === url || !results.title)) {
+                                results.title = this.cleanTitle(titleMatch[1]);
+                            }
+                            this.extractImagesFromMarkdown(text, addImage);
+                        }
+                    }
+                } catch (err) {}
+            }
+        })();
 
-                const og = getM('og:image:secure_url') || getM('og:image') || getM('twitter:image') || getM('twitter:image:src') || doc.querySelector('[itemprop="image"]')?.getAttribute('content');
-                if (og) results.images.push(resolveUrl(og));
+        // Engine 2: Microlink API (OpenGraph snapshot engine)
+        const microlinkPromise = (async () => {
+            try {
+                const res = await this.fetchWithTimeout(`https://api.microlink.io/?url=${encodeURIComponent(url)}`, {}, 3500);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data?.status === 'success' && data.data) {
+                        const m = data.data;
+                        if (m.title && (results.title === url || !results.title)) results.title = this.cleanTitle(m.title);
+                        if (m.description && !results.description) results.description = this.decodeHtml(m.description);
+                        if (m.image?.url) addImage(m.image.url);
+                        if (Array.isArray(m.images)) {
+                            m.images.forEach(img => {
+                                if (typeof img === 'string') addImage(img);
+                                else if (img?.url) addImage(img.url);
+                            });
+                        }
+                        if (m.logo?.url) addImage(m.logo.url);
+                    }
+                }
+            } catch (e) {}
+        })();
 
-                ['apple-touch-icon', 'icon', 'shortcut icon'].forEach(rel => {
-                    const href = doc.querySelector(`link[rel="${rel}"]`)?.getAttribute('href');
-                    if (href) results.images.push(resolveUrl(href));
-                });
-            }).catch(() => {});
+        // Engine 3: NoEmbed Generic oEmbed Provider
+        const noembedPromise = (async () => {
+            try {
+                const res = await this.fetchWithTimeout(`https://noembed.com/embed?url=${encodeURIComponent(url)}`, {}, 3500);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.title && (results.title === url || !results.title)) results.title = this.cleanTitle(data.title);
+                    if (data.author_name && !results.description) results.description = `By ${data.author_name}`;
+                    if (data.thumbnail_url) addImage(data.thumbnail_url);
+                }
+            } catch (e) {}
+        })();
 
-        await Promise.allSettled([microlinkPromise, jinaPromise, noembedPromise, alloriginsPromise]);
+        await Promise.allSettled([jinaPromise, microlinkPromise, noembedPromise]);
 
         // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         // 3. SMART AUTOMATIC CATEGORY TAGS
         // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        const host = this.getHostname(url).toLowerCase();
+        const host = hostname.toLowerCase();
         if (host.includes('netflix') || host.includes('primevideo') || host.includes('hotstar') || host.includes('sonyliv') || host.includes('zee5') || host.includes('hulu') || host.includes('disney')) {
             results.tags.push('movie', 'streaming');
         } else if (host.includes('youtube') || host.includes('vimeo') || host.includes('dailymotion') || host.includes('tiktok') || host.includes('twitch')) {
@@ -944,7 +1367,7 @@ class VidLinkApp {
         results.tags = [...new Set(results.tags.filter(Boolean))];
 
         // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        // 4. CLEANUP & FALLBACKS
+        // 4. CLEANUP & GUARANTEED IMAGE FALLBACKS
         // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         if (!results.title || results.title === url) {
             try {
@@ -953,30 +1376,57 @@ class VidLinkApp {
         }
 
         if (!results.description || results.description === 'Fetching metadata...') {
-            results.description = `Saved link from ${this.getHostname(url)}`;
+            results.description = `Saved link from ${hostname}`;
         }
 
-        // Add Google S2 HD Favicon and DuckDuckGo Favicon as fallback icon options
+        // Always add high-res Favicons as reliable candidates
         try {
             const u = new URL(url);
-            results.images.push(`https://www.google.com/s2/favicons?sz=128&domain=${u.hostname}`);
-            results.images.push(`https://icons.duckduckgo.com/ip3/${u.hostname}.ico`);
+            addImage(`https://www.google.com/s2/favicons?sz=256&domain=${u.hostname}`);
+            addImage(`https://icons.duckduckgo.com/ip3/${u.hostname}.ico`);
         } catch(e) {}
 
-        // Deduplicate and filter images
-        results.images = [...new Set(results.images.filter(Boolean))];
+        results.images = candidateImages;
 
+        // Guaranteed fallback if zero images survived
         if (results.images.length === 0) {
-            results.images = [results.fallback];
+            results.images = [
+                `https://www.google.com/s2/favicons?sz=256&domain=${hostname}`,
+                results.fallback
+            ];
             results.isScreenshot = true;
         }
 
         return results;
     }
 
+    updateThumbCount() {
+        if (!this.thumbPicker || !this.thumbStatus) return;
+        const count = this.thumbPicker.querySelectorAll('.thumb-option').length;
+        const firstImg = this.thumbPicker.querySelector('.thumb-option img')?.src || '';
+        const isScreenshotOnly = this.currentMetadata?.isScreenshot || (count === 1 && firstImg.includes('mshots'));
+
+        if (isScreenshotOnly) {
+            this.thumbStatus.innerText = "Screenshot Cover";
+            this.thumbStatus.style.color = "#e50914";
+        } else {
+            this.thumbStatus.innerText = `Select cover image (${count} available):`;
+            this.thumbStatus.style.color = "#ccc";
+        }
+    }
+
     showThumbPicker(images, overrideFB) {
         this.thumbPicker.innerHTML = '';
-        const allImages = overrideFB ? [overrideFB] : images;
+        let allImages = (overrideFB ? [overrideFB] : (images || [])).filter(Boolean);
+
+        if (allImages.length === 0) {
+            const host = this.getHostname(this.currentUrl);
+            allImages = [
+                `https://www.google.com/s2/favicons?sz=256&domain=${host}`,
+                `https://s.wordpress.com/mshots/v1/${encodeURIComponent(this.currentUrl)}?w=1200`
+            ];
+        }
+
         const isScreenshotOnly = this.currentMetadata?.isScreenshot || (allImages.length === 1 && allImages[0].includes('mshots'));
 
         if (this.thumbMetaPreview) {
@@ -993,14 +1443,14 @@ class VidLinkApp {
             this.thumbStatus.innerText = "Screenshot Cover";
             this.thumbStatus.style.color = "#e50914";
         } else {
-            this.thumbStatus.innerText = "Select cover image:";
+            this.thumbStatus.innerText = `Select cover image (${allImages.length} available):`;
             this.thumbStatus.style.color = "#ccc";
         }
 
         allImages.forEach((img, index) => {
             const div = document.createElement('div');
             div.className = 'thumb-option' + (index === 0 ? ' selected' : '');
-            div.innerHTML = `<img src="${img}" loading="lazy">`;
+            div.innerHTML = `<img src="${img}" referrerpolicy="no-referrer">`;
             
             const imgEl = div.querySelector('img');
             imgEl.onerror = () => {
@@ -1008,13 +1458,28 @@ class VidLinkApp {
                     imgEl.src = img.replace('maxresdefault.jpg', 'hqdefault.jpg');
                     return;
                 }
+                if (img.includes('hqdefault.jpg')) {
+                    imgEl.src = img.replace('hqdefault.jpg', 'mqdefault.jpg');
+                    return;
+                }
                 div.remove();
-                if (!this.selectedThumb || this.selectedThumb === img) {
-                    const next = this.thumbPicker.querySelector('.thumb-option');
-                    if (next) {
-                        next.classList.add('selected');
-                        this.selectedThumb = next.querySelector('img')?.src || '';
+                this.updateThumbCount();
+                const remaining = this.thumbPicker.querySelectorAll('.thumb-option');
+                if (remaining.length > 0) {
+                    if (!this.thumbPicker.querySelector('.thumb-option.selected')) {
+                        remaining[0].classList.add('selected');
+                        const nextSrc = remaining[0].querySelector('img')?.src;
+                        if (nextSrc) this.selectedThumb = nextSrc;
                     }
+                } else {
+                    const host = this.getHostname(this.currentUrl);
+                    const fb = `https://www.google.com/s2/favicons?sz=256&domain=${host}`;
+                    const fbDiv = document.createElement('div');
+                    fbDiv.className = 'thumb-option selected';
+                    fbDiv.innerHTML = `<img src="${fb}" referrerpolicy="no-referrer">`;
+                    this.thumbPicker.appendChild(fbDiv);
+                    this.selectedThumb = fb;
+                    this.updateThumbCount();
                 }
             };
 
@@ -1027,11 +1492,23 @@ class VidLinkApp {
         });
 
         this.selectedThumb = allImages[0] || '';
+        this.updateThumbCount();
         this.showModal(this.thumbModal);
     }
 
     confirmThumbnail() {
-        this.saveLink(this.selectedThumb, this.currentMetadata.title, this.currentMetadata.description, [...this.currentLinkTags]);
+        if (!this.selectedThumb) {
+            const firstImg = this.thumbPicker.querySelector('.thumb-option img');
+            if (firstImg && firstImg.src) {
+                this.selectedThumb = firstImg.src;
+            } else {
+                const host = this.getHostname(this.currentUrl);
+                this.selectedThumb = `https://www.google.com/s2/favicons?sz=256&domain=${host}`;
+            }
+        }
+        const title = this.currentMetadata?.title || this.cleanTitle(this.currentUrl) || this.currentUrl;
+        const desc = this.currentMetadata?.description || `Saved link from ${this.getHostname(this.currentUrl)}`;
+        this.saveLink(this.selectedThumb, title, desc, [...this.currentLinkTags]);
         this.hideModal(this.thumbModal);
     }
 
@@ -1059,15 +1536,17 @@ class VidLinkApp {
     }
 
     renderEditThumbPicker(images) {
-        const unique = [...new Set([...(images || []), this.selectedThumb])];
-        this.editThumbPicker.innerHTML = unique.map(img => {
-            const escapedImg = img.replace(/'/g, "\\'");
-            return `
-                <div class="thumb-option ${img === this.selectedThumb ? 'selected' : ''}" onclick="window.vidLinkApp.selectEditThumb('${escapedImg}')">
-                    <img src="${img}">
-                </div>
-            `;
-        }).join('');
+        const unique = [...new Set([...(images || []), this.selectedThumb].filter(Boolean))];
+        this.editThumbPicker.innerHTML = '';
+        unique.forEach(img => {
+            const div = document.createElement('div');
+            div.className = 'thumb-option' + (img === this.selectedThumb ? ' selected' : '');
+            div.innerHTML = `<img src="${img}" referrerpolicy="no-referrer">`;
+            div.onclick = () => this.selectEditThumb(img);
+            const imgEl = div.querySelector('img');
+            imgEl.onerror = () => div.remove();
+            this.editThumbPicker.appendChild(div);
+        });
     }
 
     selectEditThumb(img) {
@@ -1107,15 +1586,25 @@ class VidLinkApp {
     }
 
     removeLink(id) {
+        const item = this.links.find(l => l.id === id);
+        const name = item ? `"${item.title}"` : 'this link';
+        if (!confirm(`Are you sure you want to delete ${name}?`)) return;
         this.links = this.links.filter(l => l.id !== id);
         this.updateStorage();
         this.render();
-        this.showToast('Deleted', 'success');
+        this.showToast('Item deleted', 'info');
     }
 
     updateStorage() { localStorage.setItem('vidlinks', JSON.stringify(this.links)); }
     showModal(m) { if (m) m.classList.remove('hidden'); }
-    hideModal(m) { if (m) m.classList.add('hidden'); }
+    hideModal(m) {
+        if (!m) return;
+        m.classList.add('hidden');
+        if (m === this.movieModal) {
+            if (this.movieTrailerIframe) this.movieTrailerIframe.src = '';
+            if (this.movieTrailerWrap) this.movieTrailerWrap.classList.add('hidden');
+        }
+    }
 
     showToast(message, type = 'success') {
         const container = document.getElementById('toast-container');
@@ -1308,13 +1797,16 @@ class VidLinkApp {
                     <p class="empty-sub">${isFiltering ? 'Try searching different keywords or switching category tabs.' : 'Paste any URL or search above to save movies & links.'}</p>
                     ${!isFiltering ? `
                     <div class="empty-starter-chips">
-                        <button class="starter-chip" onclick="window.vidLinkApp.addDemoItem('https://www.netflix.com', 'Netflix Streaming Hub', ['streaming', 'movie'])"><i class="fas fa-play"></i> + Netflix</button>
-                        <button class="starter-chip" onclick="window.vidLinkApp.addDemoItem('https://www.imdb.com/chart/top/', 'IMDb Top 250 Movies', ['movie'])"><i class="fas fa-film"></i> + Top 250 Movies</button>
-                        <button class="starter-chip" onclick="window.vidLinkApp.addDemoItem('https://music.youtube.com', 'YouTube Music Hub', ['music'])"><i class="fas fa-music"></i> + YT Music</button>
+                        <button class="starter-chip" onclick="window.vidLinkApp.addDemoItem('https://www.netflix.com', 'Netflix Streaming Hub', ['streaming', 'movie'], 'https://assets.nflxext.com/ffe/siteui/vlv3/9d3533b2-0e2b-40b2-95e0-ecd7979cc88b/a3873901-5b7f-44bc-b959-122340229fda/US-en-20240311-popsignuptwoweeks-perspective_alpha_website_large.jpg')"><i class="fas fa-play"></i> + Netflix</button>
+                        <button class="starter-chip" onclick="window.vidLinkApp.addDemoItem('https://www.imdb.com/title/tt0111161/', 'The Shawshank Redemption (1994)', ['movie', 'drama'], 'https://m.media-amazon.com/images/M/MV5BMDFkYTc0MGEtZmNhMC00ZDIzLWFmNTEtODM1ZmRlYWMwMWFmXkEyXkFqcGdeQXVyMTMxODk2OTU@._V1_FMjpg_UX1000_.jpg')"><i class="fas fa-film"></i> + Shawshank Redemption</button>
+                        <button class="starter-chip" onclick="window.vidLinkApp.addDemoItem('https://www.imdb.com/title/tt1375666/', 'Inception (2010)', ['movie', 'sci-fi'], 'https://m.media-amazon.com/images/M/MV5BMjAxMzY3NjcxNF5BMl5BanBnXkFtZTcwNTI5OTM0Mw@@._V1_FMjpg_UX1000_.jpg')"><i class="fas fa-star" style="color: #f5c518;"></i> + Inception</button>
+                        <button class="starter-chip" onclick="window.vidLinkApp.addDemoItem('https://music.youtube.com', 'YouTube Music Hub', ['music'], 'https://lh3.googleusercontent.com/pw/AP1GczOsqq0vP83s4gP40c5fGffZ3J87E6dFvG1N3_l68Xw_xK3pEaWzK8f9=w1200-h630-p')"><i class="fas fa-music"></i> + YT Music</button>
                     </div>` : ''}
                 </div>`;
             return;
         }
+
+        const safeStr = (s) => String(s || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, ' ');
 
         this.linkGrid.innerHTML = filtered.map(l => {
             const tags = Array.isArray(l.tags) ? l.tags : (Array.isArray(l.actors) ? l.actors : (l.category ? [l.category] : []));
@@ -1324,13 +1816,14 @@ class VidLinkApp {
             const isMovie = tags.includes('movie') || (l.url && l.url.includes('imdb.com/title/'));
             const isFav = !!l.isFavorite;
             const isWatched = !!l.isWatched;
-            const escapedTitle = (l.title || 'Screen View').replace(/'/g, "\\'");
-            const escapedThumb = (l.thumb || '').replace(/'/g, "\\'");
+            const escapedTitle = safeStr(l.title || 'Screen View');
+            const escapedThumb = safeStr(l.thumb || '');
+            const escapedUrl = safeStr(l.url || '');
 
             return `
             <div class="card ${isMovie ? 'card-movie-vertical' : ''} ${isFav ? 'is-favorite' : ''} ${isWatched ? 'is-watched' : ''}" data-id="${l.id}">
-                <div class="card-img-wrapper" onclick="window.open('${l.url}', '_blank')">
-                    <img src="${l.thumb}" class="card-img" loading="lazy" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=&quot;http://www.w3.org/2000/svg&quot; width=&quot;400&quot; height=&quot;225&quot; viewBox=&quot;0 0 400 225&quot;><rect width=&quot;400&quot; height=&quot;225&quot; fill=&quot;%231a1a1a&quot;/><text x=&quot;50%&quot; y=&quot;50%&quot; dominant-baseline=&quot;middle&quot; text-anchor=&quot;middle&quot; fill=&quot;%23888&quot; font-family=&quot;sans-serif&quot; font-size=&quot;14&quot;>No Image</text></svg>'">
+                <div class="card-img-wrapper" onclick="window.open('${escapedUrl}', '_blank')">
+                    <img src="${l.thumb}" class="card-img" loading="lazy" referrerpolicy="no-referrer" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=&quot;http://www.w3.org/2000/svg&quot; width=&quot;400&quot; height=&quot;225&quot; viewBox=&quot;0 0 400 225&quot;><rect width=&quot;400&quot; height=&quot;225&quot; fill=&quot;%231a1a1a&quot;/><text x=&quot;50%&quot; y=&quot;50%&quot; dominant-baseline=&quot;middle&quot; text-anchor=&quot;middle&quot; fill=&quot;%23888&quot; font-family=&quot;sans-serif&quot; font-size=&quot;14&quot;>No Image</text></svg>'">
                     <div class="card-top-badges">
                         ${isMovie ? `<span class="badge-tag badge-movie"><i class="fab fa-imdb"></i> MOVIE</span>` : ''}
                         ${isFav ? `<span class="badge-tag badge-starred"><i class="fas fa-star"></i></span>` : ''}
@@ -1339,20 +1832,20 @@ class VidLinkApp {
                 </div>
                 <div class="card-content">
                     <div class="card-header-row">
-                        <img src="${favicon}" class="channel-avatar" onerror="this.src='https://via.placeholder.com/64?text=L'">
+                        <img src="${favicon}" class="channel-avatar" referrerpolicy="no-referrer" onerror="this.src='https://www.google.com/s2/favicons?sz=64&domain=${hostname}'">
                         <div class="card-text-col">
-                            <h3 class="card-title" onclick="window.open('${l.url}', '_blank')" title="${l.title}">${l.title}</h3>
+                            <h3 class="card-title" onclick="window.open('${escapedUrl}', '_blank')" title="${escapedTitle}">${l.title}</h3>
                             <div class="card-metadata">
                                 <span class="channel-name" title="${hostname}">${hostname}</span>
                                 <span class="metadata-separator">•</span>
                                 <span class="upload-date">${relativeTime}</span>
                             </div>
-                            <p class="card-desc">${l.desc}</p>
+                            <p class="card-desc">${l.desc || ''}</p>
                             <div class="card-tag-tags">
-                                ${tags.map(t => `<span class="card-tag-tag">${t}</span>`).join('')}
+                                ${tags.map(t => `<span class="card-tag-tag" onclick="event.stopPropagation(); window.vidLinkApp.filterByTag('${safeStr(t)}')" title="Filter by tag: ${t}">${t}</span>`).join('')}
                             </div>
                             <div class="card-actions">
-                                <button class="btn open-btn" onclick="window.open('${l.url}', '_blank')" title="Open">
+                                <button class="btn open-btn" onclick="window.open('${escapedUrl}', '_blank')" title="Open Link">
                                     Open
                                 </button>
                                 <button class="btn default-btn icon-only btn-fav ${isFav ? 'active' : ''}" onclick="window.vidLinkApp.toggleFavorite('${l.id}')" title="${isFav ? 'Unstar' : 'Star / Pin to Top'}">
@@ -1368,7 +1861,7 @@ class VidLinkApp {
                                 <button class="btn default-btn icon-only" onclick="window.vidLinkApp.openLightbox('${escapedThumb}', '${escapedTitle}')" title="Fit to Screen Lightbox">
                                     <i class="fas fa-expand"></i>
                                 </button>
-                                <button class="btn default-btn icon-only" onclick="window.vidLinkApp.copyLink('${l.url}')" title="Copy URL">
+                                <button class="btn default-btn icon-only" onclick="window.vidLinkApp.copyLink('${escapedUrl}')" title="Copy URL">
                                     <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="2" fill="none"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
                                 </button>
                                 <button class="btn default-btn icon-only" onclick="window.vidLinkApp.editLink('${l.id}')" title="Edit">
@@ -1385,6 +1878,13 @@ class VidLinkApp {
         `;}).join('');
     }
 
+    filterByTag(tag) {
+        this.activeTag = tag;
+        this.updateActiveNavPill(tag);
+        this.render();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
     updateTagBar() {
         const allTags = this.links.flatMap(l => Array.isArray(l.tags) ? l.tags : (Array.isArray(l.actors) ? l.actors : (l.category ? [l.category] : [])));
         const uniqueTags = [...new Set(allTags)].filter(t => t && t !== 'movie').sort();
@@ -1398,13 +1898,14 @@ class VidLinkApp {
             ...uniqueTags.map(tag => `<button class="cat-pill ${this.activeTag === tag ? 'active' : ''}" data-tag="${tag}">${tag}</button>`)
         ].join('');
         
-        if (this.tagFilter.innerHTML !== html) {
+        if (this.tagFilter && this.tagFilter.innerHTML !== html) {
             this.tagFilter.innerHTML = html;
         }
     }
 
     handleAddFormTag(formType) {
         const input = formType === 'add' ? this.addTagsInput : this.editTagsInput;
+        if (!input) return;
         const name = input.value.trim();
         if (name) {
             const names = name.split(',').map(n => n.trim()).filter(Boolean);
@@ -1573,25 +2074,42 @@ class VidLinkApp {
         }
     }
 
-    async fetchTrailerId(title, year) {
+    async fetchTrailerId(title, year, imdbId) {
+        // 1. Try Cinemeta API if IMDb ID is available
+        if (imdbId) {
+            try {
+                const res = await this.fetchWithTimeout(`https://v3-cinemeta.strem.io/meta/movie/${imdbId}.json`, {}, 3000);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (Array.isArray(data?.meta?.trailers) && data.meta.trailers.length > 0) {
+                        const tr = data.meta.trailers[0];
+                        const yid = tr.source || tr.ytId;
+                        if (yid) return yid;
+                    }
+                }
+            } catch (e) {}
+        }
+
+        // 2. Try scraping via allorigins proxy
         try {
             const query = `${title} ${year || ''} official trailer`;
             const url = `https://api.allorigins.win/get?url=${encodeURIComponent('https://www.youtube.com/results?search_query=' + encodeURIComponent(query))}`;
-            const response = await fetch(url);
-            if (!response.ok) return null;
-            const data = await response.json();
-            const html = data.contents;
-            const regex = /\/watch\?v=([a-zA-Z0-9_-]{11})/g;
-            let match;
-            const ids = [];
-            while ((match = regex.exec(html)) !== null) {
-                ids.push(match[1]);
+            const response = await this.fetchWithTimeout(url, {}, 4000);
+            if (response.ok) {
+                const data = await response.json();
+                const html = data.contents;
+                const regex = /\/watch\?v=([a-zA-Z0-9_-]{11})/g;
+                let match;
+                const ids = [];
+                while ((match = regex.exec(html)) !== null) {
+                    ids.push(match[1]);
+                }
+                const uniqueIds = [...new Set(ids)];
+                if (uniqueIds.length > 0) return uniqueIds[0];
             }
-            const uniqueIds = [...new Set(ids)];
-            return uniqueIds.length > 0 ? uniqueIds[0] : null;
-        } catch (e) {
-            return null;
-        }
+        } catch (e) {}
+
+        return null;
     }
 
     openMovieDetails(movie) {
@@ -1618,7 +2136,9 @@ class VidLinkApp {
                     title: `${movie.title} (${movie.year})`,
                     desc: `Starring: ${movie.actors}`,
                     tags: ['movie'],
-                    date: Date.now()
+                    date: Date.now(),
+                    isFavorite: false,
+                    isWatched: false
                 };
                 this.links.unshift(link);
                 this.updateStorage();
@@ -1628,13 +2148,17 @@ class VidLinkApp {
             this.hideModal(this.movieModal);
         };
 
-        // Fetch Official YouTube HD Trailer
+        // Fetch Official YouTube HD Trailer with zero-failure fallback
         if (this.movieTrailerWrap && this.movieTrailerIframe) {
             this.movieTrailerWrap.classList.add('hidden');
             this.movieTrailerIframe.src = '';
-            this.fetchTrailerId(movie.title, movie.year).then(vidId => {
+            this.fetchTrailerId(movie.title, movie.year, movie.imdbId).then(vidId => {
                 if (vidId) {
-                    this.movieTrailerIframe.src = `https://www.youtube.com/embed/${vidId}?autoplay=0&rel=0`;
+                    this.movieTrailerIframe.src = `https://www.youtube-nocookie.com/embed/${vidId}?autoplay=0&rel=0`;
+                    this.movieTrailerWrap.classList.remove('hidden');
+                } else {
+                    const fallbackSearch = `https://www.youtube-nocookie.com/embed?listType=search&list=${encodeURIComponent(movie.title + ' ' + (movie.year || '') + ' official trailer')}`;
+                    this.movieTrailerIframe.src = fallbackSearch;
                     this.movieTrailerWrap.classList.remove('hidden');
                 }
             });
@@ -1656,7 +2180,7 @@ class VidLinkApp {
         }
     }
 
-    addDemoItem(url, title, tags = ['movie']) {
+    addDemoItem(url, title, tags = ['movie'], thumb = 'icon.svg') {
         const existing = this.links.find(l => l.url === url);
         if (existing) {
             this.showToast('Already in your watchlist', 'info');
@@ -1665,11 +2189,13 @@ class VidLinkApp {
         const item = {
             id: 'l_' + Date.now(),
             url: url,
-            thumb: 'icon.svg',
+            thumb: thumb || 'icon.svg',
             title: title,
             desc: `Quick launch link for ${title}`,
             tags: tags,
-            date: Date.now()
+            date: Date.now(),
+            isFavorite: false,
+            isWatched: false
         };
         this.links.unshift(item);
         this.updateStorage();
@@ -1680,8 +2206,10 @@ class VidLinkApp {
     async quickTrailer(title) {
         this.showToast(`Finding trailer for "${title}"...`, 'info');
         const vidId = await this.fetchTrailerId(title);
-        if (vidId && this.movieTrailerWrap && this.movieTrailerIframe) {
-            this.movieTrailerIframe.src = `https://www.youtube.com/embed/${vidId}?autoplay=1&rel=0`;
+        if (this.movieTrailerWrap && this.movieTrailerIframe) {
+            this.movieTrailerIframe.src = vidId 
+                ? `https://www.youtube-nocookie.com/embed/${vidId}?autoplay=1&rel=0`
+                : `https://www.youtube-nocookie.com/embed?listType=search&list=${encodeURIComponent(title + ' official trailer')}&autoplay=1`;
             this.movieTrailerWrap.classList.remove('hidden');
             if (this.movieModalTitle) this.movieModalTitle.textContent = title;
             if (this.movieModalPoster) this.movieModalPoster.src = 'icon.svg';
@@ -1894,6 +2422,34 @@ class VidLinkApp {
         const words = text ? text.split(/\s+/).length : 0;
         const chars = text.length;
         this.scratchpadStats.textContent = `${words} words · ${chars} chars`;
+    }
+
+    initUrlParams() {
+        try {
+            const params = new URLSearchParams(window.location.search);
+            const action = params.get('action');
+            const filter = params.get('filter');
+            const sharedUrl = params.get('url') || params.get('text');
+
+            if (filter) {
+                this.activeTag = filter;
+                this.updateActiveNavPill(filter);
+            }
+
+            if (sharedUrl && this.isUrl(sharedUrl)) {
+                if (this.searchInput) this.searchInput.value = sharedUrl;
+                setTimeout(() => this.handleAddLink(), 300);
+            } else if (action === 'search') {
+                setTimeout(() => {
+                    if (this.searchInput) {
+                        this.searchInput.focus();
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }
+                }, 200);
+            }
+        } catch (e) {
+            console.error('URL params init error:', e);
+        }
     }
 
     openShortcuts() {
